@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import re
+import unicodedata
 
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/gif", "image/webp")
 
@@ -105,7 +106,8 @@ def reflow(data: dict) -> str:
 # OCR's usual misreadings around what veil looks for: an email with a comma, a colon or spaces for its dots
 # ("john:smith@example. com"), a house number with a period after it ("5678. Elm Street"), a period for the
 # space before a unit ("Plains.Apt. 519"), and a stray opening quote glued to a word ("1331\u2018James").
-_DOTS = r"(?:[ ]?\.[ ]?|[,:](?=[\w+-]))"   # a dot with spaces round it, or a comma or a colon for one
+# a dot with spaces round it, or a comma or a colon for one, or a dot and a comma both ("mobilemoney,.com")
+_DOTS = r"(?:[ ]?\.[ ]?|[,:]\.?(?=[\w+-])|\.[,:](?=\w))"
 _BROKEN_EMAIL = re.compile(rf"(?<![\w.@])([\w+-]+(?:{_DOTS}[\w+-]+)*)[ ]?@[ ]?([\w-]+(?:{_DOTS}[\w-]+)*{_DOTS}[A-Za-z]{{2,6}})"
                            r"(?![\w@])")
 
@@ -244,12 +246,22 @@ def _tidy_names(text: str) -> str:
                   lambda m: m.group(1) + " " if given(m.group(1)) and name_next(m) else m.group(), text)
 
 
+def _unaccent(text: str) -> str:
+    """An email's letters without the accents OCR puts on them ("mobilem\u00e9ney")."""
+    return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
+
+
 def _tidy(text: str) -> str:
     def email(m: re.Match) -> str:
-        return f"{re.sub(_DOTS, '.', m.group(1))}@{re.sub(_DOTS, '.', m.group(2))}"
+        domain = re.sub(r"\.c(?:orn|orm|om[nr])$", ".com", re.sub(_DOTS, ".", m.group(2)))   # .corn: rn for m
+        return _unaccent(f"{re.sub(_DOTS, '.', m.group(1))}@{domain}")
 
     text = _tidy_labels(text)
     text = _BROKEN_EMAIL.sub(email, text)
+    # 67.240. Nolan Junction: a street's number with a dot in it
+    text = re.sub(rf"(?<![\w.,$])(\d{{1,3}})\.(\d{{3}})\.?[ ]?(?=(?:[A-Z][\w'-]+[ ]){{1,3}}(?:{'|'.join(_SUFFIXES)})\b)",
+                  r"\1\2 ", text)
+    text = re.sub(r"(?<=\w),[:;.][ ]?(?=[A-Z0-9])", ", ", text)                              # Anytown,:AB
     text = re.sub(r"(?<![\w.,$])(\d{3,6})\.[ ]?(?=[A-Z][a-z])", r"\1 ", text)
     text = re.sub(r"(?<![\w.,$])(\d{1,2})\.[ ]?(?=[A-Z][a-z]+ (?:Street|St|Road|Avenue|Lane|Drive|Way|Place|Court)\b)",
                   r"\1 ", text)                                                            # 43. High Street
