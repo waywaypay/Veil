@@ -64,6 +64,8 @@ def main(given_csv, surname_csv, census_csv, enable_txt):
                if z < EVERYDAY or w not in dictionary))
     write("common_surnames", "Surnames of 500 or more people in the 2010 US Census that are everyday English words too",
           sorted(n.lower() for n, count in census if count >= 500 and zipf_frequency(n.lower(), "en") >= EVERYDAY))
+    write("top_surnames", "The 1,000 commonest surnames in the 2010 US Census, everyday words or not",
+          sorted(n.lower() for n, _ in sorted(census, key=lambda c: -c[1])[:1000]))
     write("common_words", "Dictionary words used at least about once in a million (Zipf 3 and up, wordfreq)",
           sorted({w for w in top_n_list("en", 100000) if w in dictionary and zipf_frequency(w, "en") >= 3}))
 

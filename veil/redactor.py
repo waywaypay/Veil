@@ -117,6 +117,14 @@ def _name_listed(word: str, known: set[str]) -> bool:
         word in _given_names() or word in _surname_list()
 
 
+@lru_cache(maxsize=None)
+def _top_surnames() -> frozenset[str]:
+    """The 1,000 commonest US surnames, everyday words or not: Carter, Wood, Mills."""
+    with resources.files("veil").joinpath("data/top_surnames.txt.gz").open("rb") as raw, \
+            gzip.open(raw, "rt", encoding="utf-8") as f:
+        return frozenset(line.strip() for line in f if not line.startswith("#"))
+
+
 def _surname_like(word: str, known: set[str]) -> bool:
     """Whether ``word`` (folded) can be a surname: one listed or known, or no everyday English word."""
     first = word.split("-")[0]
@@ -126,7 +134,8 @@ def _surname_like(word: str, known: set[str]) -> bool:
 
 # First names that are everyday words too: a name only before a surname ("Mark Tiffany Fuentes", "Will Smith").
 _WORD_GIVEN = _words("mark will grant june may rose faith hope joy dawn april summer autumn bill bob pat sue ray earl "
-                     "dean frank rich sky iris ivy holly daisy pearl ruby amber crystal destiny honor lily jade")
+                     "dean frank rich sky iris ivy holly daisy pearl ruby amber crystal destiny honor lily jade "
+                     "valentine grace robin hazel olive heather violet ginger sandy gene guy art")
 # Words a first name alone may follow: "Hello Sarah", "Thanks Kai".
 _GREETINGS = _words("hello hi hey dear thanks thank welcome congratulations congrats goodbye bye morning afternoon "
                     "evening sorry yes no ok okay great cheers")
@@ -1302,7 +1311,7 @@ class Redactor(TaxIdRedactor):
                 # a first name that's nearly a word ("Stale") needs a surname that's no word at all
                 wordy = _wordlike(t.fold) and _wordlike(t.fold.split("-")[0])
                 more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames) and
-                            toks[k].fold not in _WORD_SURNAMES and
+                            (toks[k].fold not in _WORD_SURNAMES or (toks[k].fold in _top_surnames() and not wordy)) and
                             (toks[k].fold not in _common_words() or (toks[k].fold in _common_surnames() and not wordy)),
                             True)
                 if (name := named(more, True)) is not None:
