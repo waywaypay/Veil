@@ -115,12 +115,12 @@ name, and so are a lower-case first name and surname ("add jane smith").
 
 | Placeholder | What |
 |---|---|
-| `SSN`, `EIN`, `TIN` | US taxpayer IDs, in any format: odd dashes and spaces, one digit per box, split across lines, HTML or %-escaped, Unicode digits, OCR misreads (`l23-45-6789`). Amounts, dates and phone numbers are left alone. |
-| `NAME` | People you name with `add_person`, in every way they get written (`MOCKRIDGE, AVERY K`, `A. Mockridge`, `Mr. Mockridge`). Also names it finds: first names and surnames from every country (lists drawn from Wikidata and the 2010 US Census), after Mr., Dr., Agent or Captain, after labels like `Name:`, `Attn:`, `Shipper:`, `c/o` and `Sincerely,`, a first name alone after "Hello" or before a comma, in "Last, First" order, in JSON, XML and table fields whose key or column says they hold a name (`"last_name"`, `<FirstName>`, a CSV's "Customer" column), and inside trust and joint-account names. |
+| `SSN`, `EIN`, `TIN` | US taxpayer IDs, in any format: odd dashes and spaces, one digit per box, split across lines, HTML or %-escaped, Unicode digits, OCR misreads (`l23-45-6789`), and SSNs masked to their last four (`***-**-1234`). Amounts, dates, times and phone numbers are left alone. |
+| `NAME` | People you name with `add_person`, in every way they get written (`MOCKRIDGE, AVERY K`, `A. Mockridge`, `Mr. Mockridge`). Also names it finds: first names and surnames from every country (lists drawn from Wikidata and the 2010 US Census), after Mr., Dr., Agent or Captain, after labels like `Name:`, `Attn:`, `Shipper:`, `c/o` and `Sincerely,`, a first name alone after "Hello" or before a comma, in "Last, First" order, as "First M. Last", in capitals in bank messages (`/MISTY LEE DEAN/`), after a greeting ("Thank you, Dean."), in JSON, XML and table fields whose key or column says they hold a name (`"last_name"`, `<FirstName>`, a CSV's "Customer" column), and inside trust and joint-account names. Places ("Ontario"), roles ("Policyholder") and a person's name inside a business's ("Taylor Healthcare Fund") stay. |
 | `ADDRESS` | Street addresses (any USPS street suffix) with the city, postcode, country and the lines under them; PO and rural boxes; military addresses; UK and Canadian postcodes; European forms (`Bahnhofstrasse 45`, `5 Xaviweg`, `45, Baker Street`, `7, avenue Gérard Lecoq`). |
 | `EMAIL`, `PHONE` | Including obfuscated forms like `jane at example dot com`, international numbers, and national ones with a trunk 0 (`0800 123 4567`). |
-| `ACCOUNT` | Bank, routing, card (checked with the Luhn algorithm), IBAN (checksum-validated) and SWIFT numbers, the last also without a label when shaped like one (ISO 9362, with a valid country). |
-| `ID`, `DOB` | Passport, driver's license, customer, employee, user and member ID numbers, and birth dates, when a label says what they are (`driver_license_number`, `DateOfBirth` and `date of birth (e.g. ...)` count). Also any other run of 11 to 19 digits. |
+| `ACCOUNT` | Bank, routing, card (checked with the Luhn algorithm), IBAN (checksum-validated), BBAN and SWIFT numbers, the last also without a label when shaped like one (ISO 9362, with a valid country); a card or account number a few words after its label ("the card number on file is ..."). |
+| `ID`, `DOB` | Passport, driver's license, customer, employee, user and member ID numbers, usernames and @handles, and birth dates, when a label, a field's key or a table's column says what they are (`driver_license_number`, `DateOfBirth`, `date of birth must be ...` count), or the words before them in the sentence ("the employee ID for Jo is Nq-92647"). Also UK National Insurance numbers, one to four capitals and six or more digits (`EMP286818`), and any other run of 11 to 24 digits. |
 
 Business names stay visible, because the model usually needs them. A name
 followed by Fund, Capital, Partners, LLC, L.P. and similar is treated as a
@@ -193,9 +193,10 @@ Redactor(name_finder=my_ner)                           # names from spaCy, Presi
 ```
 
 Names are found with word lists and rules, not a statistical model: about
-95,000 first names and 560,000 surnames from Wikidata and the 2010 US Census,
+98,000 first names and 560,000 surnames from Wikidata and the 2010 US Census,
 leaving out the ones that are everyday English words (by `wordfreq`
-frequency). That works well on forms, statements, messages and structured
+frequency) unless no dictionary has them ("Damien" and "Thompson" stay; the
+ENABLE word list decides). That works well on forms, statements, messages and structured
 data. In free-flowing prose, though, it misses a name that's on no list and
 has no title or label before it. Pass a `name_finder` (any function from text
 to a list of names) to close that gap. Each name it returns gets every variant spelling covered,
