@@ -196,3 +196,56 @@ def test_files_read_sends_no_taxpayer_id_from_a_scan():
         {"role": "user", "content": [_image_block(png.getvalue())]}])
     sent = _sent(fake)
     assert "6789" not in sent and "SSN_001" in json.loads(sent)[0]["messages"][0]["content"][0]["source"]["data"]
+
+
+def _words(lines):
+    """image_to_data's columns for lines of (left, words), each word 10px a letter, lines 40px apart."""
+    data = {k: [] for k in ("block_num", "par_num", "line_num", "word_num", "left", "top", "width", "height", "text")}
+    for n, (left, text) in enumerate(lines):
+        x = left
+        for k, word in enumerate(text.split()):
+            for key, value in (("block_num", 1), ("par_num", 1), ("line_num", n + 1), ("word_num", k + 1), ("left", x),
+                               ("top", 40 * n), ("width", 10 * len(word)), ("height", 30), ("text", word)):
+                data[key].append(value)
+            x += 10 * (len(word) + 1)
+    return data
+
+
+def test_reflow_joins_the_lines_a_page_wrapped_and_keeps_a_forms_lines():
+    from veil.files import reflow
+    wrapped = _words([(0, "The tenant, Avery Mockridge, lives at 1234 Main"), (0, "Street, Anytown, DE 12345, and pays all of"),
+                      (0, "the rent each month to Lisandro Carballo-"), (0, "Ariza by bank transfer.")])
+    assert reflow(wrapped) == ("The tenant, Avery Mockridge, lives at 1234 Main Street, Anytown, DE 12345, and pays all of "
+                               "the rent each month to Lisandro Carballo-Ariza by bank transfer.")
+    form = _words([(0, "Name: Avery Mockridge"), (0, "Address: 1234 Main Street"), (0, "Phone: 415-555-0134"),
+                   (0, "The tenant pays the rent on the first day of every month, without fail, by bank transfer.")])
+    assert reflow(form).split("\n")[:3] == ["Name: Avery Mockridge", "Address: 1234 Main Street", "Phone: 415-555-0134"]
+
+
+@pytest.mark.parametrize("ocr, tidy", [
+    ("Email: john:smith@example. com", "Email: john.smith@example.com"),
+    ("jane,smith@example,com", "jane.smith@example.com"),
+    ("residing at 5678. Elm Street, Toronto", "residing at 5678 Elm Street, Toronto"),
+    ("640 Yoder Plains.Apt. 519", "640 Yoder Plains Apt. 519"),
+    ("355 Kelly.Ramp", "355 Kelly Ramp"),
+    ("located at 4826 Kristi Hil, which", "located at 4826 Kristi Hill, which"),
+    ("Phorie:.+1-800-123-4567", "Phone: +1-800-123-4567"),
+    ("Telephone: +44°1234.567890", "Telephone: +44 1234 567890"),
+    ("Empioyee !D: 17028517", "Employee ID: 17028517"),
+    ("means Claire Z: Thibault, whose", "means Claire Z. Thibault, whose"),
+    ("Dear josephine M, Miller,", "Dear Josephine M. Miller,"),
+    ("appointed Leoriard Leigh Rowe as", "appointed Leonard Leigh Rowe as"),
+    ("Vancouver, BC, V6B.1C3", "Vancouver, BC, V6B 1C3"),
+])
+def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
+    from veil.files import _tidy
+    assert _tidy(ocr) == tidy
+
+
+@pytest.mark.parametrize("text", [
+    "1. Introduction", "We hired John. The team grew.", "Meeting at 10:30 Monday", "See www.Example.com",
+    "Total: 1,234.56 at 2021.09.01", "We sold 500 Apple Pies, and", "<phone>819.496.2354</phone>", "Note: Payment due",
+])
+def test_ocr_tidying_leaves_ordinary_text_alone(text):
+    from veil.files import _tidy
+    assert _tidy(text) == text
