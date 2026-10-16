@@ -135,7 +135,10 @@ def _surname_like(word: str, known: set[str]) -> bool:
 # First names that are everyday words too: a name only before a surname ("Mark Tiffany Fuentes", "Will Smith").
 _WORD_GIVEN = _words("mark will grant june may rose faith hope joy dawn april summer autumn bill bob pat sue ray earl "
                      "dean frank rich sky iris ivy holly daisy pearl ruby amber crystal destiny honor lily jade "
-                     "valentine grace robin hazel olive heather violet ginger sandy gene guy art")
+                     "valentine grace robin hazel olive heather violet ginger sandy gene guy art lee don glen angel penny "
+                     "brandy max faye flora wade homer rex earnest jewel laurel aurora candy merle clay toby charity "
+                     "heath sterling rocky gale dolly dee chuck chase august rod eve rusty cliff ward reed cole basil "
+                     "mack saul ed al geneva devon marshall burton maxwell coral nova pier")
 # Words a first name alone may follow: "Hello Sarah", "Thanks Kai".
 _GREETINGS = _words("hello hi hey dear thanks thank welcome congratulations congrats goodbye bye morning afternoon "
                     "evening sorry yes no ok okay great cheers")
@@ -162,26 +165,26 @@ _CUE_PATTERN = (
     r"(?:(?:partner|investor|member|account|beneficiary|owner|holder|client|contact)(?:'s)?\s+name"
     r"|name\s+of\s+(?:the\s+)?(?:partner|investor|member|owner|holder|beneficiary)"
     r"|(?<!bank\s)(?<!fund\s)(?<!firm\s)(?<!file\s)(?<!user\s)(?<!company\s)(?<!entity\s)(?<!business\s)"
-    r"(?<!product\s)(?<!chemical\s)(?<!substance\s)(?<!instrument\s)(?<!item\s)(?<!brand\s)(?<!project\s)(?<!event\s)(?<!venue\s)(?<!vessel\s)(?<!ship\s)(?<!plan\s)(?<!program\s)(?<!course\s)(?<!trade\s)(?<!model\s)(?<!device\s)(?<!drug\s)(?<!medication\s)(?<!domain\s)(?<!host\s)(?<!server\s)(?<!street\s)(?<!city\s)(?<!country\s)(?<!state\s)(?<!branch\s)(?<!team\s)(?<!campaign\s)name"
+    r"(?<!product\s)(?<!chemical\s)(?<!substance\s)(?<!instrument\s)(?<!item\s)(?<!brand\s)(?<!project\s)(?<!event\s)(?<!venue\s)(?<!vessel\s)(?<!ship\s)(?<!plan\s)(?<!program\s)(?<!course\s)(?<!trade\s)(?<!model\s)(?<!device\s)(?<!drug\s)(?<!medication\s)(?<!domain\s)(?<!host\s)(?<!server\s)(?<!street\s)(?<!city\s)(?<!country\s)(?<!state\s)(?<!branch\s)(?<!team\s)(?<!campaign\s)name(?:(?:(?<=my\sname)|(?<=last\sname)|(?<=first\sname)|(?<=full\sname)|(?<=surname))[ \t]+is)?"
     r"|zip\s+code|signatory|signature|regards|sincerely|cordially|respectfully"
     r"|(?:beneficial\s+)?owner|(?:account\s+)?holder|executor|executrix|administrator|guardian|conservator"
-    r"|(?:partnership\s+)?representative|designated\s+individual|attorney(?:-in-fact)?|poa)"
+    r"|(?:partnership\s+)?representative|(?:designated|named)\s+individual|attorney(?:-in-fact)?|poa)"
     r"[ \t]*(?:[:.,-][ \t]*)?(?:\n[ \t]*){0,2}"
     r"|(?:named|members?|partners?|limited\s+partner|general\s+partner|investor|shareholder|stockholder"
     r"|beneficiary|trustee|custodian|grantor|spouse|client|contact(?:\s+person)?|attn|attention|dear|fbo|c/o"
     r"|for\s+the\s+benefit\s+of|(?:prepared|issued|mailed|sent|registered)\s+(?:for|to)|prepared\s+by"
     r"|registration|signed{extra})"
-    r"(?:'s)?[ \t]*(?:[:.,-][ \t]*)?(?:/s/[ \t]*)?"
-    r"|(?:by|to|from|re|cc|bcc)[ \t]*:[ \t]*(?:/s/[ \t]*)?"
+    r"(?:'s)?[ \t]*(?:[:.,-][ \t]*)?(?:/s/[ \t]*)?(?:(?<=:)\n[ \t]*)?"
+    r"|(?:by|to|from|re|cc|bcc)[ \t]*:[ \t]*(?:/s/[ \t]*)?(?:\n[ \t]*)?"
     # a party's role, then a colon: "Shipper: Tassilo M. Hess", "Borrower: Pedro"
     r"|(?:shipper|consignee|notify\s+party|payer|payee|remitter|applicant|co-?applicant|borrower|co-?borrower"
     r"|guarantor|insured|policy\s*holder|patient|purchaser|buyer|seller|vendor|lessee|lessor|tenant|landlord"
     r"|employee|customer|claimant|sender|recipient|debtor|creditor|witness|physician|doctor|assigned\s+to"
     r"|created\s+by|modified\s+by|reported\s+by|approved\s+by|reviewed\s+by|requested\s+by|user|agent)"
-    r"(?:'s)?[ \t]*:[ \t]*(?:\*\*[ \t]*)?)\Z")
+    r"(?:'s)?[ \t]*:[ \t]*(?:\*\*[ \t]*)?(?:\n[ \t]*)?)\Z")
 # The last word of each of those: the label is looked for only after one of them.
 _CUE_ENDS = _words("""
-name code signatory signature regards sincerely cordially respectfully owner holder executor executrix administrator
+name is code signatory signature regards sincerely cordially respectfully owner holder executor executrix administrator
 guardian conservator representative individual attorney attorney-in-fact poa named member members partner partners
 investor shareholder stockholder beneficiary trustee custodian grantor spouse client contact person attn attention
 dear fbo o of for to registration signed by from re cc bcc s
@@ -190,7 +193,10 @@ guarantor insured holder policyholder patient purchaser buyer seller vendor less
 customer claimant sender recipient debtor creditor witness physician doctor user agent
 """)
 # After a name, in what the user types: what says it's a person's (a profile adds its own).
-_AFTER_CUES = (r",?[ \t]+(?i:ttee|trustee|custodian|cust|executor|executrix)\b",)
+_AFTER_CUES = (r",?[ \t]+(?i:ttee|trustee|custodian|cust|executor|executrix)\b",
+               # "Leone Toselli, an individual", "Carolyn S. Day, residing at", "Jane Doe (Spouse)"
+               r",[ \t]+(?i:an[ \t]+individual|residing[ \t]+at|who[ \t]+resides|resident[ \t]+of|born[ \t]+on)\b",
+               r"[ \t]+\((?i:spouse|husband|wife|son|daughter|child|mother|father|parent|sibling|brother|sister)\)")
 
 # A word: letters, with apostrophes (O'Brien, but not a possessive 's) and hyphens inside.
 _TOKEN = re.compile(r"[^\W\d_]+(?:'(?![sS](?![^\W\d_]))[^\W\d_]+)*(?:-[^\W\d_]+)*")
@@ -271,18 +277,18 @@ _USERNAME = re.compile(
     r"(?![^\W\d_])[\"'*]*[ \t]*[:=][ \t]*[\"'*]*[ \t]*(?P<value>@?[A-Za-z0-9][\w.\-]{2,40})(?![\w@])"
     r"|(?<![\w@.])(?P<handle>@[A-Za-z][\w.]{2,30})(?![\w@])")
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
-                r"[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:)")
+                r"[ \t]*[:.#-]?|contact[ \t]*(?:number|no\b\.?|\#)[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:)")
 _EXTENSION = r"(?:[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"
 _END = r"(?![\d]|[.,]\d)"
 _PHONES = [
     # 415-555-0134, (415) 555-0134, 415.555.0134, 415 555-0134, 415/555-0134, 1-415-555-0134, with any extension
-    re.compile(r"(?<![\w$.,+/-])(?:\+?1[ .-]?)?(?:\(\s*\d{3}\s*\)[ .-]?\d{3}[ .-]|\d{3}[.-]\d{3}[ .-]|\d{3}[ /]\d{3}-"
+    re.compile(r"(?<![\w$.,+/-])(?:\+?1[ .-]?|\(\+?1\)[ ]?)?(?:\(\s*\d{3}\s*\)[ .-]?\d{3}[ .-]|\d{3}[.-]\d{3}[ .-]|\d{3}[ /]\d{3}-"
                r"|\d{3}[ ]-[ ]\d{3}[ ]-[ ])"
                rf"\d{{4}}{_EXTENSION}{_END}"),
     # +1 415 555 0134
     re.compile(rf"(?<![\w+])\+1[ .-]?\(?[2-9]\d{{2}}\)?[ .-]?[2-9]\d{{2}}[ .-]?\d{{4}}{_EXTENSION}{_END}"),
     # anything after "Phone:", "Tel", "Fax", "Work:" ...
-    re.compile(rf"{_PHONE_LABEL}[ \t]*\**[ \t]*(?P<value>\+?[\d(][\d ().-]{{6,22}}\d{_EXTENSION}){_END}"),
+    re.compile(rf"{_PHONE_LABEL}[ \t]*\**[ \t]*(?P<value>(?:\(\+\d{{1,3}}\)[ ]?)?\+?[\d(][\d ().-]{{6,22}}\d{_EXTENSION}){_END}"),
     # A national number with its trunk 0, as the UK and Europe write them: 0800 123 4567, 020-7946-0958
     re.compile(rf"(?<![\w$.,+/:-])0\d{{1,4}}(?:[ -]\d{{2,4}}){{2,4}}{_EXTENSION}{_END}"),
     # +44 20 7946 0958, 011 44 20 7946 0958
@@ -310,7 +316,7 @@ _STREET_SUFFIX_MORE = ("Alley Anex Annex Arcade Bayou Beach Bend Bluff Bluffs Bo
                        "Stravenue Stream Streets Summit Throughway Trace Track Trafficway Tunnel Underpass Union Unions "
                        "Valley Valleys Viaduct View Views Village Villages Ville Vista Walks Wall Ways Well Wells Cross Gate Close "
                        "Rise Parade Yard Embankment Grange Rue Via").split()
-_ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:\\?!}+]|$|\.(?!\w)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
+_ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:\\?!}+\]]|$|\.(?!\w)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
                 r"|[ \t]+(?:and|was|is|in|for|to|with|as|has|have|had|where|which|on|at|from|since|by)\b)")
 # A street name of one word with its kind in it, before or after the number: "Xaviweg 5", "36 Ringtorget".
 _EURO_STREET = (r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?i:strasse|stra\u00dfe|str\.|gasse|weg|platz|allee|ring|damm"
@@ -370,7 +376,7 @@ _UNIT = (r"(?:Suite|Ste|STE|SUITE|Apartment|Apartamento|Appartamento|Apt|APT|Uni
 _NUMBER_WORDS = "One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Fifteen Twenty Fifty Hundred".split()
 _STREET = re.compile(
     rf"(?:\d{{1,3}}(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?,?[ \t]+)?"
-    rf"(?:(?<![\w$.,/-])|(?<=[A-Za-z\"],)|(?<=[A-Za-z:]/)|(?<=\d,)(?!\d{{3}}(?!\d))|(?<=Floor, )|(?<=FLOOR, )"
+    rf"(?:(?<![\w$.,/-])|(?<=[a-z])(?=\d{{3,6}}[ \t]+[A-Z])|(?<=[A-Za-z\"],)|(?<=[A-Za-z:]/)|(?<=\d,)(?!\d{{3}}(?!\d))|(?<=Floor, )|(?<=FLOOR, )"
     rf"|(?<=Floor )|(?<=Fl\. ))(?:\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2)?"
     rf"|{'|'.join(_NUMBER_WORDS)}),?[ \t]+"
     rf"(?:{_DIRECTION}[ \t]+)?(?:"
@@ -414,7 +420,7 @@ _TAIL_PIECE = re.compile(
     rf"[,;]?[ \t]*{_UNIT}(?:[.:,]|[ \t]+[.:,]){{0,3}}[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
     rf"|[,;:][.,;:]?[ \t]*(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
     rf"|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
-    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\]|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
+    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\\]]|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
     rf"|[ \t]*\n(?:[ \t]*\n)?[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_POSTAL}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})|{_POSTAL}[ \t]+{_CITY_WORDS}"
@@ -578,7 +584,7 @@ def _business_after(fold: str, end: int, v: _Vocab, typed: bool = False) -> bool
         return True
     rest = fold[end:end + 80]
     for n, m in enumerate(_TOKEN.finditer(rest)):
-        if n == 5 or re.search(r"[()\n:;<>|=\"]|[a-z0-9]{2}\.\s", rest[:m.start()]) or (n and "," in rest[:m.start()]):
+        if n == 5 or re.search(r"[()\n:;<>|=\"!?]|(?:^|[a-z0-9]{2})\.\s", rest[:m.start()]) or (n and "," in rest[:m.start()]):
             return False   # a business's word only before any comma, or right after it ("..., Inc.")
         word = m.group().casefold()
         if word in _PERSONAL:
@@ -1281,8 +1287,10 @@ class Redactor(TaxIdRedactor):
                     (re.match(r"[^\W_]", fold[t.end:t.end + 1]) and t.start and re.match(r"[^\W_]", fold[t.start - 1])):
                 return None   # a contraction (You're), a fragment of a code (5Au4), a place
             if cued:
-                if (t.fold in _common_words() or _wordlike(t.fold)) and t.fold not in _GIVEN and \
-                        t.fold not in _SURNAMES:
+                # a word ("Name: Total") is no name; a listed name that's a rare word too is ("Last Name: Begum")
+                if (t.fold in _common_words() or (_wordlike(t.fold) and t.fold not in _given_names() and
+                                                  t.fold not in _surname_list())) and \
+                        t.fold not in _GIVEN and t.fold not in _SURNAMES:
                     return None
             elif t.case != "title" or t.fold in _WORD_SURNAMES or \
                     not (t.fold in _GIVEN or (t.fold in _given_names() and not _wordlike(t.fold))):
