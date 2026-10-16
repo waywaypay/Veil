@@ -584,6 +584,24 @@ _NOT_PERSON_KEY = re.compile(r"(?i)user[ _-]?name|login|company|business|bank|pr
                              r"|campaign|group|dept|department|unit|category|type|code|tag|field|column|table|key|app"
                              r"|service|insurer|issuer|carrier|vendor|supplier|merchant|provider|partner|agency|office"
                              r"|institution|school|hospital|facility|site|store|shop|location|property|building|asset")
+# Fields that hold a birth date or a person's ID number, by their key: "date_of_birth", "EmployeeID".
+_DOB_KEY = re.compile(r"(?i)(?:\w+[ _-]?)?(?:date[ _-]?of[ _-]?birth|birth[ _-]?date|dob|birthday)")
+_ID_KEY = re.compile(r"(?i)(?:customer|client|employee|emp|user|member|patient|account[ _-]?holder|card[ _-]?holder"
+                     r"|passport|driver'?s?[ _-]?licen[cs]e|national|staff|student|policy[ _-]?holder|insured|subscriber"
+                     r"|person|personal|party|identity|citizen|voter|nhs|medicare|medicaid|loyalty|wallet|e-?wallet)"
+                     r"[ _-]?(?:id|identifier|number|no|num|nr|code|ref)?")
+# An ID number after a word that says whose it is, in the same sentence: "Employee ID for Jo Kabus is Nq-92647",
+# "her passport number, R87712693".  The value has letters and digits, or seven digits at least.
+_CONTEXT_ID = re.compile(
+    r"(?<![^\W\d_])(?i:employee|customer|client|member|user|patient|passport|driver'?s?[ \t]+licen[cs]e"
+    r"|licen[cs]e[ \t]+(?:number|no\b)|account[ \t]+holder|staff|student|policy[ \t]*holder)(?:'s)?(?![^\W\d_])"
+    r"[^\n.;:()\[\]{}<>\"]{0,40}?[ \t:(\"]"
+    r"(?P<value>(?=[A-Za-z0-9-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+){0,3})(?![\w-])")
+# An ID by its shape alone: one to four capital letters and six to ten digits (EMP286818, G4830770), not an amount
+# in a currency (USD52482349) and not an ISIN (US1234567890).
+_SHAPED_ID = re.compile(r"(?<![\w$.\-/])(?P<letters>[A-Z]{1,4})(?P<digits>\d{6,10})(?![\w-])")
+_CURRENCIES = frozenset("USD EUR GBP CAD AUD NZD CHF JPY CNY HKD SGD INR MXN BRL ZAR SEK NOK DKK PLN CZK HUF RUB TRY KRW "
+                        "AED SAR ILS THB MYR IDR PHP TWD".split())
 # A field's value that starts with one of these is no one's name: "Agent Smith", "Support Team".
 _ROLE_WORDS = _words("agent officer support representative rep manager team staff customer client user admin system "
                      "bot assistant operator advisor adviser specialist consultant service desk department unknown none "
@@ -1012,6 +1030,15 @@ class Redactor(TaxIdRedactor):
             if len(self._people) == known:
                 break
             known = len(self._people)
+        if "ID" in self._detect:
+            scan(_CONTEXT_ID, lambda m: (sum(c.isdigit() for c in m.group("value")) >= 7 or
+                                         (sum(c.isdigit() for c in m.group("value")) >= 4 and
+                                          any(c.isalpha() for c in m.group("value")))) and
+                 not re.fullmatch(_DATE, m.group("value"), re.IGNORECASE) and
+                 take(m.start("value"), m.end("value"), "ID", "ID:" + m.group("value").replace("-", "").upper()))
+            scan(_SHAPED_ID, lambda m: m.group("letters") not in _CURRENCIES and
+                 not (m.group("letters") in _ISO_COUNTRIES and len(m.group("digits")) == 10) and
+                 take(m.start(), m.end(), "ID", "ID:" + m.group()))
         scan(_LONG_NUMBER, lambda m: take(m.start(), m.end(),
                                           *(("ACCOUNT", f"ACCOUNT:{m.group()}") if len(m.group()) >= 13 and
                                             _luhn(m.group()) else ("ID", f"ID:{m.group()}"))))
@@ -1046,30 +1073,43 @@ class Redactor(TaxIdRedactor):
     def _field_names(self, copy: str, fold: str, take) -> None:
         """Names in a field whose key or column says it holds one: JSON, XML, key=value, and tables (CSV, pipe
         and tab separated) under a header such as "First Name" or "Customer"."""
-        def person_key(key: str) -> bool:
+        def key_kind(key: str) -> str | None:
             key = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", key.strip())   # camelCase: FirstName
-            return _NAME_KEY.fullmatch(key) is not None and not _NOT_PERSON_KEY.search(key)
+            if _DOB_KEY.fullmatch(key):
+                return "DOB"
+            if _ID_KEY.fullmatch(key) and re.search(r"(?i)(?:id|identifier|number|no|num|nr|code|ref|passport)$", key):
+                return "ID"
+            if _NAME_KEY.fullmatch(key) is not None and not _NOT_PERSON_KEY.search(key):
+                return "NAME"
+            return None
 
-        def put(start: int, value: str) -> None:
+        def put(start: int, value: str, kind: str = "NAME") -> None:
             lead = len(value) - len(value.lstrip())
             value = value.strip()
-            if self._name_value(value):
+            if kind == "DOB":
+                if re.fullmatch(_DATE, value, re.IGNORECASE):
+                    take(start + lead, start + lead + len(value), "DOB")
+            elif kind == "ID":
+                if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 /-]{2,30}", value) and sum(c.isdigit() for c in value) >= 3:
+                    take(start + lead, start + lead + len(value), "ID",
+                         "ID:" + re.sub(r"[^0-9A-Za-z]", "", value).upper())
+            elif self._name_value(value):
                 take(start + lead, start + lead + len(value), "NAME")
                 if len(value.split()) >= 2:
                     self.add_person(value)
 
         for m in _KEYED_VALUE.finditer(fold):
             if m.group("tag") is not None:
-                if person_key(m.group("tag")):
-                    put(m.start("tvalue"), copy[m.start("tvalue"):m.end("tvalue")])
+                if kind := key_kind(m.group("tag")):
+                    put(m.start("tvalue"), copy[m.start("tvalue"):m.end("tvalue")], kind)
                 continue
-            if not person_key(m.group("key")):
+            if not (kind := key_kind(m.group("key"))):
                 continue
-            put(m.start("value"), copy[m.start("value"):m.end("value")])
+            put(m.start("value"), copy[m.start("value"):m.end("value")], kind)
             if m.group("list"):
                 pos = m.end()
                 while (item := _LIST_ITEM.match(fold, pos)) is not None:
-                    put(item.start("value"), copy[item.start("value"):item.end("value")])
+                    put(item.start("value"), copy[item.start("value"):item.end("value")], kind)
                     pos = item.end()
         # Tables: a header line names the columns; each line after it with as many cells is a row.
         lines, pos = [], 0
@@ -1084,7 +1124,8 @@ class Redactor(TaxIdRedactor):
                 if line.count(sep) < (1 if sep != "," else 2):
                     continue
                 cells = line.split(sep)
-                columns = [k for k, c in enumerate(cells) if person_key(c.strip().strip("\"'*_ "))]
+                kinds = {k: key_kind(c.strip().strip("\"'*_ ").replace("\\_", "_")) for k, c in enumerate(cells)}
+                columns = [k for k, kind in kinds.items() if kind]
                 if not columns:
                     continue
                 while n < len(lines):
@@ -1105,7 +1146,7 @@ class Redactor(TaxIdRedactor):
                         lead = cell.index(inner) if inner else 0
                         if quote in "\"'" and len(inner) > 1 and inner[-1] == quote:
                             inner, lead = inner[1:-1], lead + 1
-                        put(at + lead, copy[at + lead:at + lead + len(inner)])
+                        put(at + lead, copy[at + lead:at + lead + len(inner)], kinds[k])
                     n += 1
                 break
 
