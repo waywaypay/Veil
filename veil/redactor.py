@@ -219,10 +219,10 @@ _ACCOUNT_LABEL = (
     rf"|(?:account|acct\b\.?|a/c)\s*(?:{_NO}|ending(?:\s+in)?)"
     rf"|(?:for\s+(?:further\s+)?credit(?:\s+to)?|ffc|further\s+credit)(?:\s+(?:account|acct\b\.?|a/c))?(?:\s*{_NO})?"
     rf"|routing(?:\s*/?\s*transit)?(?:\s*{_NO})?|aba(?:\s*routing)?(?:\s*{_NO})?"
-    rf"|rtn|iban|(?:credit|debit)\s*card(?:\s*{_NO})?|card\s*{_NO}"
+    rf"|rtn|iban|bban|(?:credit|debit)\s*card(?:\s*{_NO})?|card\s*{_NO}"
     r"|(?:visa|mastercard|amex|american\s+express|discover|card)\s+ending(?:\s+in)?)"
     # "Account Number (last 4): 4321"
-    r"(?:[ \t]*\([^()\n]{0,15}\))?")
+    r"(?:[ \t]*\([^()\n]{0,40}\))?")
 # "account", "acct" or "a/c" alone: a number needs six digits after it, and a capital account is no account.
 _BARE_ACCOUNT = r"(?<!capital\s)(?<!capital\s\s)(?:account|acct\b\.?|a/c|dda)"
 _SWIFT_LABEL = r"swift(?:\s*/\s*bic)?(?:\s*code)?|bic(?:\s*code)?"
@@ -257,6 +257,14 @@ _LABELLED = re.compile(
 # "[Date of Birth]\n01/01/1999".
 _DOB_NEAR = re.compile(rf"(?<![^\W\d_])(?i:{_DOB_LABEL})(?P<gap>(?:(?!\.\s|\d)[^\n]|\n(?![ \t]*\n)){{0,45}}?)"
                        rf"(?<![\w/.-])(?P<value>(?i:{_DATE}))(?![\w/-])")
+# A UK National Insurance number: two letters, three pairs of digits, a letter.
+_NI_NUMBER = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2}[ ]?\d{2}[ ]?\d{2}[ ]?\d{2}[ ]?[A-Z](?![A-Za-z0-9])")
+# An SSN with all but its last four digits masked: ***-**-1234
+_MASKED_SSN = re.compile(r"(?<![\w*])(?:\*{3,4}|X{3}|x{3})-(?:\*{2}|X{2}|x{2})-\d{4}(?!\d)")
+# A card or account number a few words after its label: "the credit card number on file is 3495-4026-3400-406"
+_ACCOUNT_NEAR = re.compile(
+    r"(?<![^\W\d_])(?i:(?:credit|debit)?[ \t]*card[ \t]+(?:number|no\b\.?|#)s?|account[ \t]+(?:number|no\b\.?)|iban|bban)"
+    r"(?:(?!\.\s)[^\n\d]){0,40}?(?<![\w-])(?P<value>\d{4}(?:[ -]\d{3,6}){2,4}|\d{12,24})(?![\w-])")
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
                 r"[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:)")
 _EXTENSION = r"(?:[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"
@@ -442,11 +450,11 @@ _ID_KEY = re.compile(r"(?i)(?:customer|client|employee|emp|user|member|patient|a
 _CONTEXT_ID = re.compile(
     r"(?<![^\W\d_])(?i:employee|customer|client|member|user|patient|passport|driver'?s?[ \t]+licen[cs]e"
     r"|licen[cs]e[ \t]+(?:number|no\b)|account[ \t]+holder|staff|student|policy[ \t]*holder)(?:'s)?(?![^\W\d_])"
-    r"(?:(?!\.\s)[^\n;()\[\]{}<>\"]){0,40}?[ \t:(\",]"
+    r"(?:(?!\.\s)[^\n;()\[\]{}<>\"]|\n(?![ \t]*\n)){0,40}?[ \t:(\",/]"
     r"(?P<value>(?=[A-Za-z0-9-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+){0,3})(?![\w-])")
 # An ID by its shape alone: one to four capital letters and six to ten digits (EMP286818, G4830770), not an amount
 # in a currency (USD52482349) and not an ISIN (US1234567890).
-_SHAPED_ID = re.compile(r"(?<![\w$.\-/])(?P<letters>[A-Z]{1,4})(?P<digits>\d{6,10})(?![\w-])")
+_SHAPED_ID = re.compile(r"(?<![\w$.\-])(?P<letters>[A-Z]{1,4})(?P<digits>\d{6,30})(?![\w-])")
 _CURRENCIES = frozenset("USD EUR GBP CAD AUD NZD CHF JPY CNY HKD SGD INR MXN BRL ZAR SEK NOK DKK PLN CZK HUF RUB TRY KRW "
                         "AED SAR ILS THB MYR IDR PHP TWD".split())
 # A field's value that starts with one of these is no one's name: "Agent Smith", "Support Team".
@@ -473,7 +481,7 @@ _IBAN = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?:[ ]?[A-Za-z0-9]{4}){2,7}
                    r"(?![A-Za-z0-9])")
 _CARD = re.compile(r"(?<![\d.,$])(?:\d{4}([ -])\d{4}\1\d{4}\1\d{3,4}(?:\1\d{1,3})?|\d{4}([ -])\d{6}\2\d{5})"
                    rf"{_END}")
-_LONG_NUMBER = re.compile(rf"(?<![\d.,$])\d{{11,19}}{_END}")
+_LONG_NUMBER = re.compile(rf"(?<![\d.,$])\d{{11,24}}{_END}")
 
 _APOSTROPHES = "\u2019\u2018\u02bc`\u00b4\u2032"
 _SPECIAL_LETTERS = {"\u00f8": "o", "\u00d8": "O", "\u00df": "s", "\u00e6": "a", "\u00c6": "A", "\u0153": "o",
@@ -848,8 +856,14 @@ class Redactor(TaxIdRedactor):
                                                        not in _common_words()))
              and
              take(m.start(), m.end(), "EMAIL"))
+        if "ID" in self._detect:
+            scan(_NI_NUMBER, lambda m: take(m.start(), m.end(), "ID", "ID:" + m.group().replace(" ", "")))
+        scan(_MASKED_SSN, lambda m: take(m.start(), m.end(), "SSN", "SSN:" + m.group()))
         scan(_LABELLED, lambda m: self._labelled(m, take, fold))
         scan(_DOB_NEAR, lambda m: take(m.start("value"), m.end("value"), "DOB"))
+        scan(_ACCOUNT_NEAR, lambda m: take(m.start("value"), m.end("value"), "ACCOUNT",
+                                           "ACCOUNT:" + re.sub(r"\D", "", m.group("value"))))
+
         scan(_IBAN, lambda m: _iban_ok(m.group()) and (m.group().isupper() or sum(c.isdigit() for c in m.group()) >= 8)
              and
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + m.group().replace(" ", "").upper()))
