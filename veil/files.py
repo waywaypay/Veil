@@ -75,7 +75,9 @@ def reflow(data: dict) -> str:
     if not lines:
         return ""
     ordered = [lines[key] for key in sorted(lines)]
-    right = max(left + width for words in ordered for left, _, width, _, _ in words)
+    # the text's right margin: most lines that run full end there (one overlong line doesn't move it)
+    ends = sorted(max(left + width for left, _, width, _, _ in words) for words in ordered)
+    right = ends[int(0.95 * (len(ends) - 1))] if len(ends) >= 5 else ends[-1]
     out, prev = [], None
     for key, words in zip(sorted(lines), ordered):
         text = " ".join(w for *_, w in words)
@@ -87,7 +89,8 @@ def reflow(data: dict) -> str:
             char = sum(w for _, _, w, _, _ in prev_words) / max(1, sum(len(t) for *_, t in prev_words))
             line_height = max(h for _, _, _, h, _ in prev_words)
             wrapped = right - prev_right < width + 2.5 * char and top - prev_bottom < 1.8 * line_height and \
-                abs(left - min(x for x, *_ in prev_words)) < 4 * char
+                abs(left - min(x for x, *_ in prev_words)) < 4 * char and \
+                not re.match(r"[-*\u2022]|\d{1,2}[.)]|[A-Z][\w ]{0,30}:", text) and not prev_words[-1][4].endswith(":")
             if wrapped:
                 out.append("" if out[-1].endswith("-") else " ")
             elif key[:2] == prev_key[:2]:
@@ -116,6 +119,35 @@ _LOOKS = (("rn", "m"), ("ri", "n"), ("rri", "m"), ("ii", "u"), ("i", "l"), ("l",
 _PHONE_AFTER_LABEL = re.compile(r"(?i)\b(phone(?:\s+number)?|tel(?:ephone)?(?:\s+number)?|fax|mobile|cell|contact\s+number"
                                 r"|call(?:\s+us)?(?:\s+at)?|(?:contact|reach)\s+us\s+at)([^\n\d+(]{0,6})"
                                 r"([+(]?\d[\d ()\-.:\u00b0]{7,24}\d)")
+
+
+# A street's kind, misread after its number and name: "4826 Kristi Hil", "709 Karina Traii", "693 Horton Fail".
+_SUFFIXES = ("Street Avenue Road Boulevard Lane Drive Court Place Way Terrace Circle Parkway Highway Square Trail Plaza "
+             "Alley Loop Row Path Pike Crescent Center Centre Crossing Heights Walk Hill Hills Fall Falls Well Wells Mill "
+             "Mills Ridge Ridges Island Islands Isle Junction Lake Lakes Manor Meadow Meadows Mount Park Point Points Port "
+             "Ramp Rapid Rapids River Shore Shores Spring Springs Station Summit Valley View Village Villages Ville Vista "
+             "Fork Forks Forge Fort Glen Green Greens Grove Harbor Harbors Haven Knoll Lodge Loaf Oval Pass Pine Pines "
+             "Plain Plains Ranch Run Stream Tunnel Union Unions Views Cove Creek Club Common Corner Divide Estate Estates "
+             "Flat Flats Garden Gardens Gateway Landing Light Lights Locks Neck Orchard Prairie Rest Spur Throughway "
+             "Trace Track Trafficway Turnpike Underpass Burg Burgs Bypass Camp Canyon Cape Causeway Cliff Cliffs Course "
+             "Courts Crest Curve Dale Dam Expressway Extension Extensions Ferry Field Fields Freeway Hollow Inlet Key Keys "
+             "Mission Motorway Mountain Mountains Overpass Radial Shoal Shoals Skyway Squares Stravenue Streets Ways").split()
+_STREET_WORDS = re.compile(r"(?<![\w.])(\d{1,6}[ ]+[A-Z][a-z]+[ ]+)([A-Z][a-z]{1,11})(?=[ ]?[,.;:(\n\"]|[ ]+(?:Apt|Suite)\b|$)")
+
+
+def _street_word(m: re.Match) -> str:
+    import difflib
+    from veil.redactor import _common_words
+    word = m.group(2)
+    if word in _SUFFIXES:
+        return m.group()
+    for a, b in _LOOKS + (("t", "l"), ("ii", "il"), ("il", "ill")):   # a letter OCR mistakes for another
+        if word.replace(a, b) in _SUFFIXES:
+            return m.group(1) + word.replace(a, b)
+    if word.casefold() in _common_words():   # "500 Apple Pies"
+        return m.group()
+    close = difflib.get_close_matches(word, _SUFFIXES, n=1, cutoff=0.75)
+    return m.group(1) + close[0] if close else m.group()
 
 
 def _tidy_labels(text: str) -> str:
@@ -185,6 +217,10 @@ def _tidy(text: str) -> str:
     text = _tidy_labels(text)
     text = _BROKEN_EMAIL.sub(email, text)
     text = re.sub(r"(?<![\w.,$])(\d{3,6})\.[ ]?(?=[A-Z][a-z])", r"\1 ", text)
+    text = re.sub(r"(?<![\w.,$])(\d{1,2})\.[ ]?(?=[A-Z][a-z]+ (?:Street|St|Road|Avenue|Lane|Drive|Way|Place|Court)\b)",
+                  r"\1 ", text)                                                            # 43. High Street
+    text = re.sub(r"(?<=\d)['\u00b0\u2018\u2019]+(?= [A-Z][a-z])", "", text)              # 10110'\u00b0 Jennifer
+    text = _STREET_WORDS.sub(_street_word, text)
     text = re.sub(r"(?<=[a-z])\.(?=(?:Apt|Suite|Ste|Unit|Flat)\b)", " ", text)
     text = re.sub(r"(?<!www)(?<=[a-z])\.(?!(?:Com|Org|Net|Edu|Gov|Io|Co|Uk)\b)(?=[A-Z][a-z]{2,}(?![\w-]*\.[A-Za-z]))",
                   " ", text)                                                               # Kelly.Ramp
