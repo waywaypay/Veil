@@ -102,6 +102,38 @@ A placeholder always comes back as the exact text it replaced. So when veil
 hides something that wasn't personal (a false positive), the model sees a
 placeholder, but nothing wrong is ever invented.
 
+## What the model can't do with a placeholder
+
+The model can move a placeholder around: put `NAME_001` in a name field, pass
+`SSN_001` to a tool, keep track of whose SSN is whose. All of that works,
+because your tool gets the real values back.
+
+What it can't do is look inside one. To the model, a placeholder is one
+solid block, and it comes back as the whole value it replaced:
+
+| You ask the model to | What your tool gets |
+|---|---|
+| Put the name in one field and the SSN in another | ✅ The full name and the full SSN |
+| Fill First Name and Last Name separately | ❌ The full name in both fields |
+| Enter the last 4 digits of the SSN | ❌ The full SSN, or a mangled field |
+| Write the SSN without dashes | ❌ The SSN as it was written, dashes included |
+| Fill City, State and ZIP | ❌ The whole address in every field |
+| Check that an SSN is valid, or that two spellings of a name match | ❌ Nothing it can check: it sees only placeholders |
+
+Splitting, reformatting and checking values belongs in your tool. Have the
+model pass the whole placeholder and do the work in code, after the real
+value is back:
+
+```python
+def fill_form(name: str, ssn: str, address: str):   # real values by the time this runs
+    first, *_, last = name.split()
+    ssn_last4 = ssn.replace("-", "")[-4:]
+    ...
+```
+
+If the model really does need to read a kind of value, leave that kind out
+of `detect` so it stays visible (see below).
+
 ## Profiles
 
 A profile tells veil which words in a kind of document look like names but
