@@ -17,6 +17,27 @@ The code was extracted from the K-1 assistant in Snowman, where it keeps
 partners' taxpayer IDs, names and addresses away from the model while the
 assistant reads K-1 PDFs and fills in records. It has no dependencies.
 
+## Where it runs
+
+veil is a library, not a service. It runs inside your app's own process, on
+the device where the data is, with nothing to host:
+
+- The redactor imports only Python's standard library and makes no network
+  calls.
+- The table of placeholders and real values exists only in memory, in the
+  `Redactor` object. It isn't written anywhere unless you save it yourself
+  (`r.mapping`).
+- The model receives only text that has already been redacted, and replies
+  are restored on the device.
+
+Two optional pieces send text off the device, so leave them out if
+everything must stay local:
+
+- **`veil.bedrock`** sends text to AWS before it has been redacted. That is
+  how a second check works.
+- **`name_finder`** runs wherever its code runs: a spaCy model loaded in the
+  same process stays local, but a cloud NER API does not.
+
 ## Install
 
 ```
