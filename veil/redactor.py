@@ -842,7 +842,10 @@ class Redactor(TaxIdRedactor):
             scan(pattern, lambda m, kind=kind: take(m.start(), m.end(), kind))
         scan(_EMAIL, lambda m: ("@" in m.group() or (_SPELLED_EMAIL.fullmatch(m.group()) is not None and
                                                        not re.search(r"(?i)\bwww\b|^(?:website|site|web|us|online|"
-                                                                     r"page|portal|home|link|webpage)\b", m.group())))
+                                                                     r"page|portal|home|link|webpage)\b", m.group()) and
+                                                       not re.search(r"\.[ \t]+[A-Z]", m.group()) and
+                                                       re.split(r"[ \t]+at[ \t]+|[ \t]*[\[({]at", m.group())[0].casefold()
+                                                       not in _common_words()))
              and
              take(m.start(), m.end(), "EMAIL"))
         scan(_LABELLED, lambda m: self._labelled(m, take, fold))
@@ -857,7 +860,8 @@ class Redactor(TaxIdRedactor):
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + re.sub(r"\D", "", m.group())))
         for pattern in _PHONES + (_TYPED_PHONES if typed else []):
             scan(pattern, lambda m: self._phone(m, take))
-        scan(_ADDRESS_LABEL, lambda m: take(m.start("value"), m.end("value"), "ADDRESS"))
+        scan(_ADDRESS_LABEL, lambda m: take(m.start("value"), m.start("value") + len(re.sub(
+            r"(?:,?[ \t]*[\[<][^\]>\n]*[\]>])+[ \t]*$", "", m.group("value"))), "ADDRESS"))
         scan(_STREET, lambda m: not _business_after(fold, m.end(), self._v) and
              take(m.start(), _address_tail(copy, m.end()), "ADDRESS"))
         scan(_BOXES, lambda m: take(m.start(), m.end(), "ADDRESS"))
@@ -1343,6 +1347,19 @@ class Redactor(TaxIdRedactor):
             if n.case == "initial" and n.dot and listed and (t.fold in _given_names() or t.fold in _GIVEN) and \
                     not (i + 2 < len(toks) and near(i + 1) and toks[i + 2].case in ("title", "caps")) and ok(i, i + 1):
                 return _Found(i, i + 1, None, None, None)
+        # MISTY LEE DEAN, YOLANDA RIOS: capitals, a first name then a surname that's no everyday word
+        if t.case == "caps" and near(i) and toks[i + 1].case == "caps" and not t.dot and \
+                (t.fold in _GIVEN or t.fold in _WORD_GIVEN or (t.fold in _given_names() and not _wordlike(t.fold))):
+            more = rest(i + 1, "caps", False, lambda k: _surname_like(toks[k].fold, surnames) and
+                        (toks[k].fold not in _common_words() or toks[k].fold in _top_surnames()), True)
+            if more and ok(i, more[1]):
+                return found(i, more[1], t.word, more[0], toks[more[1]].word, True)
+        # Bernardini-Vezzali, Noguera-Castrillo: a double surname alone, each half a listed surname
+        if t.case == "title" and "-" in t.word and not (near(i) and toks[i + 1].case in ("title", "caps")):
+            halves = t.fold.split("-")
+            if len(halves) == 2 and all((h in _SURNAMES or h in _surname_list() or h in _top_surnames()) and
+                                        h not in _common_words() and len(h) > 2 for h in halves) and ok(i, i):
+                return _Found(i, i, None, None, None)
         # the Le Gall family, the Scholz family
         if t.case == "title" and i > 0 and toks[i - 1].fold == "the":
             j = i
