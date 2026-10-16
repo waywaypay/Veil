@@ -236,8 +236,6 @@ def _tidy_names(text: str) -> str:
     text = re.sub(r"\b(Dear|Hello|Hi|Thanks|welcome|Name:|you,) j([a-z]{2,})\b",
                   lambda m: f"{m.group(1)} J{m.group(2)}" if given("J" + m.group(2)) else m.group(), text)
     # A period or colon after a first name, before another name: "Melanie. Robin Jordan", "Bas: Timo Evers"
-    from veil.redactor import _SURNAMES, _common_words, _surname_list
-
     def name_next(m: re.Match) -> bool:
         w = m.group(2).casefold()
         return len(w) == 1 or ((given(m.group(2)) or w in _SURNAMES or w in _surname_list()) and w not in _common_words())
@@ -248,8 +246,7 @@ def _tidy_names(text: str) -> str:
 
 def _tidy(text: str) -> str:
     def email(m: re.Match) -> str:
-        fix = lambda part: re.sub(_DOTS, ".", part)
-        return f"{fix(m.group(1))}@{fix(m.group(2))}"
+        return f"{re.sub(_DOTS, '.', m.group(1))}@{re.sub(_DOTS, '.', m.group(2))}"
 
     text = _tidy_labels(text)
     text = _BROKEN_EMAIL.sub(email, text)
