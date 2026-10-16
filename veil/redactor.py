@@ -41,10 +41,12 @@ folded, so odd characters hide nothing.
 
 from __future__ import annotations
 
+import gzip
 import re
 import unicodedata
 from dataclasses import dataclass, field
 from functools import lru_cache
+from importlib import resources
 
 from veil.profiles import Profile
 from veil.tax_ids import KINDS, TAX_ID_KINDS, TaxIdRedactor, _shadow
@@ -249,6 +251,58 @@ _FIRMS = frozenset("""morgan stanley|charles schwab|edward jones|raymond james|j
 |heidrick struggles|houlihan lokey|stifel nicolaus|keefe bruyette|duff phelps|alvarez marsal|willis towers
 |arthur gallagher|brown brothers|juniper square|sand hill|taylor rule|orlando multifamily
 """.replace("\n", "").split("|"))
+
+
+@lru_cache(maxsize=None)
+def _name_list(name: str) -> dict[str, float]:
+    """A packaged list of names (``veil/data``), each with how common it is as an English word (a Zipf
+    frequency: 0 for no word at all, 3 for a word used about once in a million)."""
+    with resources.files("veil").joinpath(f"data/{name}.txt.gz").open("rb") as raw, \
+            gzip.open(raw, "rt", encoding="utf-8") as f:
+        return {w: float(z) for w, z in (line.rstrip("\n").split("\t") for line in f if not line.startswith("#"))}
+
+
+def _given_names() -> dict[str, float]:
+    """First names from Wikidata, from every country, that are no common English word."""
+    return _name_list("given_names")
+
+
+def _surname_list() -> dict[str, float]:
+    """Surnames from Wikidata and the 2010 US Census that are no common English word."""
+    return _name_list("surnames")
+
+
+@lru_cache(maxsize=None)
+def _common_words() -> frozenset[str]:
+    """English words in everyday use ("crude", "owner", "oil"): no sign of a name by themselves."""
+    with resources.files("veil").joinpath("data/common_words.txt.gz").open("rb") as raw, \
+            gzip.open(raw, "rt", encoding="utf-8") as f:
+        return frozenset(line.strip() for line in f if not line.startswith("#"))
+
+
+@lru_cache(maxsize=None)
+def _common_surnames() -> frozenset[str]:
+    """Surnames common in the US that are everyday words too: Young, King, Doe."""
+    with resources.files("veil").joinpath("data/common_surnames.txt.gz").open("rb") as raw, \
+            gzip.open(raw, "rt", encoding="utf-8") as f:
+        return frozenset(line.strip() for line in f if not line.startswith("#"))
+
+
+def _surname_like(word: str, known: set[str]) -> bool:
+    """Whether ``word`` (folded) can be a surname: one listed or known, or no everyday English word."""
+    first = word.split("-")[0]
+    return word in _SURNAMES or word in _WORD_SURNAMES or word in known or first in _surname_list() or \
+        first in _common_surnames() or word not in _common_words()
+
+
+# First names that are places too: never taken for a name alone.
+_PLACE_NAMES = _words("""
+austin dallas houston orlando jordan sydney florence victoria georgia carolina madison lincoln hudson charlotte
+savannah phoenix denver aurora chester camden brooklyn paris london berlin vienna china india israel kenya
+chad cuba lima regina adelaide alexandria augusta beverly cleveland dakota douglas eugene hamilton helena
+jackson laramie lansing lorain marion montgomery nelson orange quincy raleigh salem sharon tyler warren
+wellington york
+""")
 _HONORIFICS = _words("mr mrs ms miss mx dr prof sir dame")
 _NAME_SUFFIXES = _words("jr sr ii iii iv md phd cpa esq")
 _ROMAN = _words("i ii iii iv v vi vii viii ix x xi xii xiii xiv xv")
@@ -261,7 +315,8 @@ _CUE_PATTERN = (
     r"(?<![^\W\d_])(?i:"
     r"(?:(?:partner|investor|member|account|beneficiary|owner|holder|client|contact)(?:'s)?\s+name"
     r"|name\s+of\s+(?:the\s+)?(?:partner|investor|member|owner|holder|beneficiary)"
-    r"|(?<!bank\s)(?<!fund\s)(?<!firm\s)(?<!file\s)(?<!user\s)(?<!company\s)(?<!entity\s)(?<!business\s)name"
+    r"|(?<!bank\s)(?<!fund\s)(?<!firm\s)(?<!file\s)(?<!user\s)(?<!company\s)(?<!entity\s)(?<!business\s)"
+    r"(?<!product\s)(?<!chemical\s)(?<!substance\s)(?<!instrument\s)(?<!item\s)(?<!brand\s)(?<!project\s)(?<!event\s)(?<!venue\s)(?<!vessel\s)(?<!ship\s)(?<!plan\s)(?<!program\s)(?<!course\s)(?<!trade\s)(?<!model\s)(?<!device\s)(?<!drug\s)(?<!medication\s)(?<!domain\s)(?<!host\s)(?<!server\s)(?<!street\s)(?<!city\s)(?<!country\s)(?<!state\s)(?<!branch\s)(?<!team\s)(?<!campaign\s)name"
     r"|zip\s+code|signatory|signature|regards|sincerely|cordially|respectfully"
     r"|(?:beneficial\s+)?owner|(?:account\s+)?holder|executor|executrix|administrator|guardian|conservator"
     r"|(?:partnership\s+)?representative|designated\s+individual|attorney(?:-in-fact)?|poa)"
@@ -360,6 +415,26 @@ _STREET_SUFFIX = ("Street St Avenue Ave Av Road Rd Boulevard Blvd Lane Ln Drive 
                   "Circle Cir Parkway Pkwy Highway Hwy Square Sq Trail Trl Plaza Plz Alley Aly Loop Row Path Pike "
                   "Crescent Cres Center Ctr Centre Expressway Expy Freeway Fwy Turnpike Tpke Causeway Mews Walk "
                   "Commons Crossing Heights Hts Route Rte Yards Wharf Pier Quay Esplanade Promenade Concourse").split()
+# The rest of the USPS street suffixes.  Many are ordinary words too ("Points", "Key", "Union"), so a street
+# ending in one needs the end of the address after it: a comma, a unit, the end of a line or a field.
+_STREET_SUFFIX_MORE = ("Alley Anex Annex Arcade Bayou Beach Bend Bluff Bluffs Bottom Branch Bridge Bridges Brook Brooks "
+                       "Burg Burgs Bypass Camp Canyon Cape Centers Circles Cliff Cliffs Club Common Corner Corners Course "
+                       "Courts Cove Coves Creek Crest Crossroad Crossroads Curve Dale Dam Divide Drives Estate Estates "
+                       "Extension Extensions Fall Falls Ferry Field Fields Flat Flats Ford Fords Forest Forge Forges Fork "
+                       "Forks Fort Garden Gardens Gateway Glen Glens Green Greens Grove Groves Harbor Harbors Haven Hill "
+                       "Hills Hollow Inlet Island Islands Isle Junction Junctions Key Keys Knoll Knolls Lake Lakes Land "
+                       "Landing Light Lights Loaf Lock Locks Lodge Mall Manor Manors Meadow Meadows Mill Mills Mission "
+                       "Motorway Mount Mountain Mountains Neck Orchard Oval Overpass Park Parks Parkways Pass Passage Pine "
+                       "Pines Plain Plains Point Points Port Ports Prairie Radial Ramp Ranch Rapid Rapids Rest Ridge "
+                       "Ridges River Roads Run Shoal Shoals Shore Shores Skyway Spring Springs Spur Spurs Squares Station "
+                       "Stravenue Stream Streets Summit Throughway Trace Track Trafficway Tunnel Underpass Union Unions "
+                       "Valley Valleys Viaduct View Views Village Villages Ville Vista Walks Wall Ways Well Wells").split()
+_ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:]|$|\.(?:\s|$)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
+                r"|[ \t]+(?:and|was|is|in|for|to|with|as|has|have|had|where|which|on|at|from|since|by)\b)")
+# A street name of one word with its kind in it, before or after the number: "Xaviweg 5", "36 Ringtorget".
+_EURO_STREET = (r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?:strasse|stra\u00dfe|str\.|gasse|weg|platz|allee|ring|damm"
+                r"|straat|laan|gracht|plein|kade|singel|dijk|steeg|gata|gatan|vagen|v\u00e4gen|v\u00e4g|vej|gade|torget"
+                r"|torg|stigen|veien|vegen|tie|katu|polku)")
 _STATE_CODES = ("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC "
                 "ND OH OK OR PA PR RI SC SD TN TX UT VT VA VI WA WV WI WY GU").split()
 _STATE_NAMES = ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
@@ -392,7 +467,7 @@ _TYPED_CITY_STATE_ZIP = re.compile(rf"(?<![\w'])(?P<city>(?:[a-z][\w'.-]*[ \t]+)
 _COUNTRIES = ("France Germany Switzerland Austria Italy Spain Belgium Netherlands Luxembourg Sweden Denmark Norway "
               "Finland Portugal Ireland Mexico Japan Canada Brazil Israel Singapore Australia").split()
 _FOREIGN = re.compile(
-    r"(?<![\w])[A-Z][\w]*(?:strasse|stra\u00dfe|str\.|gasse|weg|platz|allee|ring|damm)[ \t]+\d{1,5}[a-z]?(?![\w])"
+    rf"(?<![\w])(?:{_EURO_STREET}[ \t]+\d{{1,5}}[a-z]?|\d{{1,5}}[a-z]?,?[ \t]+{_EURO_STREET})(?![\w])"
     rf"|(?<![\w-])\d{{3,5}}(?:-\d{{4}})?[ \t]+(?:[A-Z][\w'.-]*[ \t]+){{0,3}}[A-Z][\w'.-]*,[ \t]+"
     rf"(?:{'|'.join(_COUNTRIES)})\b")
 # "Mailing address: 88 Kearny": the rest of the line, when it has a number.
@@ -406,15 +481,19 @@ _STREET = re.compile(
     rf"(?<![\w$.,/-])(?:\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2)?|{'|'.join(_NUMBER_WORDS)})[ \t]+"
     rf"(?:{_DIRECTION}[ \t]+)?(?:"
     rf"(?:(?:[A-Z][\w'.-]*|\d+(?:st|nd|rd|th))[ \t]+){{1,4}}"
-    rf"(?:{'|'.join(_STREET_SUFFIX + [s.upper() for s in _STREET_SUFFIX])})\.?(?![\w])"
+    rf"(?:(?:{'|'.join(_STREET_SUFFIX + [s.upper() for s in _STREET_SUFFIX])})\.?(?![\w])"
+    rf"|(?:{'|'.join(_STREET_SUFFIX_MORE + [s.upper() for s in _STREET_SUFFIX_MORE])})(?![\w]){_ADDRESS_END})"
     r"|(?:[a-z][\w'.-]*[ \t]+){1,3}(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|court|ct|place"
     r"|parkway|pkwy|highway|hwy|terrace|circle)\.?(?![\w])"
-    r"|(?i:el[ \t]+camino[ \t]+real|(?:alameda|avenida|calle|camino|via|rue|avenue[ \t]+of[ \t]+the)"
+    r"|(?i:el[ \t]+camino[ \t]+real|(?:alameda|avenida|calle|camino|via|rue|avenue[ \t]+of[ \t]+the|boulevard|bd"
+    r"|chemin|all\u00e9e|allee|impasse|place|quai|cours|pasaje|paseo|plaza|carrer|ronda|rambla|traves\u00eda|viale"
+    r"|piazza|corso|vicolo|strada|largo|rua|avenue)"
     r"(?:[ \t]+[a-z][\w'.-]*){1,4})|Broadway|BROADWAY)"
     rf"(?:[ \t]+{_DIRECTION}(?![\w]))?"
     rf"(?:,?[ \t]*{_UNIT}\.?[ \t]*\#?[A-Za-z0-9-]+|,?[ \t]*\d+(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?)?"
-    # the city, state and ZIP on the same line
-    rf"(?:,?[ \t]+(?:[A-Z][\w'.-]*,?[ \t]+){{0,3}}{_STATE},?[ \t]+{_ZIP})?")
+    # the city, state and ZIP on the same line; or the city alone, ending the address
+    rf"(?:,?[ \t]+(?:[A-Z][\w'.-]*,?[ \t]+){{0,3}}{_STATE},?[ \t]+{_ZIP}"
+    rf"|,[ \t]*(?:[A-Z][\w'\u00c0-\u024f-]*[ \t]+){{0,2}}[A-Z][\w'\u00c0-\u024f-]+(?=[ \t]*(?:[;|*\n\"<)/]|$|\.(?:\s|$))))?")
 _BOXES = re.compile(
     r"(?<![^\W\d_])(?i:(?:p\.?[ \t]?[o0]\.?|post[ \t]+office)[ \t]*b[o0]x|pob|pmb|private[ \t]+mailbox|postfach"
     r"|apartado(?:[ \t]+postal)?|casilla|bo\u00eete[ \t]+postale)[ \t]*\#?[ \t]*\d{1,7}"
@@ -429,6 +508,19 @@ _UNIT_LINE = re.compile(r"(?m)^[ \t]*(?:Apt|Apartment|Suite|Ste|Unit|Floor|Fl|Ro
                         r"(?![\w])")
 _POSTCODES = re.compile(r"(?<![A-Za-z0-9])(?:[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d"
                         r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})(?![A-Za-z0-9])")
+_COUNTRY_NAMES = ("USA|U\\.S\\.A\\.|US|United States(?: of America)?|UK|U\\.K\\.|United Kingdom|Great Britain|England"
+                  "|Scotland|Wales|Ireland|Canada|Australia|New Zealand|" + "|".join(_COUNTRIES))
+_CITY_WORDS = r"(?:[A-Z][\w'\u00c0-\u024f.-]*[ \t]+){0,2}[A-Z][\w'\u00c0-\u024f.-]*"
+_POSTAL = (r"(?:\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d"
+           r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})")
+# What may follow a street, piece by piece: ", 19821", ", New Shrewsbury", ", London, EC4M 2JR, UK", and lines
+# under it that are the rest of the address ("Toronto, ON M3H 2T6", "Canada").
+_TAIL_PIECE = re.compile(
+    rf",[ \t]*(?:{_POSTAL}|{_STATE}[ \t]*{_ZIP}|{_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
+    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/]|$|\.(?:\s|$)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
+    rf"|[ \t]*\n[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
+    rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
+    rf"|{_CITY_WORDS},?[ \t]+{_POSTAL}|{_POSTAL}[ \t]+{_CITY_WORDS}|(?:{_COUNTRY_NAMES}))[ \t]*(?=\n|$)")
 _IBAN = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?:[ ]?[A-Za-z0-9]{4}){2,7}(?:[ ]?[A-Za-z0-9]{1,3})?"
                    r"(?![A-Za-z0-9])")
 _CARD = re.compile(r"(?<![\d.,$])(?:\d{4}([ -])\d{4}\1\d{4}\1\d{4}(?:\1\d{1,3})?|\d{4}([ -])\d{6}\2\d{5})"
@@ -457,6 +549,14 @@ def _base(c: str) -> str:
 def _ascii(text: str) -> str:
     """``text`` with accents taken off, character for character, so offsets still line up."""
     return "".join(map(_base, text))
+
+
+def _address_tail(copy: str, end: int) -> int:
+    """Where an address that has its street end at ``end`` ends, with its city, postcode, country and the
+    lines under it."""
+    while (m := _TAIL_PIECE.match(copy, end)) is not None and m.end() > end:
+        end = m.end()
+    return end
 
 
 def _luhn(digits: str) -> bool:
@@ -802,7 +902,8 @@ class Redactor(TaxIdRedactor):
         for pattern in _PHONES + (_TYPED_PHONES if typed else []):
             scan(pattern, lambda m: self._phone(m, take))
         scan(_ADDRESS_LABEL, lambda m: take(m.start("value"), m.end("value"), "ADDRESS"))
-        scan(_STREET, lambda m: not _business_after(fold, m.end(), self._v) and take(m.start(), m.end(), "ADDRESS"))
+        scan(_STREET, lambda m: not _business_after(fold, m.end(), self._v) and
+             take(m.start(), _address_tail(copy, m.end()), "ADDRESS"))
         scan(_BOXES, lambda m: take(m.start(), m.end(), "ADDRESS"))
         scan(_CITY_STATE_ZIP, lambda m: not set(_fold(m.group("city")).split()) & _NOT_CITY and
              take(m.start(), m.end(), "ADDRESS"))
@@ -1048,7 +1149,8 @@ class Redactor(TaxIdRedactor):
 
             # Avery K. Mockridge: a common first name
             if t.fold in _GIVEN or t.fold.split("-")[0] in _GIVEN:
-                if (name := named(rest(i + 1, t.case, True, lambda k: True, True), True)) is not None:
+                more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames), True)
+                if (name := named(more, True)) is not None:
                     return name
             # Priya Patel; Thandiwe Okonkwo once an Okonkwo is known: a common or known surname
             name = named(rest(i + 1, t.case, True, lambda k: toks[k].fold in _SURNAMES or toks[k].fold in surnames,
@@ -1063,7 +1165,12 @@ class Redactor(TaxIdRedactor):
                 numbered = more is not None and more[1] + 1 < len(toks) and near(more[1]) and \
                     toks[more[1] + 1].fold in _ROMAN and toks[more[1] + 1].case in ("caps", "initial") and \
                     not any(toks[k].case == "initial" for k in range(i + 1, more[1]))
-                if (cued or after or (typed and t.case == "title")) and not numbered:
+                # Only everyday words, none of them a name ("Gallery Owner", "Hazardous Substance"): no name
+                everyday = more is not None and all(
+                    toks[k].fold in _common_words() and toks[k].fold not in _GIVEN and
+                    not _surname_like(toks[k].fold, surnames) for k in range(i, more[1] + 1)
+                    if toks[k].case != "initial")
+                if (cued or after or (typed and t.case == "title")) and not numbered and not everyday:
                     if (name := named(more, cued or after)) is not None:
                         return name
             # Zhang Wei, TANAKA HIROSHI: a common surname, then a first name
@@ -1074,11 +1181,19 @@ class Redactor(TaxIdRedactor):
                 if ok(i, end):
                     return found(i, end, n.word, [toks[k].word for k in range(i + 2, end + 1)], t.word, True,
                                  " ".join([w(k) for k in range(i + 1, end + 1)] + [w(i)]))
+            # Amelie Lage, Heike Franz-Josef Gierschner: a first name from anywhere, then a surname from anywhere
+            given, surnames_anywhere = _given_names(), _surname_list()
+            if t.fold in given or t.fold.split("-")[0] in given:
+                more = rest(i + 1, t.case, True, lambda k: toks[k].fold in surnames_anywhere or
+                            toks[k].fold.split("-")[0] in surnames_anywhere or toks[k].fold in _SURNAMES, True)
+                if (name := named(more, True)) is not None:
+                    return name
         # Mockridge, Avery K.
         if i + 1 < len(toks) and _COMMA_GAP.fullmatch(_gap(fold, toks, i)) and name_word(i):
             n = toks[i + 1]
             if name_word(i + 1) and not n.dot and \
-                    (n.fold in _GIVEN or t.fold in _SURNAMES or t.fold in surnames or cued or typed):
+                    (n.fold in _GIVEN or t.fold in _SURNAMES or t.fold in surnames or cued or typed or
+                     (n.fold in _given_names() and t.fold in _surname_list())):
                 end, middles = i + 1, []
                 while end + 1 < len(toks) and near(end) and (toks[end + 1].case == "initial" or
                                                              name_word(end + 1, n.case)) and len(middles) < 2:
@@ -1087,6 +1202,14 @@ class Redactor(TaxIdRedactor):
                 if ok(i, end):
                     return found(i, end, n.word, middles, t.word, not typed or n.fold in _GIVEN,
                                  " ".join([w(i + 1), *middles, w(i)]))
+        # A first name alone: "Hello Sarah,", "thank Kathy for": not a place's, not in a run of capitalized words
+        # (a heading), and not the start of a business's name.
+        if t.case == "title" and (t.fold in _GIVEN or _given_names().get(t.fold, 9) < 3) and \
+                t.fold not in _PLACE_NAMES and t.fold not in self._v.not_names and t.fold not in _WORD_SURNAMES and \
+                not re.match(r"[ \t]*(?:&|and[ \t])", fold[t.end:t.end + 5]) and \
+                not (i > 0 and toks[i - 1].case in ("title", "caps") and near(i - 1)) and \
+                not (i + 1 < len(toks) and toks[i + 1].case in ("title", "caps") and near(i)) and ok(i, i):
+            return _Found(i, i, None, None, None)
         return None
 
 

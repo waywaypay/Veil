@@ -18,6 +18,9 @@ dev = ["pytest>=8", "ruff>=0.5", "anthropic>=0.40", "botocore>=1.34"]
 [tool.setuptools]
 packages = ["veil"]
 
+[tool.setuptools.package-data]
+veil = ["data/*.txt.gz"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "tests"]

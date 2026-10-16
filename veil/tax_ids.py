@@ -187,8 +187,21 @@ def _joins(gap: str) -> bool:
     return len(marks) <= 6 and len(gap.replace("\n", "")) <= 8 and not any(c.isalnum() for c in marks)
 
 
+# Dates and times: 2022-02-15, 15/02/2022, 2022-02-15T10:30:00, 10:30, 20220301-12:34.
+_DATE_TIME = re.compile(r"(?<!\d)(?:(?:19|20)\d{2}([-/.])(?:0?[1-9]|1[0-2])\1(?:0?[1-9]|[12]\d|3[01])"
+                        r"|(?:0?[1-9]|[12]\d|3[01])([-/.])(?:0?[1-9]|[12]\d|3[01])\2(?:19|20)\d{2}"
+                        r"|(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?=[-T ]?\d{1,2}:\d{2}))(?!\d)"
+                        r"|(?<![\d.])(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:[.,]\d{1,9})?)?(?!\d)")
+
+
 def _mark_amounts(copy: str, clusters) -> None:
-    """Groups written as money: 1,234,567 / 1234.56 / 12.5% / a decimal like 25.1234567."""
+    """Groups written as money: 1,234,567 / 1234.56 / 12.5% / a decimal like 25.1234567; and dates and times."""
+    spans = [(m.start(), m.end()) for m in _DATE_TIME.finditer(copy)]
+    if spans:
+        for groups, _ in clusters:
+            for group in groups:
+                if any(s <= group.start and group.end <= e for s, e in spans):
+                    group.money = True
     for groups, joins in clusters:
         for i, group in enumerate(groups):
             after = copy[group.end:group.end + 5]
@@ -341,6 +354,8 @@ class TaxIdRedactor:
     def _judge(self, run: list[_Group], joins: list[str], labels) -> tuple[str, int, bool] | None:
         digits = "".join(g.digits for g in run)
         sizes = tuple(len(g.digits) for g in run)
+        if any(g.money for g in run):   # an amount or a date, even one whose digits match a number caught
+            return None
         known = self._known(digits)
         lookalikes = sum(g.lookalikes for g in run)
         # A comma is a weak separator, like a space: in a CSV row "20,1250000" is a box and an amount.
@@ -380,7 +395,8 @@ class TaxIdRedactor:
             if sizes == (3, 3, 3) and all(j == " " for j in joins):
                 return "TIN", 70, False
             # Joined by dashes or dots, any grouping is an ID typed oddly ("518-206-194"); not a ZIP+4.
-            if punct and sizes not in ((5, 4), (4, 5)) and min(sizes) > 1:
+            if punct and sizes not in ((5, 4), (4, 5)) and min(sizes) > 1 and \
+                    all(len(j.strip(" ")) == 1 and j.strip(" ") in "-./" for j in joins):
                 return "TIN", 70, False
             return ("TIN", 60, False) if near(_LABEL_BEFORE, _LABEL_AFTER) else None
         # Eight or ten digits: OCR dropped or added one.  Never a date or a phone number.

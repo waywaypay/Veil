@@ -47,7 +47,7 @@ def test_names_it_finds(text, expected):
 
 
 @pytest.mark.parametrize("text, expected", [
-    ("6224 Mockingbird Ct\nAnytown, WA 00490", ["6224 Mockingbird Ct", "Anytown, WA 00490"]),
+    ("6224 Mockingbird Ct\nAnytown, WA 00490", ["6224 Mockingbird Ct\nAnytown, WA 00490"]),
     ("4702 Placeholder Rd, Ste 323", ["4702 Placeholder Rd, Ste 323"]),
     ("345 Park Avenue, 30th Floor, New York, NY 10154-0004", ["345 Park Avenue, 30th Floor, New York, NY 10154-0004"]),
     ("2800 Sand Hill Road Suite 101 Menlo Park California 94025",
