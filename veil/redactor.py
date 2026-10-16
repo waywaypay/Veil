@@ -278,22 +278,25 @@ _USERNAME = re.compile(
     r"(?![^\W\d_])[\"'*]*[ \t]*[:=][ \t]*[\"'*]*[ \t]*(?P<value>@?[A-Za-z0-9][\w.\-]{2,40})(?![\w@])"
     r"|(?<![\w@.])(?P<handle>@[A-Za-z][\w.]{2,30})(?![\w@])")
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
-                r"[ \t]*[:.#-]?|contact[ \t]*(?:number|no\b\.?|\#)[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:)")
+                r"(?:[ \t]+is)?[ \t]*[:.#-]?|contact[ \t]*(?:number|no\b\.?|\#)[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:)")
 _EXTENSION = r"(?:[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"
 _END = r"(?![\d]|[.,]\d)"
+# A national number with its trunk 0, as the UK and Europe write them: 0800 123 4567, 020-7946-0958
+_TRUNK_PHONE = re.compile(rf"(?<![\w$.,+/:-])0\d{{1,4}}(?:[ -]\d{{2,4}}){{2,4}}{_EXTENSION}{_END}")
 _PHONES = [
+    # +1 415 555 0134, (+1) 800 111 2222: with its country code, any number of the shape
+    re.compile(rf"(?<![\w+(])(?:\+1|\(\+1\))[ .-]?\(?\d{{3}}\)?[ .-]?\d{{3}}[ .-]?\d{{4}}{_EXTENSION}{_END}"),
+    # +44 20 7946 0958, (+44) 151-123-4567, 011 44 20 7946 0958
+    re.compile(rf"(?<![\w+(])(?:\+|\(\+(?=\d{{1,3}}\))|011[ .-]?|00[ ])(?!1[ .(-]?[2-9])\d{{1,3}}\)?"
+               rf"(?:[ .-]?\(?\d{{1,5}}\)?){{2,5}}{_END}"),
     # 415-555-0134, (415) 555-0134, 415.555.0134, 415 555-0134, 415/555-0134, 1-415-555-0134, with any extension
     re.compile(r"(?<![\w$.,+/-])(?:\+?1[ .-]?|\(\+?1\)[ ]?)?(?:\(\s*\d{3}\s*\)[ .-]?\d{3}[ .-]|\d{3}[.-]\d{3}[ .-]|\d{3}[ /]\d{3}-"
                r"|\d{3}[ ]-[ ]\d{3}[ ]-[ ])"
                rf"\d{{4}}{_EXTENSION}{_END}"),
-    # +1 415 555 0134
-    re.compile(rf"(?<![\w+])\+1[ .-]?\(?[2-9]\d{{2}}\)?[ .-]?[2-9]\d{{2}}[ .-]?\d{{4}}{_EXTENSION}{_END}"),
+
     # anything after "Phone:", "Tel", "Fax", "Work:" ...
     re.compile(rf"{_PHONE_LABEL}[ \t]*\**[ \t]*(?P<value>(?:\(\+\d{{1,3}}\)[ ]?)?\+?[\d(][\d ().-]{{6,22}}\d{_EXTENSION}){_END}"),
-    # A national number with its trunk 0, as the UK and Europe write them: 0800 123 4567, 020-7946-0958
-    re.compile(rf"(?<![\w$.,+/:-])0\d{{1,4}}(?:[ -]\d{{2,4}}){{2,4}}{_EXTENSION}{_END}"),
-    # +44 20 7946 0958, 011 44 20 7946 0958
-    re.compile(rf"(?<![\w+])(?:\+|011[ .-]?|00[ ])(?!1[ .(-]?[2-9])\d{{1,3}}(?:[ .-]?\(?\d{{1,5}}\)?){{2,5}}{_END}"),
+    _TRUNK_PHONE,
 ]
 # In what the user types: 415 555 0134, 1 415 555 0134 and 4155550134 too.
 _TYPED_PHONES = [re.compile(rf"(?<![\d.,$])(?:1[ .-])?[2-9]\d{{2}} [2-9]\d{{2}} \d{{4}}{_END}"),
@@ -893,7 +896,7 @@ class Redactor(TaxIdRedactor):
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + m.group().replace(" ", "").upper()))
         scan(_BIC, lambda m: m.group("country") in _ISO_COUNTRIES and any(c.isdigit() for c in m.group()[6:]) and
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + m.group()))
-        scan(_CARD, lambda m: ((m.group(1) == "-" and len(re.sub(r"\D", "", m.group())) != 15) or
+        scan(_CARD, lambda m: (re.fullmatch(r"\d{4}([ -])\d{4}\1\d{4}\1\d{3,4}|\d{4}([ -])\d{6}\2\d{5}", m.group()) or
                                _luhn(re.sub(r"\D", "", m.group()))) and
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + re.sub(r"\D", "", m.group())))
         for pattern in _PHONES + (_TYPED_PHONES if typed else []):
@@ -1075,7 +1078,7 @@ class Redactor(TaxIdRedactor):
     def _phone(m: re.Match, take) -> bool:
         start = m.start("value") if "value" in m.re.groupindex else m.start()
         digits = re.sub(r"\D", "", m.group()[start - m.start():])
-        if m.group()[:1] == "0" and m.re is _PHONES[3] and not 10 <= len(digits) <= 11:
+        if m.group()[:1] == "0" and m.re is _TRUNK_PHONE and not 10 <= len(digits) <= 11:
             return False
         return 9 <= len(digits) <= 22 and take(start, m.end(), "PHONE", "PHONE:" + digits)
 
