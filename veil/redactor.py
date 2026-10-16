@@ -253,6 +253,10 @@ _LABELLED = re.compile(
     rf"|(?P<dob>{_DOB_LABEL})|(?P<bare>{_BARE_ACCOUNT}))(?![^\W\d_]){_SEP}"
     rf"(?P<value>(?(dob)(?i:{_DATE})|(?(swift)(?i:[A-Z]{{6}}[A-Z0-9]{{2}}(?:[A-Z0-9]{{3}})?)(?![A-Za-z0-9])"
     rf"|{_VALUE})))")
+# The first date after a birth date's label in the same sentence: "date of birth must be October 28, 1994",
+# "[Date of Birth]\n01/01/1999".
+_DOB_NEAR = re.compile(rf"(?<![^\W\d_])(?i:{_DOB_LABEL})(?P<gap>(?:(?!\.\s|\d)[^\n]|\n(?![ \t]*\n)){{0,45}}?)"
+                       rf"(?<![\w/.-])(?P<value>(?i:{_DATE}))(?![\w/-])")
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
                 r"[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:)")
 _EXTENSION = r"(?:[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"
@@ -842,6 +846,7 @@ class Redactor(TaxIdRedactor):
              and
              take(m.start(), m.end(), "EMAIL"))
         scan(_LABELLED, lambda m: self._labelled(m, take, fold))
+        scan(_DOB_NEAR, lambda m: take(m.start("value"), m.end("value"), "DOB"))
         scan(_IBAN, lambda m: _iban_ok(m.group()) and (m.group().isupper() or sum(c.isdigit() for c in m.group()) >= 8)
              and
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + m.group().replace(" ", "").upper()))
