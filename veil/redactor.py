@@ -221,7 +221,7 @@ association council health medical clinic analytics bio biosciences pharma softw
 studios media foods brands retail motors airlines resources mining reit residential apartments towers
 yards logistics lending finance trading advisory consulting law legal accounting audit tax cpas agency
 multifamily hospitality hotel hotels housing storage lodging communities homes land development developers
-builders construction square portal platform
+builders construction square portal platform etf etfs index
 """)
 # A name before one of these is still a person's: "Avery Mockridge Revocable Trust", "... IRA".
 _PERSONAL = _words("""
@@ -451,13 +451,14 @@ _STREET_SUFFIX_MORE = ("Alley Anex Annex Arcade Bayou Beach Bend Bluff Bluffs Bo
                        "Pines Plain Plains Point Points Port Ports Prairie Radial Ramp Ranch Rapid Rapids Rest Ridge "
                        "Ridges River Roads Run Shoal Shoals Shore Shores Skyway Spring Springs Spur Spurs Squares Station "
                        "Stravenue Stream Streets Summit Throughway Trace Track Trafficway Tunnel Underpass Union Unions "
-                       "Valley Valleys Viaduct View Views Village Villages Ville Vista Walks Wall Ways Well Wells").split()
-_ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:]|$|\.(?:\s|$)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
+                       "Valley Valleys Viaduct View Views Village Villages Ville Vista Walks Wall Ways Well Wells Cross Gate Close "
+                       "Rise Parade Yard Embankment Grange").split()
+_ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:\\]|$|\.(?:\s|$)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
                 r"|[ \t]+(?:and|was|is|in|for|to|with|as|has|have|had|where|which|on|at|from|since|by)\b)")
 # A street name of one word with its kind in it, before or after the number: "Xaviweg 5", "36 Ringtorget".
-_EURO_STREET = (r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?:strasse|stra\u00dfe|str\.|gasse|weg|platz|allee|ring|damm"
-                r"|straat|laan|gracht|plein|kade|singel|dijk|steeg|gata|gatan|vagen|v\u00e4gen|v\u00e4g|vej|gade|torget"
-                r"|torg|stigen|veien|vegen|tie|katu|polku)")
+_EURO_STREET = (r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?i:strasse|stra\u00dfe|str\.|gasse|weg|platz|allee|ring|damm"
+                r"|straat|laan|gracht|plein|kade|singel|dijk|steeg|dreef|boulevard|markt|hof|gata|gatan|vagen|v\u00e4gen"
+                r"|v\u00e4g|vej|gade|torget|torg|stigen|gr\u00e4nd|grand|backe|veien|vegen|tie|katu|polku)")
 _STATE_CODES = ("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC "
                 "ND OH OK OR PA PR RI SC SD TN TX UT VT VA VI WA WV WI WY GU").split()
 _STATE_NAMES = ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware",
@@ -490,18 +491,27 @@ _TYPED_CITY_STATE_ZIP = re.compile(rf"(?<![\w'])(?P<city>(?:[a-z][\w'.-]*[ \t]+)
 _COUNTRIES = ("France Germany Switzerland Austria Italy Spain Belgium Netherlands Luxembourg Sweden Denmark Norway "
               "Finland Portugal Ireland Mexico Japan Canada Brazil Israel Singapore Australia").split()
 _FOREIGN = re.compile(
-    rf"(?<![\w])(?:{_EURO_STREET}[ \t]+\d{{1,5}}[a-z]?|\d{{1,5}}[a-z]?,?[ \t]+{_EURO_STREET})(?![\w])"
+    rf"(?<![\w])(?:{_EURO_STREET}[ \t]+\d{{1,5}}[a-z]?|(?:\d{{1,5}}/)?\d{{1,5}}[a-z]?,?[ \t]+{_EURO_STREET})(?![\w])"
+    # Ronda Macario Merino 88, Via Roma 12
+    r"|(?<![\w])(?:Ronda|Calle|Avenida|Paseo|Plaza|Pasaje|Carrer|Rua|Via|Viale|Piazza|Corso|Contrada|Strada|Vicolo"
+    r"|Largo|Rue|Avenue|Boulevard|Chemin|Place|Quai|Travessa|Traves\u00eda)(?:[ \t]+(?:de|del|della|di|da|do|dos|la|las"
+    r"|los|le|les|du|des)?[ \t]*[A-Z\u00c0-\u024f][\w\u00c0-\u024f'.-]*){1,4},?[ \t]+\d{1,5}[a-z]?(?![\w])"
     rf"|(?<![\w-])\d{{3,5}}(?:-\d{{4}})?[ \t]+(?:[A-Z][\w'.-]*[ \t]+){{0,3}}[A-Z][\w'.-]*,[ \t]+"
     rf"(?:{'|'.join(_COUNTRIES)})\b")
 # "Mailing address: 88 Kearny": the rest of the line, when it has a number.
-_ADDRESS_LABEL = re.compile(r"(?<![^\W\d_])(?i:(?:mailing|street|home|residential|permanent|billing|registered|"
-                            r"partner'?s?|investor'?s?)[ \t]+address|address)[ \t]*(?::|\#|[ \t]-[ \t])[ \t]*"
-                            r"(?P<value>[^\n]*\d[^\n]*)")
+_ADDRESS_LABEL = re.compile(r"(?<![^\W\d_])(?<!ip\s)(?<!ipv4\s)(?<!ipv6\s)(?<!mac\s)(?<!email\s)(?<!e-mail\s)"
+                            r"(?<!web\s)(?<!wallet\s)(?<!bitcoin\s)(?<!crypto\s)(?<!server\s)(?<!network\s)"
+                            r"(?i:(?:mailing|street|home|residential|permanent|billing|registered|"
+                            r"partner'?s?|investor'?s?)[ \t]+address|address)[ \t]*(?::|\#|[ \t]-[ \t])[ \t]*\**[ \t]*"
+                            r"(?P<value>(?:(?!\.[ \t]+[A-Z]|[ \t]\(|;)[^\n]){0,120}?\d"
+                            r"(?:(?!\.[ \t]+[A-Z]|[ \t]\(|;)[^\n]){0,120}?)(?=\.?[ \t]*(?:$|\n)|\.[ \t]+[A-Z]|[ \t]\(|;)",
+                            re.MULTILINE)
 _DIRECTION = r"(?:N|S|E|W|NE|NW|SE|SW|North|South|East|West)\.?"
 _UNIT = r"(?:Suite|Ste|STE|SUITE|Apt|APT|Apartment|Unit|UNIT|Floor|FLOOR|Fl|Room|Rm|Bldg|Building|\#)"
 _NUMBER_WORDS = "One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Fifteen Twenty Fifty Hundred".split()
 _STREET = re.compile(
-    rf"(?<![\w$.,/-])(?:\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2)?|{'|'.join(_NUMBER_WORDS)})[ \t]+"
+    rf"(?:(?<![\w$.,/-])|(?<=[A-Za-z\"],))(?:\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2)?"
+    rf"|{'|'.join(_NUMBER_WORDS)}),?[ \t]+"
     rf"(?:{_DIRECTION}[ \t]+)?(?:"
     rf"(?:(?:[A-Z][\w'.-]*|\d+(?:st|nd|rd|th))[ \t]+){{1,4}}"
     rf"(?:(?:{'|'.join(_STREET_SUFFIX + [s.upper() for s in _STREET_SUFFIX])})\.?(?![\w])"
@@ -510,7 +520,7 @@ _STREET = re.compile(
     r"|parkway|pkwy|highway|hwy|terrace|circle)\.?(?![\w])"
     r"|(?i:el[ \t]+camino[ \t]+real|(?:alameda|avenida|calle|camino|via|rue|avenue[ \t]+of[ \t]+the|boulevard|bd"
     r"|chemin|all\u00e9e|allee|impasse|place|quai|cours|pasaje|paseo|plaza|carrer|ronda|rambla|traves\u00eda|viale"
-    r"|piazza|corso|vicolo|strada|largo|rua|avenue)"
+    r"|piazza|corso|vicolo|strada|largo|rua|avenue|contrada|travessa)"
     r"(?:[ \t]+[a-z][\w'.-]*){1,4})|Broadway|BROADWAY)"
     rf"(?:[ \t]+{_DIRECTION}(?![\w]))?"
     rf"(?:,?[ \t]*{_UNIT}\.?[ \t]*\#?[A-Za-z0-9-]+|,?[ \t]*\d+(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?)?"
@@ -539,11 +549,15 @@ _POSTAL = (r"(?:\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\
 # What may follow a street, piece by piece: ", 19821", ", New Shrewsbury", ", London, EC4M 2JR, UK", and lines
 # under it that are the rest of the address ("Toronto, ON M3H 2T6", "Canada").
 _TAIL_PIECE = re.compile(
-    rf",[ \t]*(?:{_POSTAL}|{_STATE}[ \t]*{_ZIP}|{_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
+    rf",?[ \t]*{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
+    rf"|,[ \t]*(?:{_POSTAL}|{_STATE}[ \t]*{_ZIP}|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
     rf"(?=[ \t]*(?:[,;|*\n\"'<>()/]|$|\.(?:\s|$)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
     rf"|[ \t]*\n[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
-    rf"|{_CITY_WORDS},?[ \t]+{_POSTAL}|{_POSTAL}[ \t]+{_CITY_WORDS}|(?:{_COUNTRY_NAMES}))[ \t]*(?=\n|$)")
+    rf"|{_CITY_WORDS},?[ \t]+{_POSTAL}|{_POSTAL}[ \t]+{_CITY_WORDS}|(?:{_COUNTRY_NAMES})"
+    rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|{_COUNTRY_NAMES})|\d{{5,6}}(?:-\d{{4}})?"
+    rf"|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d|(?:[A-Z]{{1,2}}\d[A-Z\d]?)[ ]\d[ABD-HJLNP-UW-Z]{{2}})"
+    rf"[ \t]*(?=\n|$)")
 # Fields that hold a person's name, by their key: "first_name", "LastName", "Customer Name", "payee" ...
 _PERSON_ROLES = ("payer|payee|shipper|consignee|applicant|co-?applicant|borrower|co-?borrower|customer|client|insured"
                  "|policy-?holder|patient|beneficiary|sender|recipient|remitter|debtor|creditor|employee|tenant|landlord"
@@ -953,7 +967,10 @@ class Redactor(TaxIdRedactor):
 
         for kind, pattern in self._custom:
             scan(pattern, lambda m, kind=kind: take(m.start(), m.end(), kind))
-        scan(_EMAIL, lambda m: ("@" in m.group() or _SPELLED_EMAIL.fullmatch(m.group()) is not None) and
+        scan(_EMAIL, lambda m: ("@" in m.group() or (_SPELLED_EMAIL.fullmatch(m.group()) is not None and
+                                                       not re.search(r"(?i)\bwww\b|^(?:website|site|web|us|online|"
+                                                                     r"page|portal|home|link|webpage)\b", m.group())))
+             and
              take(m.start(), m.end(), "EMAIL"))
         scan(_LABELLED, lambda m: self._labelled(m, take, fold))
         scan(_IBAN, lambda m: _iban_ok(m.group()) and (m.group().isupper() or sum(c.isdigit() for c in m.group()) >= 8)
@@ -975,7 +992,8 @@ class Redactor(TaxIdRedactor):
         if typed:
             scan(_TYPED_CITY_STATE_ZIP, lambda m: not set(_fold(m.group("city")).split()) & _NOT_CITY and
                  take(m.start(), m.end(), "ADDRESS"))
-        for pattern in (_UNIT_LINE, _POSTCODES, _FOREIGN):
+        scan(_FOREIGN, lambda m: take(m.start(), _address_tail(copy, m.end()), "ADDRESS"))
+        for pattern in (_UNIT_LINE, _POSTCODES):
             scan(pattern, lambda m: take(m.start(), m.end(), "ADDRESS"))
         if "NAME" in self._detect:
             self._field_names(copy, fold, take)
@@ -1012,7 +1030,7 @@ class Redactor(TaxIdRedactor):
         if not folds or not any(w[:1].isupper() for w in words) or _LEGAL_ENDING.search(value):
             return False
         if any(f in self._v.business or f in self._v.stop or f in _PERSONAL for f in folds if len(f) > 1) or \
-                folds[0] in _ROLE_WORDS:
+                folds[0] in _ROLE_WORDS or any(f"{x} {y}" in _FIRMS for x, y in zip(folds, folds[1:])):
             return False
         return any(f in _GIVEN or f in _SURNAMES or f in _given_names() or f in _surname_list() or
                    f in _common_surnames() or f not in _common_words() for f in folds if len(f) > 1)
@@ -1291,10 +1309,11 @@ class Redactor(TaxIdRedactor):
                     t.fold in _PLACE_NAMES or (t.case == "caps" and not cued):
                 return None
             if cued:
-                if t.fold in _common_words() and t.fold not in _GIVEN and t.fold not in _common_surnames():
+                if (t.fold in _common_words() or _given_names().get(t.fold, 0) >= 3 or
+                        _surname_list().get(t.fold, 0) >= 3) and t.fold not in _GIVEN:
                     return None
             elif t.case != "title" or t.fold in _WORD_SURNAMES or \
-                    not (t.fold in _GIVEN or _given_names().get(t.fold, 9) < 3.5):
+                    not (t.fold in _GIVEN or _given_names().get(t.fold, 9) < 3):
                 return None
             if re.match(r"[ \t]*(?:&|and[ \t])", fold[t.end:t.end + 5]):
                 return None
@@ -1378,7 +1397,9 @@ class Redactor(TaxIdRedactor):
         if i + 1 < len(toks) and _COMMA_GAP.fullmatch(_gap(fold, toks, i)) and name_word(i):
             n = toks[i + 1]
             if name_word(i + 1) and not n.dot and \
-                    (n.fold in _GIVEN or t.fold in _SURNAMES or t.fold in surnames or cued or typed or
+                    (n.fold in _GIVEN or t.fold in _SURNAMES or t.fold in surnames or
+                     ((cued or typed) and not (t.fold in _common_words() and t.fold not in _common_surnames()) and
+                      n.case != "caps") or
                      (n.fold in _given_names() and t.fold in _surname_list())):
                 end, middles = i + 1, []
                 while end + 1 < len(toks) and near(end) and (toks[end + 1].case == "initial" or
