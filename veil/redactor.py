@@ -412,7 +412,7 @@ _POSTAL = (r"(?:\d{3}[ ]\d{2}(?![\d])|\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[
 # under it that are the rest of the address ("Toronto, ON M3H 2T6", "Canada").
 _TAIL_PIECE = re.compile(
     rf"[,;]?[ \t]*{_UNIT}(?:[.:,]|[ \t]+[.:,]){{0,3}}[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
-    rf"|[,;:][ \t]*(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
+    rf"|[,;:][.,;:]?[ \t]*(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
     rf"|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
     rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\]|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
     rf"|[ \t]*\n(?:[ \t]*\n)?[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"

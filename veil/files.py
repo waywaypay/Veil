@@ -254,6 +254,13 @@ def _tidy(text: str) -> str:
     text = re.sub(r"(?<![\w.,$])(\d{1,2})\.[ ]?(?=[A-Z][a-z]+ (?:Street|St|Road|Avenue|Lane|Drive|Way|Place|Court)\b)",
                   r"\1 ", text)                                                            # 43. High Street
     text = re.sub(r"(?<=\d)['\u00b0\u2018\u2019]+(?= [A-Z][a-z])", "", text)              # 10110'\u00b0 Jennifer
+    text = re.sub(r"(?<![\w.,$])(\d{1,2})\.[ ]?(?=(?:Rue|Calle|Via|Avenida|Avenue|Plaza|Piazza)\b)", r"\1 ", text)  # 45.Rue
+    text = re.sub(r"(?<![\w.,$])(\d{2,6}):[ ]?\n(?=[A-Z][a-z])", r"\1 ", text)                 # 642:\nAnderson Rapid
+    text = re.sub(r"(?<=[:(\s])[.\-+]{1,2}(?=\d{2,6}[ ][A-Z][a-z])", "", text)                   # -.708 Sandra Burgs
+    text = re.sub(r"\b([ABCEGHJ-NPRSTVXY]\d[A-Z])[.\-)]?[ ]?(\d[A-Z]\d)\b", r"\1 \2", text)   # V6B.1C3
+    # the street's own words split by a colon or a period: "7190 Peter:Crossing", "34611 Canyon. View"
+    text = re.sub(r"\b(\d{1,6}[ ]+[A-Z][a-z]{2,})(?:[:.][ ]?)(?=([A-Z][a-z]+)\b)",
+                  lambda m: m.group(1) + " " if m.group(2) in _SUFFIXES else m.group(), text)
     text = _STREET_WORDS.sub(_street_word, text)
     text = re.sub(r"(?<=[a-z])\.(?=(?:Apt|Suite|Ste|Unit|Flat)\b)", " ", text)
     text = re.sub(r"(?<!www)(?<=[a-z])\.(?!(?:Com|Org|Net|Edu|Gov|Io|Co|Uk)\b)(?=[A-Z][a-z]{2,}(?![\w-]*\.[A-Za-z]))",
