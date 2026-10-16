@@ -160,6 +160,17 @@ def test_found_names_are_remembered():
     assert r.redact_text("Kwesi Mensah's K-1; KWESI MENSAH; Mensah, Kwesi") == "NAME_001's K-1; NAME_001; NAME_001"
 
 
+@pytest.mark.parametrize("verb", ["Call", "Email", "Text", "Ask", "Tell", "Message", "Invite", "Contact", "Meet",
+                                  "Remind", "Cc", "Phone"])
+@pytest.mark.parametrize("make", [Redactor, PersonalInfoRedactor, lambda: Redactor(detect={"NAME", "PHONE"})],
+                         ids=["generic", "k1", "no-email"])
+def test_a_verb_before_a_name_is_not_part_of_it(verb, make):
+    r = make()
+    out = r.redact_text(f"{verb} Priya Patel at 415-555-0134")
+    assert out == f"{verb} NAME_001 at PHONE_001"
+    assert r.restore_text("NAME_001") == "Priya Patel"
+
+
 # -- what the user types ------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("text, expected", [
