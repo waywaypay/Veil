@@ -147,6 +147,7 @@ chad cuba lima regina adelaide alexandria augusta beverly cleveland dakota dougl
 jackson laramie lansing lorain marion montgomery nelson orange quincy raleigh salem sharon tyler warren
 wellington york
 """)
+_PLACES = _PLACE_NAMES | word_file("places")
 _HONORIFICS = _words("mr mrs ms miss mx dr prof sir dame agent captain capt officer detective inspector sergeant "
                      "sgt lieutenant lt judge coach nurse pastor rev reverend rabbi imam professor")
 _NAME_SUFFIXES = _words("jr sr ii iii iv md phd cpa esq")
@@ -903,7 +904,9 @@ class Redactor(TaxIdRedactor):
             return False
         folds = [w.strip(".,").casefold() for w in _name_words(value)]
         if not folds or not any(w[:1].isupper() for w in words) or _LEGAL_ENDING.search(value) or \
-                re.fullmatch(r"[A-Z]{2,4}", value.strip()):   # a code: GBP, USD
+                re.fullmatch(r"[A-Z]{2,4}", value.strip()) or re.search(r"[A-Z]{2,}-[A-Z]{2,}|\d", value) or \
+                any(re.search(r"[a-z][A-Z]", w) and not re.match(r"(?:Mc|Mac|De|Di|Da|Du|La|Le|Van|Von|Fitz)[A-Z]", w)
+                    for w in words):   # a code: GBP, MemberA, CPI-US
             return False
         if any(f in self._v.business or f in self._v.stop or f in _PERSONAL for f in folds if len(f) > 1) or \
                 folds[0] in _ROLE_WORDS or any(f"{x} {y}" in _FIRMS for x, y in zip(folds, folds[1:])):
@@ -1217,8 +1220,11 @@ class Redactor(TaxIdRedactor):
             word that's no everyday word ("Last Name: Ritter").  Not a place's name, not in a run of
             capitalized words (a heading), and not the start of a business's name."""
             if t.case not in ("title", "caps") or len(t.word) < 2 or t.fold in self._v.not_names or \
-                    t.fold in _PLACE_NAMES or (t.case == "caps" and not cued):
-                return None
+                    t.fold in _PLACES or (t.case == "caps" and not cued) or \
+                    re.search(r"'(?:re|ve|m|d|ll|t)$", t.fold) or \
+                    (len(t.word) < 3 and t.fold not in _GIVEN) or \
+                    (re.match(r"[^\W_]", fold[t.end:t.end + 1]) and t.start and re.match(r"[^\W_]", fold[t.start - 1])):
+                return None   # a contraction (You're), a fragment of a code (5Au4), a place
             if cued:
                 if (t.fold in _common_words() or _wordlike(t.fold)) and t.fold not in _GIVEN and \
                         t.fold not in _SURNAMES:

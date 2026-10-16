@@ -1,0 +1,25 @@
+# Countries, provinces, states and big cities: places, never a person's name alone (veil.redactor._PLACES).
+afghanistan albania algeria andorra angola argentina armenia australia austria azerbaijan bahamas bahrain
+bangladesh barbados belarus belgium belize benin bhutan bolivia bosnia botswana brazil brunei bulgaria burundi
+cambodia cameroon canada chile china colombia congo croatia cuba cyprus czechia denmark djibouti dominica ecuador
+egypt england eritrea estonia eswatini ethiopia fiji finland france gabon gambia germany ghana greece grenada
+guatemala guinea guyana haiti honduras hungary iceland india indonesia iran iraq ireland israel italy jamaica japan
+jordan kazakhstan kenya kiribati kosovo kuwait kyrgyzstan laos latvia lebanon lesotho liberia libya liechtenstein
+lithuania luxembourg madagascar malawi malaysia maldives mali malta mauritania mauritius mexico micronesia moldova
+monaco mongolia montenegro morocco mozambique myanmar namibia nauru nepal netherlands nicaragua niger nigeria
+norway oman pakistan palau palestine panama paraguay peru philippines poland portugal qatar romania russia rwanda
+samoa scotland senegal serbia seychelles singapore slovakia slovenia somalia spain sudan suriname sweden
+switzerland syria taiwan tajikistan tanzania thailand togo tonga tunisia turkey turkmenistan tuvalu uganda ukraine
+uruguay uzbekistan vanuatu venezuela vietnam wales yemen zambia zimbabwe europe asia africa america americas
+antarctica oceania atlantic pacific arctic mediterranean caribbean scandinavia
+ontario quebec alberta manitoba saskatchewan nunavut yukon newfoundland labrador nova scotia brunswick columbia
+bavaria saxony catalonia andalusia galicia lombardy tuscany sicily sardinia normandy brittany provence flanders
+wallonia kent surrey essex sussex yorkshire lancashire cornwall devon somerset dorset hampshire berkshire cheshire
+london paris berlin madrid rome milan vienna zurich geneva amsterdam rotterdam brussels antwerp lisbon porto dublin
+edinburgh glasgow manchester liverpool birmingham leeds bristol cardiff belfast oxford cambridge southampton
+portsmouth brighton windsor halifax toronto montreal vancouver calgary ottawa winnipeg edmonton sydney melbourne
+brisbane perth auckland wellington tokyo osaka beijing shanghai shenzhen hongkong singapore mumbai delhi bangalore
+dubai riyadh doha cairo lagos nairobi johannesburg istanbul moscow warsaw prague budapest stockholm oslo copenhagen
+helsinki athens munich frankfurt hamburg cologne stuttgart lyon marseille barcelona valencia seville naples turin
+florence venice chicago boston atlanta miami seattle denver dallas houston austin phoenix philadelphia detroit
+heathrow gatwick havre manhattan brooklyn queens bronx
