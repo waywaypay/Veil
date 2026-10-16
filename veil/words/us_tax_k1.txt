@@ -1,0 +1,8 @@
+# Stop words the US_TAX_K1 profile adds (veil.profiles).
+active activities activity adjusted allocation allocations amazon amended amendment amortization anthropic
+apportionment aws bedrock bonus box boxes carry certificate claude collectibles composite delaware depletion
+depreciation domestic drilling election elections employer employment excel extension extensions federal
+foreign gaap guaranteed harbor intangible interests internal irs k-1 k-1s k1 like-kind lpi nonrecourse
+nonresident ordinary passive pdf pdfs proc qualified recapture recourse reg regulation regulations resident
+rev ruling rulings safe section self splits statutory term treas treasury treaty underlying unrecaptured
+unrelated upload withheld withholding

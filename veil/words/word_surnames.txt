@@ -1,0 +1,14 @@
+# Surnames that are ordinary words or places too (veil.redactor._WORD_SURNAMES).
+price young king hall wood woods hill hills green brown white black gray grey long ford gross cash rich bond
+bonds banks rice love lamb fox little small short field fields grant mark marks hunter cook baker carter
+miller mason porter parker walker taylor fisher fowler butler chandler page case chase bell bush rose west
+east north south lane moore wells ball hart hope hood snow frost winter summer day knight bishop pope dean
+major sharp strong wise best good goode noble payne sterling gold silver stone rock bird swan crane drake
+finch wolf lyon bear hawk steel bridge bridges ware waters rivers brook brooks lake pond marsh moss heath
+shore street gates hand holder shields freeman newman chambers law worth money cost sale sales share english
+french german welsh scott park burns lynch carpenter ward warren hicks gill turner sanders marshall martin
+wheeler pierce welch washington cross dial dodge duke earl farmer fuller glass golden guy hale hardy head hunt
+joy keen lord mills miles nash penny pike power powers rush salmon sawyer seal shepherd simple sparks spears
+stamp storm sweet tower vale vance wall walls webb wing wren york ridge hollow summit crest gate glen dale
+grove river creek valley point harbor haven peak mesa canyon meadow spring springs bay cove island isle forest
+oak pine cedar maple birch ash elm willow ivy
