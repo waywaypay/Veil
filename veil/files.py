@@ -186,13 +186,48 @@ def _tidy_names(text: str) -> str:
     """OCR's misreadings inside a person's name: an initial's period read as a colon or a comma ("Claire Z:
     Thibault"), a period or a colon after a first name ("Melanie. Robin", "Bas: Timo"), a capital J read
     small ("Hello john,"), stray quotes ("Emil\u2018 Winkler"), and a hyphen broken by spaces ("Payne- -Gilbert")."""
-    from veil.redactor import _GIVEN, _given_names, _wordlike
+    from veil.redactor import _GIVEN, _WORD_GIVEN, _ascii, _given_names, _wordlike
 
     def given(word: str) -> bool:
-        w = word.casefold()
-        return w in _GIVEN or (w in _given_names() and not _wordlike(w))
+        w = _ascii(word).casefold()
+        return w in _GIVEN or w in _WORD_GIVEN or (w in _given_names() and not _wordlike(w))
 
-    text = re.sub(r"(?<=[a-z] [A-Z])(?:[:,]|\.\.|\.[,:])[ ]?(?=[A-Z][a-z])", ". ", text)       # Claire Z: Thibault
+    from veil.redactor import _SURNAMES, _common_surnames, _common_words, _surname_list, _top_surnames
+
+    def known(word: str) -> bool:
+        w = _ascii(word).casefold()
+        return given(word) or w in _SURNAMES or w in _surname_list() or w in _top_surnames()
+
+    def mend(m: re.Match) -> str:
+        # Tarnmy -> Tammy, Leoriard -> Leonard, lda -> Ida: lookalike letters, when that makes a name and the word
+        # read is none
+        w = m.group()
+        if w[0] == "l" and not known(w) and known("I" + w[1:]) and m.end() < len(text) and \
+                re.match(r"[ ]+[A-Z][a-z]+[ ]+[A-Z]|[ ]+[A-Z]\.", text[m.end():m.end() + 30]):
+            return "I" + w[1:]   # lan Pamela Turner, lda G. Lopresti: an I read as an l, before more of a name
+        if w.casefold() in _common_words() or known(w):
+            return w
+        for a, b in (("rn", "m"), ("ri", "n"), ("rri", "m"), ("ii", "il"), ("!l", "l"), ("!", "i"), ("1", "l")):
+            if a in w and known(w.replace(a, b)):
+                return w.replace(a, b)
+        if w[0] == "l" and known("I" + w[1:]):
+            return "I" + w[1:]
+        return w
+
+    text = re.sub(r"\b(?:[A-Z][a-z!1]{2,}|l[a-z]{1,})\b(?=[ ,.]+[A-Z])|(?<=[A-Z][a-z] )[A-Z][a-z!1]{2,}\b", mend, text)
+    # this isSarah, DearLarry, andEnzo, between-Sarah: a name glued to the word before it
+    text = re.sub(r"\b(is|and|Dear|between|including|means|by|to|of|for|with|Hi|Hello)-?(?=([A-Z][a-z]{2,}))",
+                  lambda m: m.group(1) + " " if given(m.group(2)) else m.group(), text)
+    text = re.sub(r"\b([A-Z][a-z]{2,})([A-Z])\.(?= [A-Z])", lambda m: f"{m.group(1)} {m.group(2)}." if given(m.group(1))
+                  else m.group(), text)                                                         # DawnB. Neal
+    # an initial, its period misread: "Mark G; Evans", "Amber. M. Martinez", "Arsenio.M: Boiardo", "E.-Colas"
+    text = re.sub(r"\b([A-Z][^\W\d_]{2,})[.]?[ ]?([A-Z])(?:[.:;,]|\.[\u2019'\-:,_]|\.\.)[ ]?(?=[A-Z][^\W\d_])",
+                  lambda m: f"{m.group(1)} {m.group(2)}. " if given(m.group(1)) else m.group(), text)
+    text = re.sub(r"(?<=[a-z] [A-Z])(?:[:,;]|\.\.|\.[,:])[ ]?(?=[A-Z][a-z])", ". ", text)       # Claire Z: Thibault
+    # a first name, a colon or "._", a surname: "John: Doe", "John._Doe"
+    text = re.sub(r"\b([A-Z][a-z]{2,})(?::|\._|_)[ ]?(?=([A-Z][a-z]{2,}))",
+                  lambda m: m.group(1) + " " if given(m.group(1)) and (known(m.group(2)) or m.group(2).casefold() in
+                                                                        _common_surnames()) else m.group(), text)
     text = re.sub(r"(?<=\b(?:Mr|Ms|Dr))\.?:[ ]?(?=[A-Z])|(?<=\bMrs)\.?:[ ]?(?=[A-Z])", ". ", text)  # Mr.:Smith
     text = re.sub(r"(?<=[a-z])[\u2018\u2019'](?=[ ]?[A-Z](?:[a-z]|\.))", "", text)            # Emil' Winkler
     text = re.sub(r"(?<=[a-z])-[ ]+-?(?=[A-Z][a-z])|(?<=[a-z])[ ]+-[ ]?-(?=[A-Z][a-z])", "-", text)   # Payne- -Gilbert
