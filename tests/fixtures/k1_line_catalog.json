@@ -1,0 +1,192 @@
+[
+{
+"k1_line": "1 - Ordinary business income (loss)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "2 - Net rental real estate income (loss)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "4 - Guaranteed payments",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "5 - Interest income",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "6a - Ordinary dividends",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "6b - Qualified dividends",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "7 - Royalties",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "8 - Net short-term capital gain (loss)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "9a - Net mid-term capital gain (loss)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "9a - Net long-term capital gain (loss)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "9b - Collectibles (28%) gain (loss)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "9c - Unrecaptured section 1250 gain",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "10 - Net section 1231 gain (loss)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "11A - Other portfolio income",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "11C - Sec 1256 contracts & straddles",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "11F - Section 743(b) positive adjustments",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "11I - Other income",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "13A - Cash contributions (60%)",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "13H - Investment interest expense",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "13V - Section 743(b) negative adjustments",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "13AE - Deductions\u2014portfolio income",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "13ZZ - Other deductions",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "17A - Post-1986 depreciation adjustment",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "17B - Adjusted gain or loss",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "18A - Tax-exempt interest income",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "18B - Other tax-exempt income",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "18C - Nondeductible expenses",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "19A - Cash and marketable securities",
+"line_type": "distribution",
+"tax_treatment": "full"
+},
+{
+"k1_line": "19B - Distribution subject to section 737",
+"line_type": "distribution",
+"tax_treatment": "full"
+},
+{
+"k1_line": "19C - Other property",
+"line_type": "distribution",
+"tax_treatment": "full"
+},
+{
+"k1_line": "20A - Investment income",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "20B - Investment expenses",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "20N - Business interest expense",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "20ZZ - Other information",
+"line_type": "income",
+"tax_treatment": "full"
+},
+{
+"k1_line": "20Z - Revaluation / \u00a7704(b) book-up (book-down)",
+"line_type": "income",
+"tax_treatment": "book_only"
+},
+{
+"k1_line": "Syndication Costs [704(b) only]",
+"line_type": "income",
+"tax_treatment": "book_only"
+},
+{
+"k1_line": "Organizational Costs [704(b) only]",
+"line_type": "income",
+"tax_treatment": "book_only"
+},
+{
+"k1_line": "Capital contributed during the year",
+"line_type": "contribution",
+"tax_treatment": "full"
+}
+]

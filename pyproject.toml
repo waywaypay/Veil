@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "veil"
+version = "0.1.0"
+description = "Reversible placeholders for personal information in what you send an LLM, through tool calls and back."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+bedrock = ["boto3>=1.34"]
+dev = ["pytest>=8", "ruff>=0.5", "anthropic>=0.40", "botocore>=1.34"]
+
+[tool.setuptools]
+packages = ["veil"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
