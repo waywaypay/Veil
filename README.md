@@ -88,18 +88,20 @@ name, and so are a lower-case first name and surname ("add jane smith").
 | Placeholder | What |
 |---|---|
 | `SSN`, `EIN`, `TIN` | US taxpayer IDs, in any format: odd dashes and spaces, one digit per box, split across lines, HTML or %-escaped, Unicode digits, OCR misreads (`l23-45-6789`). Amounts, dates and phone numbers are left alone. |
-| `NAME` | People you name with `add_person`, in every way they get written (`MOCKRIDGE, AVERY K`, `A. Mockridge`, `Mr. Mockridge`). Also names it finds: common first names and surnames, after Mr./Dr., after labels like `Name:`, `Attn:`, `c/o` and `Sincerely,`, in "Last, First" order, and inside trust and joint-account names. |
-| `ADDRESS` | Street addresses with city, state and ZIP; PO and rural boxes; military addresses; UK and Canadian postcodes; some European formats. |
-| `EMAIL`, `PHONE` | Including obfuscated forms like `jane at example dot com`, and international numbers. |
-| `ACCOUNT` | Bank, routing, card (checked with the Luhn algorithm), IBAN (checksum-validated) and SWIFT numbers. |
-| `ID`, `DOB` | Passport, driver's license and member ID numbers, and birth dates, when a label says what they are. Also any other run of 11 to 19 digits. |
+| `NAME` | People you name with `add_person`, in every way they get written (`MOCKRIDGE, AVERY K`, `A. Mockridge`, `Mr. Mockridge`). Also names it finds: first names and surnames from every country (lists drawn from Wikidata and the 2010 US Census), after Mr., Dr., Agent or Captain, after labels like `Name:`, `Attn:`, `Shipper:`, `c/o` and `Sincerely,`, a first name alone after "Hello" or before a comma, in "Last, First" order, in JSON, XML and table fields whose key or column says they hold a name (`"last_name"`, `<FirstName>`, a CSV's "Customer" column), and inside trust and joint-account names. |
+| `ADDRESS` | Street addresses (any USPS street suffix) with the city, postcode, country and the lines under them; PO and rural boxes; military addresses; UK and Canadian postcodes; European forms (`Bahnhofstrasse 45`, `5 Xaviweg`, `45, Baker Street`, `7, avenue Gérard Lecoq`). |
+| `EMAIL`, `PHONE` | Including obfuscated forms like `jane at example dot com`, international numbers, and national ones with a trunk 0 (`0800 123 4567`). |
+| `ACCOUNT` | Bank, routing, card (checked with the Luhn algorithm), IBAN (checksum-validated) and SWIFT numbers, the last also without a label when shaped like one (ISO 9362, with a valid country). |
+| `ID`, `DOB` | Passport, driver's license, customer, employee, user and member ID numbers, and birth dates, when a label says what they are (`driver_license_number`, `DateOfBirth` and `date of birth (e.g. ...)` count). Also any other run of 11 to 19 digits. |
 
 Business names stay visible, because the model usually needs them. A name
 followed by Fund, Capital, Partners, LLC, L.P. and similar is treated as a
 business, as is anything you pass to `add_business`.
 
-A placeholder always comes back as the exact text it replaced. So when veil
-hides something that wasn't personal (a false positive), the model sees a
+A placeholder comes back as the text it replaced, except a person's name,
+which comes back the way that person was first written (so a tool call that
+adds `NAME_001` adds the person by their full name). So when veil hides
+something that wasn't personal (a false positive), the model sees a
 placeholder, but nothing wrong is ever invented.
 
 ## Profiles
@@ -130,11 +132,13 @@ r.add("Project Nightingale", "CODENAME")               # one value, by hand
 Redactor(name_finder=my_ner)                           # names from spaCy, Presidio, a cloud API ...
 ```
 
-Names are found with word lists and rules, not a statistical model. That
-works well on forms, statements and messages. In free-flowing prose, though,
-it misses an unusual name that has no title or label before it ("CEO Satya
-Nadella"). Pass a `name_finder` (any function from text to a list of names)
-to close that gap. Each name it returns gets every variant spelling covered,
+Names are found with word lists and rules, not a statistical model: about
+95,000 first names and 560,000 surnames from Wikidata and the 2010 US Census,
+leaving out the ones that are everyday English words (by `wordfreq`
+frequency). That works well on forms, statements, messages and structured
+data. In free-flowing prose, though, it misses a name that's on no list and
+has no title or label before it. Pass a `name_finder` (any function from text
+to a list of names) to close that gap. Each name it returns gets every variant spelling covered,
 like names given to `add_person`.
 
 ## A second check: Amazon Bedrock Guardrails
