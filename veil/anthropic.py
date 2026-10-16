@@ -15,10 +15,11 @@ turns), and the reply's text and tool-call inputs come back with the real
 values.  Use one redactor per conversation.  Thinking blocks go back exactly
 as they came.
 
-Images and PDFs pass through as they are unless you say otherwise:
-``files="read"`` reads their text on this machine (``veil.files.read_text``)
-and sends that, redacted, in their place; ``files="refuse"`` stops any request
-with one in it; or pass your own ``reader(data, media_type) -> str``.
+A request with an image or PDF in it is refused (``FileError``) unless you
+say otherwise: ``files="read"`` reads their text on this machine
+(``veil.files.read_text``) and sends that, redacted, in their place;
+``files="send"`` sends them as they are; or pass your own
+``reader(data, media_type) -> str``.
 
 With a ``guardrail`` (any object with a ``check(texts, source) -> Findings``
 method, raising GuardrailError when it can't check), each new text in a
@@ -80,7 +81,7 @@ class Session:
     """One conversation's redactor and guardrail, and the request and reply handling ``wrap`` uses."""
 
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
-                 files: str | Callable[[bytes, str], str] = "send"):
+                 files: str | Callable[[bytes, str], str] = "refuse"):
         self.redactor = redactor if redactor is not None else Redactor()
         self.guardrail = guardrail
         self.redact_system = redact_system
@@ -157,7 +158,8 @@ class Session:
         name = "An image" if b.get("type") == "image" else "A PDF"
         if self.files == "refuse":
             raise FileError(f"{name} in this request would have reached the model with any personal information "
-                            "in it. Nothing was sent.")
+                            'in it. Nothing was sent. Pass files="read" to send its text redacted, or files="send" '
+                            "to send it as it is.")
         source = b.get("source") if isinstance(b.get("source"), dict) else {}
         if source.get("type") != "base64":
             how = {"url": "a link, which Anthropic would fetch", "file": "an uploaded file ID"}.get(
@@ -335,10 +337,10 @@ class VeiledClient:
 
 
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
-         files: str | Callable[[bytes, str], str] = "send") -> VeiledClient:
+         files: str | Callable[[bytes, str], str] = "refuse") -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
-    ``files`` says what happens to images and PDFs: "send" them as they are, "read" their text here and send
-    it redacted instead, "refuse" the request, or a function ``(data, media_type) -> text`` to read them."""
+    ``files`` says what happens to images and PDFs: "refuse" the request (the default), "read" their text
+    here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them."""
     return VeiledClient(client, Session(redactor, guardrail, redact_system, files))

@@ -82,11 +82,12 @@ def test_an_image_from_the_user_becomes_a_titled_document():
     assert doc["title"] == "Text read from an image" and doc["source"]["data"] == FILE_UNREAD
 
 
-def test_refuse_sends_nothing():
+@pytest.mark.parametrize("block", [_pdf_block(), _image_block()])
+def test_by_default_a_request_with_a_file_is_refused_and_nothing_is_sent(block):
     fake = FakeClient([_message("ok")])
-    client = wrap(fake, files="refuse")
-    with pytest.raises(FileError, match="Nothing was sent"):
-        client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": [_pdf_block()]}])
+    client = wrap(fake)
+    with pytest.raises(FileError, match='Nothing was sent. Pass files="read"'):
+        client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": [block]}])
     assert fake.requests == []
 
 
@@ -111,9 +112,9 @@ def test_a_reader_that_fails_sends_nothing():
     assert fake.requests == []
 
 
-def test_by_default_files_go_as_they_are_but_document_text_is_redacted():
+def test_send_lets_files_go_as_they_are_but_document_text_is_redacted():
     fake = FakeClient([_message("ok")])
-    client = wrap(fake)
+    client = wrap(fake, files="send")
     client.redactor.add_person("Avery Mockridge")
     content_doc = {"type": "document", "source": {"type": "content", "content": [
         {"type": "text", "text": "Avery Mockridge, SSN 123-45-6789"}, _image_block()]}}
