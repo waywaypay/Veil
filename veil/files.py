@@ -137,7 +137,9 @@ _STREET_WORDS = re.compile(r"(?<![\w.])(\d{1,6}[ ]+[A-Z][a-z]+[ ]+)([A-Z][a-z]{1
 
 def _street_word(m: re.Match) -> str:
     import difflib
+
     from veil.redactor import _common_words
+
     word = m.group(2)
     if word in _SUFFIXES:
         return m.group()
