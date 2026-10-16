@@ -426,7 +426,7 @@ _ID_KEY = re.compile(r"(?i)(?:customer|client|employee|emp|user|member|patient|a
 _CONTEXT_ID = re.compile(
     r"(?<![^\W\d_])(?i:employee|customer|client|member|user|patient|passport|driver'?s?[ \t]+licen[cs]e"
     r"|licen[cs]e[ \t]+(?:number|no\b)|account[ \t]+holder|staff|student|policy[ \t]*holder)(?:'s)?(?![^\W\d_])"
-    r"[^\n.;:()\[\]{}<>\"]{0,40}?[ \t:(\"]"
+    r"(?:(?!\.\s)[^\n;()\[\]{}<>\"]){0,40}?[ \t:(\",]"
     r"(?P<value>(?=[A-Za-z0-9-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+){0,3})(?![\w-])")
 # An ID by its shape alone: one to four capital letters and six to ten digits (EMP286818, G4830770), not an amount
 # in a currency (USD52482349) and not an ISIN (US1234567890).
@@ -852,15 +852,6 @@ class Redactor(TaxIdRedactor):
         scan(_FOREIGN, lambda m: take(m.start(), _address_tail(copy, m.end()), "ADDRESS"))
         for pattern in (_UNIT_LINE, _POSTCODES):
             scan(pattern, lambda m: take(m.start(), m.end(), "ADDRESS"))
-        if "NAME" in self._detect:
-            self._field_names(copy, fold, take)
-        known = len(self._people)
-        for _ in range(2 if "NAME" in self._detect else 0):   # names found in this text are hidden wherever else it says them
-            self._known_names(fold, take, typed)
-            self._found_names(copy, fold, take, typed)
-            if len(self._people) == known:
-                break
-            known = len(self._people)
         if "ID" in self._detect:
             scan(_CONTEXT_ID, lambda m: (sum(c.isdigit() for c in m.group("value")) >= 7 or
                                          (sum(c.isdigit() for c in m.group("value")) >= 4 and
@@ -870,6 +861,15 @@ class Redactor(TaxIdRedactor):
             scan(_SHAPED_ID, lambda m: m.group("letters") not in _CURRENCIES and
                  not (m.group("letters") in _ISO_COUNTRIES and len(m.group("digits")) == 10) and
                  take(m.start(), m.end(), "ID", "ID:" + m.group()))
+        if "NAME" in self._detect:
+            self._field_names(copy, fold, take)
+        known = len(self._people)
+        for _ in range(2 if "NAME" in self._detect else 0):   # names found in this text are hidden wherever else it says them
+            self._known_names(fold, take, typed)
+            self._found_names(copy, fold, take, typed)
+            if len(self._people) == known:
+                break
+            known = len(self._people)
         scan(_LONG_NUMBER, lambda m: take(m.start(), m.end(),
                                           *(("ACCOUNT", f"ACCOUNT:{m.group()}") if len(m.group()) >= 13 and
                                             _luhn(m.group()) else ("ID", f"ID:{m.group()}"))))
@@ -967,7 +967,7 @@ class Redactor(TaxIdRedactor):
                     continue
                 while n < len(lines):
                     row_start, row = lines[n]
-                    if row.count(sep) != line.count(sep):
+                    if row.count(sep) < line.count(sep) or (sep != "," and row.count(sep) != line.count(sep)):
                         if re.fullmatch(r"[\s|:+-]*", row) and row.strip():   # a markdown table's rule
                             n += 1
                             continue
@@ -1065,6 +1065,16 @@ class Redactor(TaxIdRedactor):
             if found is None:
                 i += 1
                 continue
+            # Rhys Ian Mills, CIRINO CARLA CORDOBA: a listed first name or surname right before the name found
+            first = found.first_tok
+            if found.key and first > 0 and first - 1 >= i - 1 and toks[first - 1].case == toks[first].case and \
+                    toks[first - 1].case in ("title", "caps") and not toks[first - 1].dot and \
+                    _NAME_GAP.fullmatch(_gap(fold, toks, first - 1)) and \
+                    toks[first - 1].fold not in self._v.not_names and toks[first - 1].fold not in _HONORIFICS and \
+                    _name_listed(toks[first - 1].fold, surnames) and not _wordlike(toks[first - 1].fold) and \
+                    toks[first - 1].fold not in _common_words():
+                found = _Found(first - 1, found.last_tok, found.key, copy[toks[first - 1].start:toks[found.last_tok].end],
+                               found.person)
             start, stop = toks[found.first_tok].start, toks[found.last_tok].end
             if toks[found.last_tok].case == "initial" and toks[found.last_tok].dot:
                 stop += 1
@@ -1160,7 +1170,7 @@ class Redactor(TaxIdRedactor):
             j = i + 1
             if toks[j].case == "initial" and near(j):
                 j += 1
-            if j < len(toks) and name_word(j):
+            if j < len(toks) and (name_word(j) or (toks[j].fold in _WORD_GIVEN and toks[j].case in ("title", "caps"))):
                 more = rest(j + 1, toks[j].case, True, lambda k: True, True) if near(j) else None
                 if more and ok(j, more[1]):
                     return found(j, more[1], toks[j].word, more[0], toks[more[1]].word, True)
@@ -1211,7 +1221,12 @@ class Redactor(TaxIdRedactor):
                 return None
             if i > 0 and toks[i - 1].case in ("title", "caps") and near(i - 1) and not cued and \
                     toks[i - 1].fold not in _GREETINGS and not (toks[i - 1].dot and toks[i - 1].case != "initial"):
-                return None
+                # "Provided Rahel with": an everyday word starting the line before it
+                p = toks[i - 1]
+                line_start = re.search(r"(?:^|\n)[ \t]*(?:[-*\u2022]|\d{1,2}[.)])?[ \t]*\Z", fold[:p.start])
+                if not (line_start and p.fold in _common_words() and not _name_listed(p.fold, surnames) and
+                        f"{p.fold} {t.fold}" not in _FIRMS):
+                    return None
             if i + 1 < len(toks) and toks[i + 1].case in ("title", "caps") and near(i) and not t.dot:
                 return None
             return _Found(i, i, None, None, None) if ok(i, i) else None
@@ -1292,6 +1307,29 @@ class Redactor(TaxIdRedactor):
                             True)
                 if (name := named(more, True)) is not None:
                     return name
+        if near(i) and t.case in ("title", "caps") and not t.dot and t.fold not in self._v.not_names:
+            n = toks[i + 1]
+            listed = t.fold in _GIVEN or t.fold in _SURNAMES or (_name_listed(t.fold, surnames) and not _wordlike(t.fold))
+            # Micheletto G. Ligorio, Dawn B. Neal: a capitalized word, an initial, and a surname-like word
+            if n.case == "initial" and n.dot and i + 2 < len(toks) and near(i + 1) and \
+                    toks[i + 2].case == t.case and not toks[i + 2].dot and len(toks[i + 2].word) > 1 and \
+                    toks[i + 2].fold not in self._v.not_names and \
+                    (listed or t.fold not in _common_words()) and _surname_like(toks[i + 2].fold, surnames) and \
+                    not (t.fold in _common_words() and toks[i + 2].fold in _common_words()) and ok(i, i + 2):
+                return found(i, i + 2, t.word, [n.word], toks[i + 2].word, True)
+            # Sarah K.: a first name and an initial
+            if n.case == "initial" and n.dot and listed and (t.fold in _given_names() or t.fold in _GIVEN) and \
+                    not (i + 2 < len(toks) and near(i + 1) and toks[i + 2].case in ("title", "caps")) and ok(i, i + 1):
+                return _Found(i, i + 1, None, None, None)
+        # the Le Gall family, the Scholz family
+        if t.case == "title" and i > 0 and toks[i - 1].fold == "the":
+            j = i
+            while j + 1 < len(toks) and j - i < 2 and near(j) and toks[j + 1].case == "title":
+                j += 1
+            if j + 1 < len(toks) and near(j) and toks[j + 1].fold == "family" and toks[j + 1].case == "lower" and \
+                    all(t2.fold not in self._v.not_names and _surname_like(t2.fold, surnames) for t2 in toks[i:j + 1]) and \
+                    not all(t2.fold in _common_words() for t2 in toks[i:j + 1]):
+                return _Found(i, j, None, None, None)
         # Mockridge, Avery K.
         if i + 1 < len(toks) and _COMMA_GAP.fullmatch(_gap(fold, toks, i)) and name_word(i):
             n = toks[i + 1]
