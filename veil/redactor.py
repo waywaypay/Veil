@@ -359,8 +359,11 @@ _FOREIGN = re.compile(
     # Ronda Macario Merino 88, Via Roma 12
     r"|(?<![\w])(?:Ronda|Calle|Avenida|Paseo|Plaza|Pasaje|Carrer|Rua|Via|Viale|Piazza|Corso|Contrada|Strada|Vicolo"
     r"|Largo|Rue|Avenue|Boulevard|Chemin|Place|Quai|Travessa|Traves\u00eda|Glorieta|Rotonda|Stretto|Callej\u00f3n|Callejon"
-    r"|Camino|Cuesta|Alameda|Avinguda|Passatge|Pra\u00e7a|Pra\u00e7a|Borgo|Viale|Salita|Vico)(?:[ \t]+(?:de|del|della|di|da|do|dos|la|las"
-    r"|los|le|les|du|des)?[ \t]*[A-Z\u00c0-\u024f][\w\u00c0-\u024f'.-]*){1,4},?[ \t]+\d{1,5}[a-z]?(?![\w])"
+    r"|Camino|Cuesta|Alameda|Avinguda|Passatge|Pra\u00e7a|Rambla|Acceso|Borgo|Viale|Salita|Vico)(?:[ \t]+(?:(?:de|del|della|di|da|do"
+    r"|dos|la|las|los|le|les|du|des|el)[ \t]+){0,2}[A-Z\u00c0-\u024f][\w\u00c0-\u024f'.-]*){1,4},?[ \t]+\d{1,5}[a-z]?(?![\w])"
+    # rue de Bonnet, chemin Germain: a French street's kind in lower case, then its name
+    r"|(?<![\w])(?:rue|chemin|impasse|all\u00e9e|boulevard|avenue)[ \t]+(?:(?:de|du|des|la|d')[ \t]*){0,2}"
+    r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?:[ \t]+[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*){0,3}(?=[ \t]*(?:[,.;:)\n]|$))"
     rf"|(?<![\w-])\d{{3,5}}(?:-\d{{4}})?[ \t]+(?:[A-Z][\w'.-]*[ \t]+){{0,3}}[A-Z][\w'.-]*,[ \t]+"
     rf"(?:{'|'.join(_COUNTRIES)})\b")
 # "Mailing address: 88 Kearny": the rest of the line, when it has a number.
@@ -419,9 +422,10 @@ _POSTAL = (r"(?:\d{3}[ ]\d{2}(?![\d])|\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[
 # under it that are the rest of the address ("Toronto, ON M3H 2T6", "Canada").
 _TAIL_PIECE = re.compile(
     rf"[,;]?[ \t]*{_UNIT}(?:[.:,]|[ \t]+[.:,]){{0,3}}[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
-    rf"|[,;:][.,;:]?[ \t]*(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
+    rf"|(?:[,;:][.,;:]?[ \t]*(?:\n[ \t]*)?|/(?=[A-Z0-9]))(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
     rf"|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
-    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\\]]|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
+    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\\]]|\[|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on|has|had|have|may|will|shall|can|could|would"
+    rf"|should|must|are|were|or|but|at|from|by|if|which|where|that)\b))"
     rf"|[ \t]*\n(?:[ \t]*\n)?[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_POSTAL}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})|{_POSTAL}[ \t]+{_CITY_WORDS}"
@@ -524,6 +528,12 @@ def _address_tail(copy: str, end: int) -> int:
     lines under it."""
     while (m := _TAIL_PIECE.match(copy, end)) is not None and m.end() > end:
         end = m.end()
+    # "887 Simon Cliff, 28346" then "Clineville" alone on the next line: a town no everyday word
+    if re.search(r"\d{4,6}[ \t]*\Z", copy[max(0, end - 8):end]) and \
+            (m := re.match(r"[ \t]*\n[ \t]*((?:[A-Z][\w'\u00c0-\u024f-]+[ \t]+){0,2}[A-Z][\w'\u00c0-\u024f-]+)[ \t]*(?=\n|$)",
+                           copy[end:])) and \
+            not any(w.casefold() in _common_words() for w in m.group(1).split()):
+        end += m.end()
     return end
 
 
