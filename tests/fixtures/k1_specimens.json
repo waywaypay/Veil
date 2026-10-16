@@ -1,0 +1,556 @@
+[
+ {
+  "file": "k2-0012.pdf",
+  "partner_name": "Rowan S. Mockridge",
+  "data": {
+   "partnership": "Marlow Vane Growth Fund, LP",
+   "partner": {
+    "name": "Rowan S. Mockridge",
+    "general_partner": false,
+    "entity_type": "Individual",
+    "profit_pct": "3.7005"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "64871"
+    },
+    {
+     "k1_line": "5 - Interest income",
+     "amount": "3240"
+    },
+    {
+     "k1_line": "6a - Ordinary dividends",
+     "amount": "4679"
+    },
+    {
+     "k1_line": "6b - Qualified dividends",
+     "amount": "2044"
+    },
+    {
+     "k1_line": "9a - Net long-term capital gain (loss)",
+     "amount": "23604"
+    },
+    {
+     "k1_line": "10 - Net section 1231 gain (loss)",
+     "amount": "-6686"
+    },
+    {
+     "k1_line": "13A - Cash contributions (60%)",
+     "amount": "-2150"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "47950"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "7919"
+    },
+    {
+     "k1_line": "20B - Investment expenses",
+     "amount": "1542"
+    }
+   ],
+   "warnings": [
+    "Box 3 (Other net rental income (loss)) shows 3,563 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2022\nFor calendar year 2022, or tax year\nbeginning 01/01/2022  ending 12/31/2022\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-0602997\nB  Partnership's name, address, city, state, and ZIP code\nMarlow Vane Growth Fund, LP\n4702 Placeholder Rd, Ste 323\nAnytown, MA 00453\nC  IRS center where partnership filed return\n Sample Service Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n000-35-9059\nF  Partner's name, address, city, state, and ZIP code\nRowan S. Mockridge\n6055 Placeholder Rd\nTestburg, FL 00473\nG\n General partner / LLC mgr\nX\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Individual\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n3.7005 %\n3.7005 %\nLoss\n3.7005 %\n3.7005 %\nCapital\n3.5149 %\n3.5149 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 0\n$ 158,000\nQualified nonrecourse\n$ 185,500\n$ 180,700\nRecourse\n$ 0\n$ 0\nL  Partner's capital account analysis:\n Beginning capital account\n$ 796,000\nCapital contributed during the year\n$ 0\nCurrent year net income (loss)\n$ 91,121\nOther increase (decrease)\n$ (13,000)\nWithdrawals & distributions\n$ (47,950)\nEnding capital account\n$ 826,171\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n64,871\n2\nNet rental real estate income (loss)\n3\nOther net rental income (loss)\n3,563\n4a\nGuaranteed payments for services\n4b\nGuaranteed payments for capital\n4c\nTotal guaranteed payments\n5\nInterest income\n3,240\n6a\nOrdinary dividends\n4,679\n6b\nQualified dividends\n2,044\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n9a\nNet long-term capital gain (loss)\n23,604\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n(6,686)\n11\nOther income (loss)  [A] Other portfolio\n12\nSection 179 deduction\n13\nOther deductions  [A] Cash contrib. (60%)\n2,150\n14\nSelf-employment earnings  [A] Net SE\n15\nCredits  [A] Low-income housing credit\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n18\nTax-exempt income  [A] Tax-exempt interest\n19\nDistributions  [A] Cash and marketable securities\n47,950\n20\nOther information  [A] Investment income\n7,919\n20\n[B] Investment expenses\n1,542\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0012 (seed 50012). Layout approximates the IRS form for software testing and training only.\n",
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSupplemental Information - Schedule K-1 (Form 1065)\nTax year 2022   Partnership: Marlow Vane Growth Fund, LP   EIN 00-0602997\nPartner: Rowan S. Mockridge   TIN 000-35-9059\nStatement A - Codes reported in Part III\n Box\nCode\nDescription\nAmount\n13\nA\nCash contributions (60%)\n2,150\n19\nA\nDistributions - cash and marketable securities\n47,950\n20\nA\nInvestment income\n7,919\n20\nB\nInvestment expenses\n1,542\nStatement B - Section 199A information (Box 20, Code Z)\n Item\nAmount\nQualified business income (loss)\n64,871\nW-2 wages\n642,618\nUnadjusted basis immediately after acquisition of qualified property\n1,296,990\nNotes\nAmounts are reported on a tax basis and may differ from amounts shown in the partnership's financial statements.\nThis is a synthetic specimen created for software testing and does not describe any real entity.\nQuestions regarding this package should be directed to the partnership's investor relations contact.\nThe partnership may issue an amended K-1 if corrected information becomes available after the date of this package.\nEstimated figures are marked on the individual statements where applicable and are subject to revision.\nNothing in this document constitutes tax advice; partners should consult their own advisers.\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0012 (seed 50012).\nPage 2 of 2\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0022.pdf",
+  "partner_name": "Dummerton Retirement Trust",
+  "data": {
+   "partnership": "Eastmere Energy Partners, LLC",
+   "partner": {
+    "name": "Dummerton Retirement Trust",
+    "general_partner": false,
+    "entity_type": "Partnership",
+    "profit_pct": "26.4490"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "-43093"
+    },
+    {
+     "k1_line": "2 - Net rental real estate income (loss)",
+     "amount": "-24417"
+    },
+    {
+     "k1_line": "5 - Interest income",
+     "amount": "2316"
+    },
+    {
+     "k1_line": "8 - Net short-term capital gain (loss)",
+     "amount": "12670"
+    },
+    {
+     "k1_line": "10 - Net section 1231 gain (loss)",
+     "amount": "11403"
+    },
+    {
+     "k1_line": "13A - Cash contributions (60%)",
+     "amount": "-3787"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "2316"
+    }
+   ],
+   "warnings": [],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2022\nFor calendar year 2022, or tax year\nbeginning 01/01/2022  ending 12/31/2022\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-8000966\nB  Partnership's name, address, city, state, and ZIP code\nEastmere Energy Partners, LLC\n4008 Example Ave, Ste 124\nAnytown, IL 00449\nC  IRS center where partnership filed return\n Sample Service Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n00-4885220\nF  Partner's name, address, city, state, and ZIP code\nDummerton Retirement Trust\n5169 Demo Street\nSamplewood, AZ 00411\nG\n General partner / LLC mgr\nX\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Partnership\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n26.6171 %\n26.4490 %\nLoss\n26.6171 %\n26.4490 %\nCapital\n25.5825 %\n26.4490 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 192,500\n$ 287,200\nQualified nonrecourse\n$ 343,800\n$ 282,100\nRecourse\n$ 0\n$ 40,000\nL  Partner's capital account analysis:\n Beginning capital account\n$ 1,803,950\nCapital contributed during the year\n$ 0\nCurrent year net income (loss)\n$ (44,908)\nOther increase (decrease)\n$ 0\nWithdrawals & distributions\n$ 0\nEnding capital account\n$ 1,759,042\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n(43,093)\n2\nNet rental real estate income (loss)\n(24,417)\n3\nOther net rental income (loss)\n4a\nGuaranteed payments for services\n4b\nGuaranteed payments for capital\n4c\nTotal guaranteed payments\n5\nInterest income\n2,316\n6a\nOrdinary dividends\n6b\nQualified dividends\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n12,670\n9a\nNet long-term capital gain (loss)\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n11,403\n11\nOther income (loss)  [A] Other portfolio\n12\nSection 179 deduction\n13\nOther deductions  [A] Cash contrib. (60%)\n3,787\n14\nSelf-employment earnings  [A] Net SE\n15\nCredits  [A] Low-income housing credit\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n18\nTax-exempt income  [A] Tax-exempt interest\n19\nDistributions  [A] Cash and marketable securities\n20\nOther information  [A] Investment income\n2,316\n20\n[B] Investment expenses\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0022 (seed 50022). Layout approximates the IRS form for software testing and training only.\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0063.pdf",
+  "partner_name": "Notreal Retirement Trust",
+  "data": {
+   "partnership": "Marlow Vane Ventures, LLC",
+   "partner": {
+    "name": "Notreal Retirement Trust",
+    "general_partner": false,
+    "entity_type": "Trust",
+    "profit_pct": "38.6446"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "61469"
+    },
+    {
+     "k1_line": "2 - Net rental real estate income (loss)",
+     "amount": "-9075"
+    },
+    {
+     "k1_line": "6a - Ordinary dividends",
+     "amount": "1914"
+    },
+    {
+     "k1_line": "6b - Qualified dividends",
+     "amount": "1698"
+    },
+    {
+     "k1_line": "9a - Net long-term capital gain (loss)",
+     "amount": "46227"
+    },
+    {
+     "k1_line": "11A - Other portfolio income",
+     "amount": "1157"
+    },
+    {
+     "k1_line": "13A - Cash contributions (60%)",
+     "amount": "-1686"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "56250"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "1914"
+    },
+    {
+     "k1_line": "Capital contributed during the year",
+     "amount": "146100"
+    }
+   ],
+   "warnings": [
+    "Box 12 (Section 179 deduction) shows 17,603 but has no matching K-1 line; enter it manually if it matters to the allocation.",
+    "Box 15A (Credits  [A] Low-income housing credit) shows 4,974 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2022\nFor calendar year 2022, or tax year\nbeginning 01/01/2022  ending 12/31/2022\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-4237816\nB  Partnership's name, address, city, state, and ZIP code\nMarlow Vane Ventures, LLC\n1357 Placeholder Rd\nExampleville, NY 00363\nC  IRS center where partnership filed return\n Specimen Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n00-7724962\nF  Partner's name, address, city, state, and ZIP code\nNotreal Retirement Trust\n4089 Test Lane, Ste 374\nDummyfield, IL 00096\nG\n General partner / LLC mgr\nX\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Trust\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n38.6446 %\n38.6446 %\nLoss\n38.6446 %\n38.6446 %\nCapital\n36.1719 %\n38.6446 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 0\n$ 112,100\nQualified nonrecourse\n$ 260,200\n$ 291,500\nRecourse\n$ 0\n$ 24,200\nL  Partner's capital account analysis:\n Beginning capital account\n$ 394,950\nCapital contributed during the year\n$ 146,100\nCurrent year net income (loss)\n$ 82,403\nOther increase (decrease)\n$ 0\nWithdrawals & distributions\n$ (56,250)\nEnding capital account\n$ 567,203\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n61,469\n2\nNet rental real estate income (loss)\n(9,075)\n3\nOther net rental income (loss)\n4a\nGuaranteed payments for services\n4b\nGuaranteed payments for capital\n4c\nTotal guaranteed payments\n5\nInterest income\n6a\nOrdinary dividends\n1,914\n6b\nQualified dividends\n1,698\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n9a\nNet long-term capital gain (loss)\n46,227\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n11\nOther income (loss)  [A] Other portfolio\n1,157\n12\nSection 179 deduction\n17,603\n13\nOther deductions  [A] Cash contrib. (60%)\n1,686\n14\nSelf-employment earnings  [A] Net SE\n15\nCredits  [A] Low-income housing credit\n4,974\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n18\nTax-exempt income  [A] Tax-exempt interest\n19\nDistributions  [A] Cash and marketable securities\n56,250\n20\nOther information  [A] Investment income\n1,914\n20\n[B] Investment expenses\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0063 (seed 50063). Layout approximates the IRS form for software testing and training only.\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0071.pdf",
+  "partner_name": "Samplestein Retirement Trust",
+  "data": {
+   "partnership": "Eastmere Holdings, LP",
+   "partner": {
+    "name": "Samplestein Retirement Trust",
+    "general_partner": true,
+    "entity_type": "Trust",
+    "profit_pct": "2.6380"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "2031258"
+    },
+    {
+     "k1_line": "4 - Guaranteed payments",
+     "amount": "1409167"
+    },
+    {
+     "k1_line": "5 - Interest income",
+     "amount": "346134"
+    },
+    {
+     "k1_line": "6a - Ordinary dividends",
+     "amount": "179114"
+    },
+    {
+     "k1_line": "6b - Qualified dividends",
+     "amount": "169440"
+    },
+    {
+     "k1_line": "8 - Net short-term capital gain (loss)",
+     "amount": "-101873"
+    },
+    {
+     "k1_line": "9a - Net long-term capital gain (loss)",
+     "amount": "1430123"
+    },
+    {
+     "k1_line": "10 - Net section 1231 gain (loss)",
+     "amount": "-99616"
+    },
+    {
+     "k1_line": "18A - Tax-exempt interest income",
+     "amount": "47649"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "5148550"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "525248"
+    },
+    {
+     "k1_line": "Capital contributed during the year",
+     "amount": "104400"
+    }
+   ],
+   "warnings": [
+    "Box 14A (Self-employment earnings  [A] Net SE) shows 3,440,425 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2023\nFor calendar year 2023, or tax year\nbeginning 01/01/2023  ending 12/31/2023\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-1816991\nB  Partnership's name, address, city, state, and ZIP code\nEastmere Holdings, LP\n5067 Demo Street\nAnytown, MA 00388\nC  IRS center where partnership filed return\n Sample Service Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n00-4678764\nF  Partner's name, address, city, state, and ZIP code\nSamplestein Retirement Trust\n6717 Test Lane\nMocktown, IL 00420\nG\n X\nGeneral partner / LLC mgr\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Trust\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n2.6380 %\n2.6380 %\nLoss\n2.6380 %\n2.6380 %\nCapital\n2.6003 %\n2.6380 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 120,700\n$ 341,000\nQualified nonrecourse\n$ 0\n$ 0\nRecourse\n$ 270,200\n$ 221,100\nL  Partner's capital account analysis:\n Beginning capital account\n$ 946,650\nCapital contributed during the year\n$ 104,400\nCurrent year net income (loss)\n$ 5,194,307\nOther increase (decrease)\n$ 0\nWithdrawals & distributions\n$ (5,148,550)\nEnding capital account\n$ 1,096,807\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n2,031,258\n2\nNet rental real estate income (loss)\n3\nOther net rental income (loss)\n4a\nGuaranteed payments for services\n1,409,167\n4b\nGuaranteed payments for capital\n4c\nTotal guaranteed payments\n1,409,167\n5\nInterest income\n346,134\n6a\nOrdinary dividends\n179,114\n6b\nQualified dividends\n169,440\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n(101,873)\n9a\nNet long-term capital gain (loss)\n1,430,123\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n(99,616)\n11\nOther income (loss)  [A] Other portfolio\n12\nSection 179 deduction\n13\nOther deductions  [A] Cash contrib. (60%)\n14\nSelf-employment earnings  [A] Net SE\n3,440,425\n15\nCredits  [A] Low-income housing credit\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n18\nTax-exempt income  [A] Tax-exempt interest\n47,649\n19\nDistributions  [A] Cash and marketable securities\n5,148,550\n20\nOther information  [A] Investment income\n525,248\n20\n[B] Investment expenses\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0071 (seed 50071). Layout approximates the IRS form for software testing and training only.\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0095.pdf",
+  "partner_name": "Placeholder Holdings, Inc.",
+  "data": {
+   "partnership": "Brindle Cross Capital Fund II, LP",
+   "partner": {
+    "name": "Placeholder Holdings, Inc.",
+    "general_partner": true,
+    "entity_type": "Partnership",
+    "profit_pct": "7.5689"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "762634"
+    },
+    {
+     "k1_line": "4 - Guaranteed payments",
+     "amount": "238169"
+    },
+    {
+     "k1_line": "5 - Interest income",
+     "amount": "63027"
+    },
+    {
+     "k1_line": "8 - Net short-term capital gain (loss)",
+     "amount": "59710"
+    },
+    {
+     "k1_line": "9a - Net long-term capital gain (loss)",
+     "amount": "36027"
+    },
+    {
+     "k1_line": "13A - Cash contributions (60%)",
+     "amount": "-20335"
+    },
+    {
+     "k1_line": "18A - Tax-exempt interest income",
+     "amount": "35299"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "996700"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "63027"
+    },
+    {
+     "k1_line": "Capital contributed during the year",
+     "amount": "177650"
+    }
+   ],
+   "warnings": [
+    "Box 14A (Self-employment earnings  [A] Net SE) shows 1,000,803 but has no matching K-1 line; enter it manually if it matters to the allocation.",
+    "Box 21 (Foreign taxes paid or accrued) shows 17,257 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2022\nFor calendar year 2022, or tax year\nbeginning 01/01/2022  ending 12/31/2022\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-7651514\nB  Partnership's name, address, city, state, and ZIP code\nBrindle Cross Capital Fund II, LP\n6249 Sample Blvd, Ste 9\nSamplewood, CA 00261\nC  IRS center where partnership filed return\n Sample Service Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n00-6039901\nF  Partner's name, address, city, state, and ZIP code\nPlaceholder Holdings, Inc.\n739 Mockingbird Ct, Ste 287\nExampleville, NC 00389\nG\n X\nGeneral partner / LLC mgr\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Partnership\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n7.5498 %\n7.5689 %\nLoss\n7.5498 %\n7.5689 %\nCapital\n8.1060 %\n7.5689 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 172,000\n$ 272,300\nQualified nonrecourse\n$ 385,200\n$ 0\nRecourse\n$ 251,900\n$ 216,300\nL  Partner's capital account analysis:\n Beginning capital account\n$ 1,606,200\nCapital contributed during the year\n$ 177,650\nCurrent year net income (loss)\n$ 1,139,232\nOther increase (decrease)\n$ 0\nWithdrawals & distributions\n$ (996,700)\nEnding capital account\n$ 1,926,382\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n762,634\n2\nNet rental real estate income (loss)\n3\nOther net rental income (loss)\n4a\nGuaranteed payments for services\n238,169\n4b\nGuaranteed payments for capital\n4c\nTotal guaranteed payments\n238,169\n5\nInterest income\n63,027\n6a\nOrdinary dividends\n6b\nQualified dividends\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n59,710\n9a\nNet long-term capital gain (loss)\n36,027\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n11\nOther income (loss)  [A] Other portfolio\n12\nSection 179 deduction\n13\nOther deductions  [A] Cash contrib. (60%)\n20,335\n14\nSelf-employment earnings  [A] Net SE\n1,000,803\n15\nCredits  [A] Low-income housing credit\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n18\nTax-exempt income  [A] Tax-exempt interest\n35,299\n19\nDistributions  [A] Cash and marketable securities\n996,700\n20\nOther information  [A] Investment income\n63,027\n20\n[B] Investment expenses\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\n17,257\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0095 (seed 50095). Layout approximates the IRS form for software testing and training only.\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0103.pdf",
+  "partner_name": "Avery F. Mockridge",
+  "data": {
+   "partnership": "Fennel Hollow Growth Fund, LP",
+   "partner": {
+    "name": "Avery F. Mockridge",
+    "general_partner": false,
+    "entity_type": "Individual",
+    "profit_pct": "5.8042"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "-1083246"
+    },
+    {
+     "k1_line": "6a - Ordinary dividends",
+     "amount": "204725"
+    },
+    {
+     "k1_line": "6b - Qualified dividends",
+     "amount": "136176"
+    },
+    {
+     "k1_line": "13A - Cash contributions (60%)",
+     "amount": "-95535"
+    },
+    {
+     "k1_line": "17A - Post-1986 depreciation adjustment",
+     "amount": "113670"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "204725"
+    },
+    {
+     "k1_line": "Capital contributed during the year",
+     "amount": "148350"
+    }
+   ],
+   "warnings": [
+    "Box 12 (Section 179 deduction) shows 498,218 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2023\nFor calendar year 2023, or tax year\nbeginning 01/01/2023  ending 12/31/2023\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nX\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-3886027\nB  Partnership's name, address, city, state, and ZIP code\nFennel Hollow Growth Fund, LP\n1048 Fictional Pkwy\nMocktown, NC 00187\nC  IRS center where partnership filed return\n Specimen Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n000-18-1211\nF  Partner's name, address, city, state, and ZIP code\nAvery F. Mockridge\n6224 Mockingbird Ct\nAnytown, WA 00490\nG\n General partner / LLC mgr\nX\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Individual\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n5.8042 %\n5.8042 %\nLoss\n5.8042 %\n5.8042 %\nCapital\n5.3107 %\n5.8042 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 0\n$ 0\nQualified nonrecourse\n$ 0\n$ 66,700\nRecourse\n$ 108,900\n$ 148,200\nL  Partner's capital account analysis:\n Beginning capital account\n$ 1,614,150\nCapital contributed during the year\n$ 148,350\nCurrent year net income (loss)\n$ (1,472,274)\nOther increase (decrease)\n$ 0\nWithdrawals & distributions\n$ 0\nEnding capital account\n$ 290,226\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n(1,083,246)\n2\nNet rental real estate income (loss)\n3\nOther net rental income (loss)\n4a\nGuaranteed payments for services\n4b\nGuaranteed payments for capital\n4c\nTotal guaranteed payments\n5\nInterest income\n6a\nOrdinary dividends\n204,725\n6b\nQualified dividends\n136,176\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n9a\nNet long-term capital gain (loss)\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n11\nOther income (loss)  [A] Other portfolio\n12\nSection 179 deduction\n498,218\n13\nOther deductions  [A] Cash contrib. (60%)\n95,535\n14\nSelf-employment earnings  [A] Net SE\n15\nCredits  [A] Low-income housing credit\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n113,670\n18\nTax-exempt income  [A] Tax-exempt interest\n19\nDistributions  [A] Cash and marketable securities\n20\nOther information  [A] Investment income\n204,725\n20\n[B] Investment expenses\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0103 (seed 50103). Layout approximates the IRS form for software testing and training only.\n",
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSupplemental Information - Schedule K-1 (Form 1065)\nTax year 2023   Partnership: Fennel Hollow Growth Fund, LP   EIN 00-3886027\nPartner: Avery F. Mockridge   TIN 000-18-1211\nStatement A - Codes reported in Part III\n Box\nCode\nDescription\nAmount\n13\nA\nCash contributions (60%)\n95,535\n17\nA\nPost-1986 depreciation adjustment\n113,670\n20\nA\nInvestment income\n204,725\nStatement B - Section 199A information (Box 20, Code Z)\n Item\nAmount\nQualified business income (loss)\n(1,083,246)\nW-2 wages\n644,005\nUnadjusted basis immediately after acquisition of qualified property\n1,435,350\nNotes\nAmounts are reported on a tax basis and may differ from amounts shown in the partnership's financial statements.\nQuestions regarding this package should be directed to the partnership's investor relations contact.\nThe partnership may issue an amended K-1 if corrected information becomes available after the date of this package.\nThis package contains the partner's Schedule K-1 and supporting information for the tax year indicated above.\nNothing in this document constitutes tax advice; partners should consult their own advisers.\nPlease retain this document with your tax records and provide a copy to your tax preparer.\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0103 (seed 50103).\nPage 2 of 2\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0151.pdf",
+  "partner_name": "Riley K. Testwell",
+  "data": {
+   "partnership": "Ostrander Income Partners, LP",
+   "partner": {
+    "name": "Riley K. Testwell",
+    "general_partner": false,
+    "entity_type": "Individual",
+    "profit_pct": "9.4046"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "69293"
+    },
+    {
+     "k1_line": "5 - Interest income",
+     "amount": "5035"
+    },
+    {
+     "k1_line": "9a - Net long-term capital gain (loss)",
+     "amount": "2738"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "33400"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "5035"
+    },
+    {
+     "k1_line": "20B - Investment expenses",
+     "amount": "1102"
+    }
+   ],
+   "warnings": [
+    "Box 12 (Section 179 deduction) shows $3,544 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1 (Form 1065)   Tax Year 2023\nPartner's Share of Current Year Income, Deductions, Credits, and Other Items\n[ ] Final K-1     [X] Amended K-1     [ ] Publicly traded partnership\nPart I  Partnership\nPart II  Partner\nEIN\n00-9652025\nSSN/TIN\n000-85-6491\nName\nOstrander Income Partners, LP\nName\nRiley K. Testwell\nAddress\n2711 Placeholder Rd\nAddress\n5735 Example Ave\nDummyfield, FL 00014\nSamplewood, AZ 00146\nIRS center\nSpecimen Center\nEntity type\nIndividual\n[ ] GP/LLC mgr  [X] LP/other member\n[X] Domestic  [ ] Foreign\nShare\nBeginning\nEnding\nProfit\n9.4046%\n9.4046%\nLoss\n9.4046%\n9.4046%\nCapital\n8.7179%\n9.4046%\nLiabilities\nBeginning\nEnding\nNonrecourse\n$165,700\n$201,700\nQualified nonrecourse\n$88,400\n$0\nRecourse\n$0\n$393,200\nPart III  Partner's share of current year income, deductions, credits, and other items\n Box\nCode\nDescription\nAmount\n1\nOrdinary business income (loss)\n$69,293\n5\nInterest income\n$5,035\n9a\nNet long-term capital gain (loss)\n$2,738\n12\nSection 179 deduction\n$3,544\n19\nA\nDistributions - cash and marketable securities\n$33,400\n20\nA\nInvestment income\n$5,035\n20\nB\nInvestment expenses\n$1,102\nPartner's capital account analysis\n Beginning capital account\n$49,400\nCapital contributed during the year\n$0\nCurrent year net income (loss)\n$73,522\nOther increase (decrease)\n$0\nWithdrawals and distributions\n($33,400)\nEnding capital account\n$89,522\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0151 (seed 50151).\nPage 1 of 1\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0206.pdf",
+  "partner_name": "Rowan N. Exemplar",
+  "data": {
+   "partnership": "Pinecrest Gate Real Estate Fund III, LP",
+   "partner": {
+    "name": "Rowan N. Exemplar",
+    "general_partner": false,
+    "entity_type": "Individual",
+    "profit_pct": "33.6860"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "1360874"
+    },
+    {
+     "k1_line": "2 - Net rental real estate income (loss)",
+     "amount": "-688210"
+    },
+    {
+     "k1_line": "5 - Interest income",
+     "amount": "4470"
+    },
+    {
+     "k1_line": "18A - Tax-exempt interest income",
+     "amount": "42585"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "155800"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "4470"
+    },
+    {
+     "k1_line": "Capital contributed during the year",
+     "amount": "97550"
+    }
+   ],
+   "warnings": [
+    "Box 12 (Section 179 deduction) shows 192,576 but has no matching K-1 line; enter it manually if it matters to the allocation.",
+    "Box 15A (Low-income housing credit) shows 136,778 but has no matching K-1 line; enter it manually if it matters to the allocation.",
+    "Box 21 (Foreign taxes paid or accrued) shows 15,365 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1 (Form 1065)   Tax Year 2025\nPartner's Share of Current Year Income, Deductions, Credits, and Other Items\n[ ] Final K-1     [ ] Amended K-1     [ ] Publicly traded partnership\nPart I  Partnership\nPart II  Partner\nEIN\n00-3065990\nSSN/TIN\n000-29-2873\nName\nPinecrest Gate Real Estate Fund III, LP\nName\nRowan N. Exemplar\nAddress\n2680 Example Ave\nAddress\n3612 Test Lane, Ste 258\nExampleville, OH 00175\nAnytown, CO 00476\nIRS center\nSample Service Center\nEntity type\nIndividual\n[ ] GP/LLC mgr  [X] LP/other member\n[X] Domestic  [ ] Foreign\nShare\nBeginning\nEnding\nProfit\n33.6860%\n33.6860%\nLoss\n33.6860%\n33.6860%\nCapital\n32.8752%\n33.6860%\nLiabilities\nBeginning\nEnding\nNonrecourse\n128,600\n0\nQualified nonrecourse\n161,800\n0\nRecourse\n371,000\n0\nPart III  Partner's share of current year income, deductions, credits, and other items\n Box\nCode\nDescription\nAmount\n1\nOrdinary business income (loss)\n1,360,874\n2\nNet rental real estate income (loss)\n(688,210)\n5\nInterest income\n4,470\n12\nSection 179 deduction\n192,576\n15\nA\nLow-income housing credit\n136,778\n18\nA\nTax-exempt interest income\n42,585\n19\nA\nDistributions - cash and marketable securities\n155,800\n20\nA\nInvestment income\n4,470\n21\nForeign taxes paid or accrued\n15,365\nPartner's capital account analysis\n Beginning capital account\n2,358,450\nCapital contributed during the year\n97,550\nCurrent year net income (loss)\n484,558\nOther increase (decrease)\n0\nWithdrawals and distributions\n(155,800)\nEnding capital account\n2,784,758\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0206 (seed 50206).\nPage 1 of 1\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0267.pdf",
+  "partner_name": "Parker D. Specimen",
+  "data": {
+   "partnership": "Halcyon Mere Energy Partners, LLC",
+   "partner": {
+    "name": "Parker D. Specimen",
+    "general_partner": true,
+    "entity_type": "Individual",
+    "profit_pct": "18.0050"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "-10852"
+    },
+    {
+     "k1_line": "4 - Guaranteed payments",
+     "amount": "47130"
+    },
+    {
+     "k1_line": "5 - Interest income",
+     "amount": "10951"
+    },
+    {
+     "k1_line": "9a - Net long-term capital gain (loss)",
+     "amount": "17155"
+    },
+    {
+     "k1_line": "13A - Cash contributions (60%)",
+     "amount": "-2968"
+    },
+    {
+     "k1_line": "18A - Tax-exempt interest income",
+     "amount": "1129"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "59700"
+    },
+    {
+     "k1_line": "20A - Investment income",
+     "amount": "10951"
+    },
+    {
+     "k1_line": "Capital contributed during the year",
+     "amount": "133400"
+    }
+   ],
+   "warnings": [
+    "Box 14A (Self-employment earnings  [A] Net SE) shows 36,278 but has no matching K-1 line; enter it manually if it matters to the allocation."
+   ],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nHalcyon Mere Energy Partners, LLC\n8130 Demo Street, Mocktown, MA 00089\nEIN 00-6124364\nPartner Tax Package - Tax Year 2023\nPrepared for:\nParker D. Specimen\n8385 Sample Blvd, Ste 247\nDummyfield, GA 00047\nPartner TIN: 000-36-8219\nAmounts are reported on a tax basis and may differ from amounts shown in the partnership's financial statements.\nThe partnership may issue an amended K-1 if corrected information becomes available after the date of this package.\nEstimated figures are marked on the individual statements where applicable and are subject to revision.\nThis is a synthetic specimen created for software testing and does not describe any real entity.\nNothing in this document constitutes tax advice; partners should consult their own advisers.\nSummary of reported items\n Item\nAmount\nOrdinary business income (loss)\n(10,852)\nInterest income\n10,951\nNet long-term capital gain (loss)\n17,155\nDistributions\n59,700\nCurrent year net income (loss)\n61,416\nEnding capital account\n2,130,216\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0267 (seed 50267).\nPage 1 of 2\n",
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2023\nFor calendar year 2023, or tax year\nbeginning 01/01/2023  ending 12/31/2023\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-6124364\nB  Partnership's name, address, city, state, and ZIP code\nHalcyon Mere Energy Partners, LLC\n8130 Demo Street\nMocktown, MA 00089\nC  IRS center where partnership filed return\n Specimen Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n000-36-8219\nF  Partner's name, address, city, state, and ZIP code\nParker D. Specimen\n8385 Sample Blvd, Ste 247\nDummyfield, GA 00047\nG\n X\nGeneral partner / LLC mgr\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Individual\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n18.0050 %\n18.0050 %\nLoss\n18.0050 %\n18.0050 %\nCapital\n17.1777 %\n18.0050 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 395,900\n$ 0\nQualified nonrecourse\n$ 232,600\n$ 0\nRecourse\n$ 43,800\n$ 352,100\nL  Partner's capital account analysis:\n Beginning capital account\n$ 1,995,100\nCapital contributed during the year\n$ 133,400\nCurrent year net income (loss)\n$ 61,416\nOther increase (decrease)\n$ 0\nWithdrawals & distributions\n$ (59,700)\nEnding capital account\n$ 2,130,216\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n(10,852)\n2\nNet rental real estate income (loss)\n3\nOther net rental income (loss)\n4a\nGuaranteed payments for services\n33,376\n4b\nGuaranteed payments for capital\n13,754\n4c\nTotal guaranteed payments\n47,130\n5\nInterest income\n10,951\n6a\nOrdinary dividends\n6b\nQualified dividends\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n9a\nNet long-term capital gain (loss)\n17,155\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n11\nOther income (loss)  [A] Other portfolio\n12\nSection 179 deduction\n13\nOther deductions  [A] Cash contrib. (60%)\n2,968\n14\nSelf-employment earnings  [A] Net SE\n36,278\n15\nCredits  [A] Low-income housing credit\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n18\nTax-exempt income  [A] Tax-exempt interest\n1,129\n19\nDistributions  [A] Cash and marketable securities\n59,700\n20\nOther information  [A] Investment income\n10,951\n20\n[B] Investment expenses\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0267 (seed 50267). Layout approximates the IRS form for software testing and training only.\n"
+   ]
+  }
+ },
+ {
+  "file": "k2-0315.pdf",
+  "partner_name": "Dana T. Specimen",
+  "data": {
+   "partnership": "Tamarack Bend Opportunity Partners, LLC",
+   "partner": {
+    "name": "Dana T. Specimen",
+    "general_partner": false,
+    "entity_type": "Individual",
+    "profit_pct": "15.8175"
+   },
+   "rows": [
+    {
+     "k1_line": "1 - Ordinary business income (loss)",
+     "amount": "16307"
+    },
+    {
+     "k1_line": "2 - Net rental real estate income (loss)",
+     "amount": "23906"
+    },
+    {
+     "k1_line": "13A - Cash contributions (60%)",
+     "amount": "-1253"
+    },
+    {
+     "k1_line": "17A - Post-1986 depreciation adjustment",
+     "amount": "-4172"
+    },
+    {
+     "k1_line": "18A - Tax-exempt interest income",
+     "amount": "1245"
+    },
+    {
+     "k1_line": "19A - Cash and marketable securities",
+     "amount": "36300"
+    },
+    {
+     "k1_line": "20B - Investment expenses",
+     "amount": "2419"
+    }
+   ],
+   "warnings": [],
+   "pages": [
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nTamarack Bend Opportunity Partners, LLC\n1923 Specimen Way, Ste 114, Samplewood, CA 00293\nEIN 00-2364869\nPartner Tax Package - Tax Year 2024\nPrepared for:\nDana T. Specimen\n2076 Specimen Way\nDummyfield, OH 00330\nPartner TIN: 000-68-1179\nQuestions regarding this package should be directed to the partnership's investor relations contact.\nPlease retain this document with your tax records and provide a copy to your tax preparer.\nThis package contains the partner's Schedule K-1 and supporting information for the tax year indicated above.\nEstimated figures are marked on the individual statements where applicable and are subject to revision.\nThis is a synthetic specimen created for software testing and does not describe any real entity.\nSummary of reported items\n Item\nAmount\nOrdinary business income (loss)\n16,307\nDistributions\n36,300\nCurrent year net income (loss)\n38,960\nEnding capital account\n1,115,710\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0315 (seed 50315).\nPage 1 of 2\n",
+    "SPECIMEN\nFICTIONAL DATA - NOT FOR FILING\nSchedule K-1\n(Form 1065)\nDepartment of the Treasury / Internal Revenue Service (specimen layout)\n2024\nFor calendar year 2024, or tax year\nbeginning 01/01/2024  ending 12/31/2024\nPartner's Share of Income, Deductions,\nCredits, and Other Items\nFinal K-1\nAmended K-1\nOMB No. 0000-0000\nPart I   Information About the Partnership\nA  Partnership's employer identification number\n00-2364869\nB  Partnership's name, address, city, state, and ZIP code\nTamarack Bend Opportunity Partners, LLC\n1923 Specimen Way, Ste 114\nSamplewood, CA 00293\nC  IRS center where partnership filed return\n Sample Service Center\nD  Check if this is a publicly traded partnership (PTP)\nPart II   Information About the Partner\nE  Partner's SSN or TIN (do not use TIN of a disregarded entity)\n000-68-1179\nF  Partner's name, address, city, state, and ZIP code\nDana T. Specimen\n2076 Specimen Way\nDummyfield, OH 00330\nG\n General partner / LLC mgr\nX\nLimited / other member\nH1\n X\nDomestic partner\nForeign partner\nH2  If the partner is a disregarded entity (DE), enter the partner's:\nI1  What type of entity is this partner?\n Individual\nI2  If this partner is a retirement plan (IRA/SEP/Keogh/etc.), check here\nJ  Partner's share of profit, loss, and capital:\n Beginning\nEnding\nProfit\n15.8175 %\n15.8175 %\nLoss\n15.8175 %\n15.8175 %\nCapital\n16.2664 %\n15.8175 %\nK  Partner's share of liabilities:\n Beginning\nEnding\nNonrecourse\n$ 354,400\n$ 0\nQualified nonrecourse\n$ 126,000\n$ 0\nRecourse\n$ 36,600\n$ 232,300\nL  Partner's capital account analysis:\n Beginning capital account\n$ 1,113,050\nCapital contributed during the year\n$ 0\nCurrent year net income (loss)\n$ 38,960\nOther increase (decrease)\n$ 0\nWithdrawals & distributions\n$ (36,300)\nEnding capital account\n$ 1,115,710\nM  Did the partner contribute property with a built-in gain or loss?\n Yes\nX\nNo\nPart III   Partner's Share of Current Year Income, Deductions, Credits, and Other Items\n1\nOrdinary business income (loss)\n16,307\n2\nNet rental real estate income (loss)\n23,906\n3\nOther net rental income (loss)\n4a\nGuaranteed payments for services\n4b\nGuaranteed payments for capital\n4c\nTotal guaranteed payments\n5\nInterest income\n6a\nOrdinary dividends\n6b\nQualified dividends\n6c\nDividend equivalents\n7\nRoyalties\n8\nNet short-term capital gain (loss)\n9a\nNet long-term capital gain (loss)\n9b\nCollectibles (28%) gain (loss)\n9c\nUnrecaptured section 1250 gain\n10\nNet section 1231 gain (loss)\n11\nOther income (loss)  [A] Other portfolio\n12\nSection 179 deduction\n13\nOther deductions  [A] Cash contrib. (60%)\n1,253\n14\nSelf-employment earnings  [A] Net SE\n15\nCredits  [A] Low-income housing credit\n16\nSchedule K-3 is attached if checked\n17\nAMT items  [A] Post-1986 depreciation adj.\n(4,172)\n18\nTax-exempt income  [A] Tax-exempt interest\n1,245\n19\nDistributions  [A] Cash and marketable securities\n36,300\n20\nOther information  [A] Investment income\n20\n[B] Investment expenses\n2,419\n20\n[Z] Section 199A information\n21\nForeign taxes paid or accrued\nSPECIMEN - FICTIONAL PARTNERSHIP AND PARTNER - INVALID TIN/EIN - NOT FOR FILING, LENDING, OR ANY REPRESENTATION TO THIRD PARTIES\nSynthetic test document k2-0315 (seed 50315). Layout approximates the IRS form for software testing and training only.\n"
+   ]
+  }
+ }
+]
