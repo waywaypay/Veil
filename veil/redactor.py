@@ -288,6 +288,13 @@ def _common_surnames() -> frozenset[str]:
         return frozenset(line.strip() for line in f if not line.startswith("#"))
 
 
+def _name_listed(word: str, known: set[str]) -> bool:
+    """Whether ``word`` (folded) is on a list of names, or a name already known.  Of the surnames that are
+    everyday words, only those listed here count ("Young", not "Driver")."""
+    return word in _GIVEN or word in _SURNAMES or word in known or word in _WORD_SURNAMES or word in _WORD_GIVEN or \
+        word in _given_names() or word in _surname_list()
+
+
 def _surname_like(word: str, known: set[str]) -> bool:
     """Whether ``word`` (folded) can be a surname: one listed or known, or no everyday English word."""
     first = word.split("-")[0]
@@ -309,7 +316,8 @@ chad cuba lima regina adelaide alexandria augusta beverly cleveland dakota dougl
 jackson laramie lansing lorain marion montgomery nelson orange quincy raleigh salem sharon tyler warren
 wellington york
 """)
-_HONORIFICS = _words("mr mrs ms miss mx dr prof sir dame")
+_HONORIFICS = _words("mr mrs ms miss mx dr prof sir dame agent captain capt officer detective inspector sergeant "
+                     "sgt lieutenant lt judge coach nurse pastor rev reverend rabbi imam professor")
 _NAME_SUFFIXES = _words("jr sr ii iii iv md phd cpa esq")
 _ROMAN = _words("i ii iii iv v vi vii viii ix x xi xii xiii xiv xv")
 _PARTICLES = _words("van von de da del della der den di du la le st bin binti ibn abu al el ni nic mac dos das do "
@@ -389,7 +397,7 @@ _SWIFT_LABEL = r"swift(?:\s*/\s*bic)?(?:\s*code)?|bic(?:\s*code)?"
 _ID_LABEL = (
     rf"driver'?s?[\s_\\]*licen[cs]e(?:[\s_\\]*{_NO})?|dl(?=\s*[#:])|dl\s*no\b\.?|passport(?:[\s_\\]*{_NO})?"
     r"|(?:lp|gp|investor|partner|member|client|customer|policy|employee|patient|holder|medicare|medicaid|insurance"
-    r"|national|user|corporate|e-?wallet|wallet|staff|student|tax(?:payer)?|subscriber|loyalty"
+    r"|national|user|corporate|e-?wallet|wallet|staff|student|subscriber|loyalty"
     rf"|foreign(?:\s+tax)?)[\s_\\]*(?:id\b\.?|i\.\s?d\.|code|identification(?:[\s_\\]*{_NO})?|{_NO})"
     # a foreign tax number; a US one is the taxpayer IDs' (utils.taxpayer_ids)
     r"|foreign(?:\s+tax)?\s*tin\b"
@@ -1255,6 +1263,10 @@ class Redactor(TaxIdRedactor):
             words = [toks[k].fold for k in range(a, b + 1)]
             if any(f"{x} {y}" in _FIRMS for x, y in zip(words, words[1:])) or tuple(words) in self._businesses:
                 return False
+            # Only everyday words, none a name: "Driver Exclusion", "ADDITIONAL LIVING", "Stale Bill"
+            if all(toks[k].case == "initial" or (toks[k].fold in _common_words() and not _name_listed(toks[k].fold, surnames))
+                   for k in range(a, b + 1)):
+                return False
             return not _business_after(fold, toks[b].end + (1 if toks[b].dot and toks[b].case == "initial" else 0),
                                        self._v, typed)
 
@@ -1282,8 +1294,10 @@ class Redactor(TaxIdRedactor):
         while j - i < 4 and j + 1 < len(toks) and (name_word(j) or (j > i and toks[j].case == "initial")) and \
                 not (toks[j].dot and toks[j].case != "initial") and near(j):
             nxt = toks[j + 1]
-            if nxt.fold in _FAMILY or nxt.fold == "ira" or (nxt.fold in ("family", "retirement") and j + 2 < len(toks)
-                                                             and toks[j + 2].fold in ("trust", "foundation", "plan")):
+            if (nxt.fold in _FAMILY or nxt.fold == "ira" or (nxt.fold in ("family", "retirement") and j + 2 < len(toks)
+                                                              and toks[j + 2].fold in ("trust", "foundation", "plan"))) \
+                    and not all(toks[k].fold in _common_words() and not _name_listed(toks[k].fold, surnames)
+                                for k in range(i, j + 1)):
                 if j > i:
                     return found(i, j, t.word, [toks[m].word for m in range(i + 1, j)], toks[j].word, True)
                 if t.fold not in _GIVEN:
@@ -1355,11 +1369,14 @@ class Redactor(TaxIdRedactor):
                 more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames), True)
                 if (name := named(more, True)) is not None:
                     return name
-            # Priya Patel; Thandiwe Okonkwo once an Okonkwo is known: a common or known surname
-            name = named(rest(i + 1, t.case, True, lambda k: toks[k].fold in _SURNAMES or toks[k].fold in surnames,
-                              True), True)
-            if name is not None:
-                return name
+            # Priya Patel; Thandiwe Okonkwo once an Okonkwo is known: a common or known surname, after a word that
+            # can be a first name ("Call Priya Patel" is Priya Patel)
+            if not (t.fold in _common_words() and not _name_listed(t.fold, surnames) and
+                    (toks[i + 1].fold in _GIVEN or toks[i + 1].fold in _given_names())):
+                name = named(rest(i + 1, t.case, True, lambda k: toks[k].fold in _SURNAMES or toks[k].fold in surnames,
+                                  True), True)
+                if name is not None:
+                    return name
             # After a label or cue, before "as an LLC member", or in what the user typed: any capitalized words
             if t.case == "title" or cued or typed:
                 more = rest(i + 1, t.case, False, lambda k: True, True)
@@ -1388,9 +1405,12 @@ class Redactor(TaxIdRedactor):
             given = _given_names()
             if t.fold in given or t.fold.split("-")[0] in given:
                 # a surname that's an everyday word or a place ("Calder Ridge") only after a common first name
+                # a first name that's nearly a word ("Stale") needs a surname that's no word at all
+                wordy = max(given.get(t.fold, 0), given.get(t.fold.split("-")[0], 0)) >= 3
                 more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames) and
                             toks[k].fold not in _WORD_SURNAMES and
-                            (toks[k].fold not in _common_words() or toks[k].fold in _common_surnames()), True)
+                            (toks[k].fold not in _common_words() or (toks[k].fold in _common_surnames() and not wordy)),
+                            True)
                 if (name := named(more, True)) is not None:
                     return name
         # Mockridge, Avery K.
