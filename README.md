@@ -43,6 +43,7 @@ does:
 ```
 pip install "git+https://github.com/waywaypay/veil"              # the redactor only
 pip install "veil[anthropic] @ git+https://github.com/waywaypay/veil"
+pip install "veil[anthropic,files] @ git+https://github.com/waywaypay/veil"  # also reads PDFs and images
 ```
 
 ## Use it with the Anthropic SDK
@@ -65,6 +66,31 @@ values. That covers what the user typed, tool results, the system prompt and
 the model's earlier turns. In the reply, text and tool-call inputs come back
 with the real values. Thinking blocks go back unchanged. Streaming isn't
 supported yet: `stream=True` raises an error.
+
+## Images and PDFs
+
+veil redacts text, so by default an image or PDF goes to the model as it is,
+with whatever is written in it. Say what should happen to them instead:
+
+```python
+client = wrap(anthropic.Anthropic(), Redactor(FINANCE), files="read")     # send their text, redacted
+client = wrap(anthropic.Anthropic(), Redactor(FINANCE), files="refuse")   # stop any request with one
+client = wrap(anthropic.Anthropic(), Redactor(FINANCE), files=my_reader)  # (data, media_type) -> text
+```
+
+With `files="read"`, each image and PDF is read on this machine and its text,
+with placeholders in it, is sent in its place. A PDF's own text is read with
+pypdf; images and scanned pages are read with Tesseract OCR, which you install
+yourself (`apt install tesseract-ocr`, `brew install tesseract`). The model
+then sees the words, not the picture or the layout. Each file is read once a
+conversation.
+
+A file sent as a URL or a Files API ID can't be read first (Anthropic fetches
+those, or already has them), so with `"read"` or `"refuse"` the request
+raises `FileError` and nothing is sent. Send its bytes as base64 instead.
+
+Outside the wrapper, `veil.files.read_text(data, media_type)` gives you the
+text to pass to `redact_text` yourself.
 
 ## Use it with anything else
 
