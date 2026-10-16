@@ -107,6 +107,47 @@ _BROKEN_EMAIL = re.compile(rf"(?<![\w.@])([\w+-]+(?:{_DOTS}[\w+-]+)*)[ ]?@[ ]?([
                            r"(?![\w@])")
 
 
+# The words of labels that say what follows, which OCR misreads letter by letter ("Phorie", "Empioyee").
+_LABEL_WORDS = frozenset("""phone telephone mobile number address customer employee passport license licence
+birth date email account name street contact identification""".split())
+_LOOKS = (("rn", "m"), ("ri", "n"), ("rri", "m"), ("ii", "u"), ("i", "l"), ("l", "i"), ("1", "l"), ("0", "o"),
+          ("c", "e"), ("e", "c"), ("o", "e"), ("a", "o"))
+# A phone number after its label, with OCR's colons, degree signs and dots for its separators.
+_PHONE_AFTER_LABEL = re.compile(r"(?i)\b(phone(?:\s+number)?|tel(?:ephone)?(?:\s+number)?|fax|mobile|cell|contact\s+number"
+                                r"|call(?:\s+us)?(?:\s+at)?|(?:contact|reach)\s+us\s+at)([^\n\d+(]{0,6})"
+                                r"([+(]?\d[\d ()\-.:\u00b0]{7,24}\d)")
+
+
+def _tidy_labels(text: str) -> str:
+    from veil.redactor import _common_words
+
+    def word(m: re.Match) -> str:
+        w = m.group()
+        low = w.casefold()
+        if low in _LABEL_WORDS or low in _common_words() or len(low) < 4:
+            return w
+        for a, b in _LOOKS:
+            fixed = low.replace(a, b)
+            if fixed != low and fixed in _LABEL_WORDS:
+                return fixed.capitalize() if w[0].isupper() else fixed
+        return w
+
+    text = re.sub(r"[A-Za-z01]{4,12}", word, text)
+    # Employee 1D, Customer !D, employee. ID: an ID's label
+    text = re.sub(r"\b(employee|customer|user|member|Employee|Customer|User|Member)[ .:]*[1!l|I]D\b(?:[ ]?[;.])?",
+                  r"\1 ID", text)
+
+    def phone(m: re.Match) -> str:
+        label = m.group(1) + re.sub(r"[.:;]+[ ]?$", ": ", m.group(2))
+        if re.fullmatch(r"[+(]?[\d()]+(?:[.][\d()]+)+|[+(]?[\d() -]+", m.group(3)):   # dots alone, or no misreading
+            return label + m.group(3)
+        number = re.sub(r"(?<=\d)[ ]*[:\u00b0.][ ]*(?=\d)|(?<=[)])[ ]*[:.][ ]*(?=\d)", " ", m.group(3))
+        return label + number
+
+    text = _PHONE_AFTER_LABEL.sub(phone, text)
+    return re.sub(r"(?<=[A-Z0-9])[:](?=\d{3,}-\d)", "-", text)   # a license number's dash read as a colon
+
+
 def _tidy_names(text: str) -> str:
     """OCR's misreadings inside a person's name: an initial's period read as a colon or a comma ("Claire Z:
     Thibault"), a period or a colon after a first name ("Melanie. Robin", "Bas: Timo"), a capital J read
@@ -141,6 +182,7 @@ def _tidy(text: str) -> str:
         fix = lambda part: re.sub(_DOTS, ".", part)
         return f"{fix(m.group(1))}@{fix(m.group(2))}"
 
+    text = _tidy_labels(text)
     text = _BROKEN_EMAIL.sub(email, text)
     text = re.sub(r"(?<![\w.,$])(\d{3,6})\.[ ]?(?=[A-Z][a-z])", r"\1 ", text)
     text = re.sub(r"(?<=[a-z])\.(?=(?:Apt|Suite|Ste|Unit|Flat)\b)", " ", text)

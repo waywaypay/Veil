@@ -958,6 +958,9 @@ class Redactor(TaxIdRedactor):
                 return "DOB"
             if re.fullmatch(r"(?i)user[ _-]?name|login(?:[ _-]?(?:id|name))?|user[ _-]?id|screen[ _-]?name|handle", key):
                 return "USERNAME"
+            if re.fullmatch(r"(?i)(?:(?:home|work|mobile|cell|contact|business|office|primary)[ _-]?)?(?:phone|telephone|tel"
+                            r"|mobile|cell|fax)(?:[ _-]?(?:number|no|num|nr))?", key):
+                return "PHONE"
             if _ID_KEY.fullmatch(key) and re.search(r"(?i)(?:id|identifier|number|no|num|nr|code|ref|passport)$", key):
                 return "ID"
             if _NAME_KEY.fullmatch(key) is not None and not _NOT_PERSON_KEY.search(key):
@@ -973,6 +976,10 @@ class Redactor(TaxIdRedactor):
             elif kind == "ADDRESS":
                 if re.search(r"\d", value) and re.search(r"[^\W\d_]{2}", value) and len(value) <= 160:
                     take(start + lead, start + lead + len(value), "ADDRESS")
+            elif kind == "PHONE":
+                digits = re.sub(r"\D", "", value)
+                if 9 <= len(digits) <= 16 and re.fullmatch(r"\+?[\d ().\-]+(?:[ ]?(?:x|ext\.?)[ ]?\d{1,6})?", value):
+                    take(start + lead, start + lead + len(value), "PHONE", "PHONE:" + digits)
             elif kind == "USERNAME":
                 if re.fullmatch(r"@?[A-Za-z0-9][\w.\-]{2,40}", value):
                     take(start + lead, start + lead + len(value), "ID", "ID:" + value.casefold())
