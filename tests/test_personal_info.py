@@ -344,7 +344,7 @@ def test_typed_names_and_numbers_red_teaming_found(text, expected):
     ("Coeur d'Alene, ID 83814", ["Coeur d'Alene, ID 83814"]),
     ("Mailing address: 88 Kearny", ["88 Kearny"]),
     ("Toronto, ON M5V 2T6", ["M5V 2T6"]),
-    ("Bahnhofstrasse 45, 8001 Zurich, Switzerland", ["Bahnhofstrasse 45", "8001 Zurich, Switzerland"]),
+    ("Bahnhofstrasse 45, 8001 Zurich, Switzerland", ["Bahnhofstrasse 45, 8001 Zurich, Switzerland"]),
     ("Account: 3302114471", ["3302114471"]),
     ("Acct 12345678", ["12345678"]),
     ("for credit to account 1029384756", ["1029384756"]),
