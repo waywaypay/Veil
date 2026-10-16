@@ -55,7 +55,8 @@ def test_a_profiles_words_are_never_names():
 def test_a_profiles_cues_put_a_name_next():
     text = "Payee: Bartholomew Quince"
     assert Redactor().redact_text(text) == "Payee: NAME_001"   # "Bartholomew" is a common first name
-    odd = "Payee Zeb Quarrington"
+    assert Redactor().redact_text("Payee Zeb Quarrington") == "Payee NAME_001"   # a first name and a surname anywhere
+    odd = "Payee Zorblax Quarlix"   # names in no list
     assert Redactor().redact_text(odd) == odd
     assert Redactor(GENERIC.extend("pay", cues=[r"payee"], cue_ends="payee")).redact_text(odd) == "Payee NAME_001"
 
@@ -93,14 +94,15 @@ def test_placeholder_shaped_text_that_isnt_ours_is_broken_up():
 
 
 def test_a_name_finder_covers_names_the_word_lists_miss():
-    text = "CEO Satya Nadella met the board."
+    assert Redactor().redact_text("CEO Satya Nadella met the board.") == "CEO NAME_001 met the board."
+    text = "CEO Zorblax Vrenquist met the board."   # names in no list
     assert Redactor().redact_text(text) == text
-    found = Redactor(name_finder=lambda t: ["Satya Nadella"] if "Nadella" in t else [])
+    found = Redactor(name_finder=lambda t: ["Zorblax Vrenquist"] if "Vrenquist" in t else [])
     assert found.redact_text(text) == "CEO NAME_001 met the board."
-    assert found.restore_text("NAME_001") == "Satya Nadella"
+    assert found.restore_text("NAME_001") == "Zorblax Vrenquist"
     # The surname alone, from then on, put back as written.
-    out = found.redact_text("Nadella agreed.")
-    assert "Nadella" not in out and found.restore_text(out) == "Nadella agreed."
+    out = found.redact_text("Vrenquist agreed.")
+    assert "Vrenquist" not in out and found.restore_text(out) == "Vrenquist agreed."
 
 
 def test_mapping_shows_what_each_placeholder_stands_for():

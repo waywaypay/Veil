@@ -47,7 +47,7 @@ def test_names_it_finds(text, expected):
 
 
 @pytest.mark.parametrize("text, expected", [
-    ("6224 Mockingbird Ct\nAnytown, WA 00490", ["6224 Mockingbird Ct", "Anytown, WA 00490"]),
+    ("6224 Mockingbird Ct\nAnytown, WA 00490", ["6224 Mockingbird Ct\nAnytown, WA 00490"]),
     ("4702 Placeholder Rd, Ste 323", ["4702 Placeholder Rd, Ste 323"]),
     ("345 Park Avenue, 30th Floor, New York, NY 10154-0004", ["345 Park Avenue, 30th Floor, New York, NY 10154-0004"]),
     ("2800 Sand Hill Road Suite 101 Menlo Park California 94025",
@@ -434,3 +434,66 @@ def test_a_placeholder_before_digits_comes_back():
     r = PersonalInfoRedactor()
     out = r.redact_text("ABC 12345678901(415) 555-0134")
     assert out.startswith("ABC ID_001") and r.restore_text(out) == "ABC 12345678901(415) 555-0134"
+
+
+@pytest.mark.parametrize("text, expected", [
+    # what the benchmark on Gretel's synthetic financial documents found
+    ("Call Priya Patel at 415-555-0134", ["Priya Patel", "415-555-0134"]),
+    ("Dear Gudula Scheuermann,", ["Gudula Scheuermann"]),
+    ("Applicant Name: Mark Tiffany Fuentes", ["Mark Tiffany Fuentes"]),
+    ("Shipper: Tassilo M. Heß", ["Tassilo M. Heß"]),
+    ("Hello Sarah, thanks for writing.", ["Sarah"]),
+    ('{"first_name": "Inna", "last_name": "Patberg"}', ["Inna", "Patberg"]),
+    ("<fpml:name>Moreno</fpml:name>", ["Moreno"]),
+    ('"ID","First Name","Last Name"\n"1","Bob","Johnson"', ["Bob", "Johnson"]),
+    ("Lives at 8563 Wilson Forks and works", ["8563 Wilson Forks"]),
+    ("3091 Paul Hill, Port Briannaport\nSan Teresa", ["3091 Paul Hill, Port Briannaport"]),
+    ("Shipper:\nGustav Jakobsson\n5 Xaviweg\nLondon, UK", ["Gustav Jakobsson", "5 Xaviweg\nLondon, UK"]),
+    ("located at 45, Baker Street, London, NW1 6XE.", ["45, Baker Street, London, NW1 6XE"]),
+    ("Email: john.thompson@atlanticshipping.co.uk", ["john.thompson@atlanticshipping.co.uk"]),
+    ("Call us at 0800 123 4567.", ["0800 123 4567"]),
+    ('"driver_license_number": "C057-8449-728-8"', ["C057-8449-728-8"]),
+    ("date of birth (e.g. 1994-08-29)", ["1994-08-29"]),
+    ("At WCRMGBPJ669 we lend.", ["WCRMGBPJ669"]),
+])
+def test_what_the_gretel_benchmark_found(text, expected):
+    assert hidden(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "<InstrumentName>Brent Crude Oil</InstrumentName>", "goods, Premium Organic Olive Oil, have been inspected",
+    "Hazardous substance name: Hazardous Substance", "IV. ADDITIONAL LIVING EXPENSES", "STALE BILL OF LADING",
+    "A. Named Driver Exclusion: none",
+    "visit our website at www.example.com", "<creationTime>2022-02-15T10:30:00</creationTime>",
+    '"2021-01-01",15000,8000', "Sender:", "Skin contact: Wash off with soap",
+])
+def test_what_the_gretel_benchmark_found_hidden_by_mistake(text):
+    assert hidden(text) == []
+
+
+def test_an_ip_address_label_takes_no_sentence_with_it():
+    assert hidden("IP address: 14.47.149.44. This information is confidential.") == ["14.47.149.44"]
+
+
+def test_an_amount_with_the_digits_of_a_number_caught_stays_an_amount():
+    r = PersonalInfoRedactor()
+    text = "TIN 123456789; CashLetterAmount=\"1234567.89\""
+    out = r.redact_text(text)
+    assert "1234567.89" in out and r.restore_text(out) == text
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("<us-gaap:DateOfBirth>1940-07-20</us-gaap:DateOfBirth>", ["1940-07-20"]),
+    ("first,last,date_of_birth\nInna,Patberg,1935-12-01", ["Inna", "Patberg", "1935-12-01"]),
+    ('<n1:CustomerID>M9089Y551</n1:CustomerID>', ["M9089Y551"]),
+    ("The employee ID for Heinz Kabus is Nq-92647.", ["Heinz Kabus", "Nq-92647"]),
+    ("we noted that her passport number, R87712693, did not match", ["R87712693"]),
+    ("such as James Aguilar (EMP286818), have been", ["James Aguilar", "EMP286818"]),
+])
+def test_ids_and_birth_dates_by_their_field_or_context(text, expected):
+    assert hidden(text) == expected
+
+
+@pytest.mark.parametrize("text", ["Balance USD52482349 at close", "ISIN US1234567890 traded", "employee benefits since 2019"])
+def test_amounts_isins_and_years_are_no_ids(text):
+    assert hidden(text) == []

@@ -18,7 +18,7 @@ dev = ["pytest>=8", "ruff>=0.5", "anthropic>=0.40"]
 packages = ["veil"]
 
 [tool.setuptools.package-data]
-veil = ["words/*.txt"]
+veil = ["data/*.txt.gz", "words/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
