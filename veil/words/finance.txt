@@ -1,0 +1,16 @@
+# Stop words the FINANCE profile adds (veil.profiles).
+account accounting accounts adjustment agreement alternative amount amounts analysis annual appendix approve
+assets audit audited auditor auditors balance balances bank begin book call called calls cap capital carried
+carta cash catch cents clawback close closes closing closings commitment commitments committee compliance
+contribution contributions county credit credits decrease desk detail details distribution distributions
+dividend dividends division dollars dpi draft drive dropbox earnings end ending entries entry equity escrow
+estate estimated estimates exchange exempt exhibit expense expenses fair fee fees final finals finance
+financing flow flows fund funded funds gain gains google gp gross group hold holds hurdle income increase
+instruction instructions interest investment investments investor investors irr journal ledger legal letter
+letters liabilities llc loss losses lp management market minimum moic monthly multiple multiples nav net
+notice notices office opening operations ownership partner partners partnership partnerships payment payments
+pct percent period plan portfolio preferred proceeds profit promote quarter quarterly quickbooks rate rates
+real record recorded relations rental report reporting reports reserve reserves return revenue room royalties
+royalty rvpi schedule schedules service share shares side stock summary support table tax taxes team total
+true tvpi unfunded up usd valuation valuations value values vintage waterfall wire wires withdrawals year-end
+yearly

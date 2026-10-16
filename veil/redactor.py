@@ -1,42 +1,20 @@
 """Personal information swapped for placeholders before text goes to a model.
 
-``Redactor`` finds what identifies a person and gives each a placeholder; the
-model only ever sees the placeholder, and ``restore`` puts the real value back
-in what the model writes (its reply, and the input of its tool calls).  What
-it finds:
+``Redactor`` finds taxpayer IDs (``veil.tax_ids``), names, addresses, email
+addresses, phone numbers, account and ID numbers, birth dates, long digit
+runs and whatever your own ``patterns`` match (the README lists the forms
+each takes), and gives each a placeholder: NAME_001, ADDRESS_001 ... the same
+one for the same person or value all conversation.  ``restore`` puts the real
+values back; a person's name comes back the way it was first known, anything
+else as it was written.
 
-- taxpayer IDs (``veil.tax_ids``);
-- names: everyone you tell it of (``add_person``) however the name is written
-  ("Avery K. Mockridge", "MOCKRIDGE, AVERY K", "A. Mockridge", "Mr.
-  Mockridge", and "Mockridge" alone when it's no ordinary word); and names it
-  finds: a common first name or surname beside another name, a surname it
-  already knows with another name before it, a name after Mr., Ms. or Dr.,
-  "Last, First", a name after a label or word such as "Name:", "Attn:",
-  "c/o", "Prepared for:" or "Sincerely,", the names listed after any of
-  these, and the family in "The Okonkwo Family Trust";
-- street addresses (with the city, state and ZIP after them), PO and rural
-  boxes, "City, ST 12345", UK and Canadian postcodes and some European forms;
-- email addresses (also written "jane at example dot com") and phone numbers;
-- bank, card, routing, IBAN and SWIFT numbers, and other account and ID
-  numbers after their label (account no., passport no., member ID ...);
-- birth dates after their label;
-- any other run of 11 to 19 digits;
-- whatever your own ``patterns`` match.
-
-What the user types (``typed=True``) is read more eagerly: any two or three
-capitalized words that aren't the profile's vocabulary are taken for a name.
-
-Each becomes a placeholder: NAME_001, ADDRESS_001, EMAIL_001, PHONE_001,
-ACCOUNT_001, ID_001 or DOB_001, the same one for the same person or value
-all conversation.  A person's name comes back the way it was first known (so
-a tool call that adds NAME_001 as a member adds that person by name);
-everything else comes back as it was written.
-
-Business names stay, since a model often needs them: a found name followed by
-Fund, Capital, Partners, L.P. and the like is taken for a business's, as are
-the names you tell it of (``add_business``).  The text is read through the
-same normalized copy as taxpayer IDs, with accents and curly apostrophes
-folded, so odd characters hide nothing.
+Names are those you tell it of (``add_person``), however they're written, and
+those it finds by word lists and cues ("Mr.", "Attn:", "Last, First").  What
+the user types (``typed=True``) is read more eagerly.  A found name followed
+by Fund, Capital, L.P. and the like is a business's and stays, as do names
+given to ``add_business``.  The text is read through the same normalized copy
+as taxpayer IDs, so odd characters hide nothing.  The word lists are in
+``veil/words``.
 """
 
 from __future__ import annotations
@@ -48,7 +26,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import resources
 
-from veil.profiles import Profile
+from veil.profiles import Profile, word_file
 from veil.tax_ids import KINDS, TAX_ID_KINDS, TaxIdRedactor, _shadow
 
 
@@ -58,171 +36,17 @@ def _words(text: str) -> frozenset[str]:
 
 # Common first names.  Words that are ordinary words too (Will, Mark, Grant, June, Rose, Faith, Virginia ...)
 # are left out: those count only as part of a name found another way.
-_GIVEN = _words("""
-aaron abby abdul abel abigail abraham ada adam adeline adrian adriana agnes ahmad ahmed aidan aiden aileen
-aisha akira alan alana albert alberto alejandra alejandro alessandra alessandro alex alexa alexander
-alexandra alexei alexis alfonso alfred alfredo ali alice alicia alina alisha alison allan allen allison alma
-alyssa amanda amelia amir amit amy ana anand ananya anastasia anders andre andrea andreas andrei andres
-andrew andy anette angela angelica angelina angelo anika anil anita anjali ann anna annabelle anne annette
-annie anthony antoine antonio anya arjun arnold arthur arturo arun aryan ashley ashok astrid aubrey audrey
-austin ava avery axel barbara barry beatrice beatriz becky ben benjamin bernard bernadette beth bethany
-betty beverly bianca blake bob bobby bonnie boris brad bradley brady brandon brayden brenda brendan brent
-brett brian briana brianna bridget brigitte britney brittany brody brooke bruce bruno bryan bryce caitlin
-caleb calvin camden cameron camila camille carl carla carlos carmen carol carole caroline carolyn carrie
-carson casey cassandra catherine cathy cecilia cedric celia cesar chad chang charlene charles charlotte
-chelsea cheryl chester chiamaka chinedu chloe chris christian christina christine christopher cindy claire
-clara clarence claude claudia clayton clifford clint clinton cody colin colleen connor conor constance
-corey cory courtney craig cristina curtis cynthia daisuke dakota dale dallas dalton damian damon dan dana
-daniel daniela danielle danny dante daria darius darlene darren darryl dave david dean deanna debbie
-deborah debra declan deepak deepika deirdre delilah denise dennis derek derrick desmond devin dexter
-diana diane diego dimitri dina dmitri dolores dominic dominique donald donna doreen doris dorothy douglas
-drew duane dustin dwayne dylan earl easton eddie edgar edith edmund eduardo edward edwin eileen elaine
-eleanor elena eli elias elijah elisa elisabeth eliza elizabeth ella ellen elliot elliott ellis eloise
-elsa emeka emerson emilia emilio emily emma emmanuel emmett enrique eric erica erik erika erin ernest
-esther ethan eugene eva evan evelyn everett ezra fabian farid fatima federica federico felicia felipe
-felix femi fernanda fernando finley finn fiona florence floyd folake frances francesca francesco francis
-francisco franco francois frederick gabriel gabriela gabriella gabrielle gareth gary gavin gemma genevieve
-geoffrey george georgina gerald geraldine gerard gianna gina giorgio giovanni giulia giuseppe gladys glenda
-gloria gordon graham grayson greg gregory greta gretchen griffin guillermo gustavo gwen gwendolyn hailey
-haley hamid hank hannah hans harold harper harriet harrison haruka haruto harvey hassan hayden hazel
-heather hector heidi helen helena henrik henry herbert herman hilary hillary hiroshi howard hudson hugh
-hugo hussein ian ibrahim ignacio igor ines ingrid irene irina irma isaac isabel isabela isabella isabelle
-isaiah ismael ivan jace jacob jacqueline jacques jaden jaime jake jamal james jamie jan jane janet
-janice janine jared jasmine jason javier jay jayden jean jeanette jeanne jeff jeffery jeffrey jenna jennifer
-jenny jeremiah jeremy jerome jerry jesse jessica jesus jill jim jimmy jo joan joann joanna joanne jocelyn
-jodi jody joe joel joey johan johanna john johnny jon jonah jonathan jordan jordyn jorge jose josef joseph
-josephine josh joshua joyce juan juanita judith judy jules julia julian juliana julie juliet juliette
-julio julius jurgen justin kaitlyn kamal karan karen kari karim karl karla kate katelyn katherine kathleen
-kathryn kathy katie katrina kavya kay kayla kaylee keegan keiko keith kelly kelsey ken kendall kendra kenji
-kenneth kenny kent kerry kevin khalid kieran kim kimberly kirk kiran klaus kofi krista kristen kristin
-kristina kristine krishna kurt kwame kyle kylie lakshmi lana lance landon lars laura lauren laurence
-laurie layla leah leila lena leo leon leonard leonardo leroy leslie levi liam lila liliana lillian linda
-lindsay lindsey lisa liz logan lois lorena lorenzo loretta lori lorraine louis louise luca lucas lucia
-luciana lucy luis luisa luke luz lydia lynn lynne mackenzie madeleine madeline madelyn madison magdalena
-magnus maggie malcolm mallory mandy manish manon manuel marc marcel marcia marco marcos marcus margaret
-margarita margot maria mariah mariam marian mariana marianne marie marilyn marina mario marion marisa
-marissa marjorie markus marlene marsha martha martin martina marvin mary maryann mason matteo matthew
-matthias maureen maurice maxine maya megan meghan mei melanie melinda melissa melody mercedes meredith
-mia micah michael michaela micheal michel michele michelle miguel mikhail mila milan miles mildred milton
-mindy miranda miriam mohamed mohammad mohammed molly monica monique morgan muhammad muriel mustafa myra
-myron nadia nancy naomi natalia natalie natasha nathan nathaniel neal neha neil nelson nicholas nicola
-nicolas nicole nikhil nikita nikolai nils nina noah noel nolan nora norah norma norman octavia olga olive
-oliver olivia omar orlando oscar oskar otto owen pablo paige pamela paolo parker pascal patrice patricia
-patrick paul paula pauline pedro peggy penelope percy perry peter petra peyton philip philippe phillip
-phyllis pierre pieter piper pooja pradeep prakash preston priscilla priya quentin quinn rachel rafael
-rahul raj rajesh ralph ramesh ramon randall randy raphael raquel raul raymond rebecca rebekah reese regina
-reginald reid renee reuben rhonda ricardo richard rick ricky riley rita rob robert roberta roberto robyn
-rocco roderick rodney rodrigo roger rohan roland rolando roman ronald ronnie rosa rosalind rosemary rowan
-roxanne ruben rudolph rudy rupert russell ruth ryan ryder rylee sabrina sadie salvador sam samantha samir
-samuel sandeep sandra sanjay santiago sara sarah sasha satoshi savannah sawyer scott sean sebastian
-sergei sergio seth shane shannon sharon shauna shawn sheila shelby shelley sheryl shirley shreya sidney
-silas silvia simon simone sofia sonia sophia sophie stacey stacy stanley stefan stefano stella stephanie
-stephen steve steven stuart sunil suresh susan susanna suzanne sven svetlana sydney sylvia takeshi tamara
-tammy tanner tanya tara tariq tatiana taylor ted teresa terrence terri tessa thaddeus thelma theodore
-theresa thierry thomas tiffany timothy tina tobias todd tom tommy toni tony tracey traci tracy travis
-trevor tristan troy tyler ursula valentina valeria valerie vanessa vera veronica vicki vicky victor
-victoria vijay vikram vincent viola violet vivian vladimir walter wanda warren wayne wei wendy wesley
-weston whitney wilfred willem william willie wilson winston wolfgang wyatt xavier ximena yasmin yolanda
-yuki yuri yusuf yvette yvonne zachary zainab zane zoe zoey
-ezekiel bartholomew obadiah josiah jedidiah zebulon gideon thaddeus abdullah abdulrahman yousef youssef khaled
-rashid faisal hamza bilal tarek tariq omar samira yasmine leyla fatma ayesha zeynep mehmet emre burak kemal
-oluwaseun olumide adebayo ayodele babatunde bolaji yetunde tunde kunle chidi chinwe nkechi uche ifeoma adaeze
-kwabena kojo kwesi akosua thandiwe nomvula sipho themba lindiwe zanele amara kofi ama abena
-soren bjorn freya sigrid mikkel rasmus jens nils lasse ingrid helga gunnar leif olaf
-grzegorz krzysztof wojciech piotr pawel tomasz jakub lukasz agnieszka katarzyna malgorzata zofia jan
-dmitry anastasiya olena oksana yulia yevgeny vladislav arkady ruslan
-ji hyun jae sung joon hoon min seo soo young hee eun woo jin
-hiroko kenta takumi yuto riku sota haruki naoko yoko emi ayumi
-thi anh linh minh duc hoa lan tuan huong trang thanh hung phuong quang khanh
-xin ming wei hao jun jian hui ying jing yan fang lei chen ling
-raj ravi rakesh ramesh rohit sachin vivek naveen ashwin harish ganesh lakshman sanjeev rajiv kavita sunita
-meera rekha shalini nisha pooja preeti swati anita aarav vihaan ishaan arnav reyansh aditi diya saanvi
-mateus joao thiago gustavo rodrigo leonardo bruna larissa camila luana
-""")
+_GIVEN = word_file("given_names")
 # Common surnames that are no ordinary word.  One beside another name makes a name: "Priya Patel".
-_SURNAMES = _words("""
-abbott acosta adams adler aguilar ahmed alexander ali allen alvarez anderson andrews armstrong arnold
-bailey baker barnes barnett becker bennett berg berger bernstein bhatt blackwell bowman boyd bradley
-brennan bryant burke burton caldwell campbell cardenas carlson carroll castillo castro chan chang chapman
-chavez chen cheng choi chopra chung clark clarke cohen coleman collins contreras cooper cortez crawford
-cunningham daniels davidson davies davis delgado diaz dixon dominguez doyle duncan dunn edwards ellis
-erickson espinoza estrada evans ferguson fernandez fischer fitzgerald flores flynn foster fowler friedman
-garcia gardner garza gibson goldberg goldman gomez gonzales gonzalez gordon graham gupta gutierrez hamilton
-hansen hanson harper harris harrison hawkins hayes henderson hernandez herrera hoffman holmes howard
-howell huang hughes iyer jackson jacobs jain jenkins jensen jimenez johnson johnston jones jordan joshi
-kaplan kapoor katz kaufman keller kelley kelly kennedy khan kim klein kowalski kramer kumar larsen larson
-lee levine levy lewis lin liu lopez mahoney malik marquez martinez mcbride mccarthy mcdonald mcgee
-mckenzie medina mehta mendez mendoza meyer meyers miller mitchell montgomery morales moreno morgan morris
-morrison murphy murray myers nair nelson nguyen nichols nielsen novak obrien o'brien o'connor o'neill
-olsen olson ortiz owens padilla palmer patel patterson pena perez perkins peters peterson phillips powell
-pratt qureshi ramirez ramos rao reddy reyes reynolds richards richardson riley rivera roberts robertson
-robinson rodriguez rogers romero rosen rosenberg ross ruiz russell ryan saini salazar sanchez sandoval
-schmidt schneider schroeder schultz schwartz scott shah shapiro sharma shaw silva simmons simpson singh
-smith snyder soto spencer stein stephens stevens stewart sullivan suzuki tanaka thompson thomson torres
-tran tucker vargas vasquez vazquez wagner wallace walsh wang watanabe watkins watson weber webb weiss
-williams williamson willis wilson wong wright wu xu yamamoto yang yoshida zhang zhao zhou zhu
-""")
+_SURNAMES = word_file("surnames")
 # Surnames that are ordinary words or places too: hidden with a first name or a title, never alone, and no
 # sign of a name by themselves.
-_WORD_SURNAMES = _words("""
-price young king hall wood woods hill hills green brown white black gray grey long ford gross cash rich bond
-bonds banks rice love lamb fox little small short field fields grant mark marks hunter cook baker carter
-miller mason porter parker walker taylor fisher fowler butler chandler page case chase bell bush rose west
-east north south lane moore wells ball hart hope hood snow frost winter summer day knight bishop pope dean
-major sharp strong wise best good goode noble payne sterling gold silver stone rock bird swan crane drake
-finch wolf lyon bear hawk steel bridge bridges ware waters rivers brook brooks lake pond marsh moss heath
-shore street gates hand holder shields freeman newman chambers law worth money cost sale sales share
-english french german welsh scott park burns lynch carpenter ward warren hicks gill turner sanders
-marshall martin wheeler pierce welch washington cross dial dodge duke earl farmer fuller glass golden
-guy hale hardy head hunt joy keen lord mills miles nash penny pike power powers rush salmon sawyer
-seal shepherd simple sparks spears stamp storm sweet tower vale vance wall walls webb wing wren york
-ridge hollow summit crest gate glen dale grove river creek valley point harbor haven peak mesa canyon
-meadow spring springs bay cove island isle forest oak pine cedar maple birch ash elm willow ivy
-""")
+_WORD_SURNAMES = word_file("word_surnames")
 # Capitalized words that aren't names in any document: everyday words, months, days, places and words that
 # start sentences.  A profile (veil.profiles) adds its documents' own words.
-_STOP = _words("""
-a about above add added address administrator after again all also an analyst analysts and answer any
-applicant applicants april are area as ask assistant at attach attached august autumn avenue based basis bay
-be beach because beginning below best between board borrower borrowers both bronx brooklyn business but buyer
-buyers by can cayman center central ceo cfo chair chairman chairwoman change check chief cio ciso city client
-clients coach coast code codes colleagues company compare confirm consultant continue coo corp corporation
-could council country create cto current customer customers data date dates day dear december deduction
-deductions delete department design designer devops did director directors district do doctor does done
-downtown due each east eastern el employee employees engineer engineering engineers enter entities entity
-even every everyone evp explain falls february fill find fine first fix for form forms fort friday friends
-from general get give go good got grand great greater guest has have he head heights hello her hey hi hills
-his how hr human i id if in individual information infrastructure intern into is island islands it item items
-its january jersey july june junior just keep kind know la lakes las last lead learning leave let lets like
-limited line lines list local look los lower machine madam made make manager managers manhattan march mark
-marketing match may maybe member members menlo method methods metro midtown might monday month mount move mt
-must name need new next nice no north northern not note notes november number nurse october of officer
-officers ok okay old on one only open ops option options or other our page pages paid palo part parts patient
-patients people per perhaps physician pick platform please port president product products professor put
-queens read really recruiting refund regards remove research resources review road rule rules run saint sales
-san santa saturday save science second secretary security see seller sellers send senior september set shall
-she short should show silicon sir small so sorry source sourced sources south southern split springs staff
-start state statement statements staten states still stop street student students suite sunday sure surgeon
-svp teacher tell tenant tenants test tests than thank thanks that the their them then there these they think
-third this those through thursday to town trust try tuesday two type types under united update upper us usa
-use user users valley valued verify very vice village visitor vp want was we wednesday were west western what
-when where which who why will winter with would year years yes yet you your zip
-""")
+_STOP = word_file("stop_words")
 # After a found name, these make it a business's: "Jordan Ridge Capital", "Hudson Yards Co-Invest".
-_BUSINESS = _words("""
-advisers advisors associates asset assets bancorp bank bancshares brokerage brothers bros capital
-company co corp corporation credit equity energy financial fund funds group growth healthcare holding
-holdings inc incorporated income infrastructure insurance international investments investors labs llc
-llp lp ltd limited management markets master offshore onshore opportunities opportunity partners
-partnership pharmaceuticals plc pllc properties realty research sciences securities services spv systems
-technologies technology therapeutics ventures venture wealth gp co-invest coinvest portfolio industrial
-office offices university college school academy hospital institute endowment church museum society
-association council health medical clinic analytics bio biosciences pharma software networks solutions
-studios media foods brands retail motors airlines resources mining reit residential apartments towers
-yards logistics lending finance trading advisory consulting law legal accounting audit tax cpas agency
-multifamily hospitality hotel hotels housing storage lodging communities homes land development developers
-builders construction square portal platform etf etfs index
-""")
+_BUSINESS = word_file("business_words")
 # A name before one of these is still a person's: "Avery Mockridge Revocable Trust", "... IRA".
 _PERSONAL = _words("""
 trust revocable irrevocable living family ira roth sep rollover jtwros ttee trustee custodian fbo
@@ -232,25 +56,7 @@ children heirs survivor survivors bypass qtip
 # A capitalized word before one of these is a family's name: "The Okonkwo Family Trust".
 _FAMILY = _words("revocable irrevocable living dynasty grantor marital gst bypass qtip descendants heirs")
 # Firms and the like with what looks like a person's name.
-_FIRMS = frozenset("""morgan stanley|charles schwab|edward jones|raymond james|john hancock|franklin templeton
-|grant thornton|william blair|paul weiss|paul hastings|kirkland ellis|davis polk|robert half|morgan lewis
-|jackson national|lincoln financial|jordan ridge|thomas reuters|moss adams|wilson sonsini|elliott davis
-|gibson dunn|baker mckenzie|kleiner perkins|kayne anderson|piper sandler|w baird|jpmorgan chase
-|wells fargo|dow jones|eli lilly|oscar health|ada health|clara analytics|hamilton lane|sutter hill
-|silver lake|union square|goldman sachs|andreessen horowitz|davis wright|nelson mullins|booz allen
-|bristol myers|ralph lauren|allen overy|shearman sterling|bain capital|warburg pincus|thoma bravo
-|general atlantic|tiger global|sidley austin|latham watkins|simpson thacher|ropes gray|goodwin procter
-|fenwick west|morrison foerster|sullivan cromwell|weil gotshal|debevoise plimpton|proskauer rose
-|schulte roth|seward kissel|willkie farr|fried frank|akin gump|baker tilly|plante moran|cherry bekaert
-|frank rimerman|ernst young|price waterhouse|marcum|eisner amper|cohen co|hudson yards|hudson river
-|austin office|dallas industrial|houston street|madison avenue|lexington avenue|jackson hole|kelly services
-|johnson controls|johnson johnson|harley davidson|charles river|james river|lewis clark
-|stanford university|harvard university|yale university|duke university|ford foundation|carnegie mellon
-|johns hopkins|emerson electric|grace church|morgan creek|parker hannifin|marsh mclennan|carter hawley
-|spencer stuart|stuart spencer|janney montgomery|montgomery scott|alliance bernstein|korn ferry|russell reynolds
-|heidrick struggles|houlihan lokey|stifel nicolaus|keefe bruyette|duff phelps|alvarez marsal|willis towers
-|arthur gallagher|brown brothers|juniper square|sand hill|taylor rule|orlando multifamily
-""".replace("\n", "").split("|"))
+_FIRMS = word_file("firms", lines=True)
 
 
 @lru_cache(maxsize=None)

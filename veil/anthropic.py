@@ -9,28 +9,17 @@
     reply = client.messages.create(model="claude-opus-5-5", max_tokens=1024, tools=TOOLS,
                                    messages=[{"role": "user", "content": "Add Avery Mockridge as an LP"}])
 
-You keep the conversation with real values in it, as you would without veil.
-On the way out, ``messages.create`` sends a copy with each one replaced by a
-placeholder (NAME_001, SSN_001 ...): what the user typed, each tool result,
-the system prompt, and the model's own earlier turns.  On the way back, the
-reply's text and each tool call's input have the real values put back, so
-the tools you run get "Avery K. Mockridge", not NAME_001.  The same value
-keeps the same placeholder for as long as you use the same redactor, so use
-one per conversation.
+Each request goes out as a copy with placeholders in place of the real values
+(what the user typed, tool results, the system prompt and the model's earlier
+turns), and the reply's text and tool-call inputs come back with the real
+values.  Use one redactor per conversation.  Images and PDFs sent as files
+pass through as they are; thinking blocks go back exactly as they came.
 
-What's redacted: text, tool results (text and JSON), and tool calls.  Images
-and PDFs sent as files are passed through as they are: send their text
-instead.  Thinking blocks go back exactly as they came (the API checks
-them), and they only ever held placeholders.
-
-With a ``guardrail`` (``veil.bedrock.BedrockGuardrail`` or anything with the
-same ``check`` method), each new text in a request is checked before it's
-sent: what it finds that the placeholders missed becomes a placeholder too,
-and anything else it objects to, or a guardrail that can't be reached, raises
-GuardrailError and nothing is sent.  The reply is checked too: a taxpayer ID
-in it is taken out (the model only saw placeholders, so it shouldn't have
-written one), other personal information it finds stays for the user but is
-hidden from then on, and a reply it objects to is replaced with a note.
+With a ``guardrail`` (any object with a ``check(texts, source) -> Findings``
+method, raising GuardrailError when it can't check), each new text in a
+request is checked first: what it finds becomes a placeholder too, and
+anything else it objects to stops the request.  In a reply, a taxpayer ID it
+finds is taken out, and a reply it objects to is replaced with a note.
 
 Streaming isn't supported yet: ``stream=True`` raises.
 """
@@ -39,13 +28,32 @@ from __future__ import annotations
 
 import copy
 import hashlib
+from dataclasses import dataclass, field
 from typing import Any
 
-from veil.bedrock import GuardrailError, what
 from veil.redactor import Redactor
 from veil.tax_ids import TAX_ID_KINDS
 
 TAX_ID_REMOVED = "[taxpayer ID removed]"
+_WHAT = {"SSN": "a taxpayer ID", "EIN": "a taxpayer ID", "TIN": "a taxpayer ID", "NAME": "a name",
+         "ADDRESS": "an address", "EMAIL": "an email address", "PHONE": "a phone number",
+         "ACCOUNT": "an account number", "DOB": "a birth date", "ID": "personal information"}
+
+
+class GuardrailError(Exception):
+    """The guardrail stopped a request, or couldn't check it.  The message is for the user."""
+
+
+@dataclass
+class Findings:
+    """What a guardrail's ``check`` found."""
+    hidden: list[tuple[str, str]] = field(default_factory=list)   # (placeholder kind, as written) for each find
+    other: list[str] = field(default_factory=list)     # anything else it objected to, in words
+
+
+def what(kind: str) -> str:
+    """A placeholder kind in words: "a taxpayer ID", "a name" ..."""
+    return _WHAT.get(kind, "personal information")
 
 
 def _as_dict(block: Any) -> Any:

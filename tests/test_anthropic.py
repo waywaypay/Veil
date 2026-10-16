@@ -5,12 +5,10 @@ import json
 import pytest
 
 from veil import FINANCE, Redactor
-from veil.anthropic import TAX_ID_REMOVED, Session, wrap
-from veil.bedrock import BedrockGuardrail, GuardrailError
+from veil.anthropic import TAX_ID_REMOVED, Findings, GuardrailError, Session, wrap
 
 anthropic = pytest.importorskip("anthropic")
 from anthropic.types import Message  # noqa: E402
-from test_bedrock import NONE, FakeGuardrailAPI, pii  # noqa: E402
 
 
 def _message(*blocks, stop="end_turn"):
@@ -103,11 +101,32 @@ def test_other_attributes_pass_through():
 
 # -- with a guardrail --------------------------------------------------------------------------------------
 
+NONE = Findings()
+
+
+def pii(*matches, kind="SSN"):
+    return Findings(hidden=[(kind, m) for m in matches])
+
+
+class FakeGuardrail:
+    """A guardrail that answers with ``answer(source, texts)``, or raises it if it's an exception."""
+
+    def __init__(self, answer):
+        self.answer = answer
+        self.calls = []
+
+    def check(self, texts, source):
+        self.calls.append({"source": source, "texts": texts})
+        result = self.answer(source, texts)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
 def _guarded(answer, script, redactor=None):
-    api = FakeGuardrailAPI(answer)
+    api = FakeGuardrail(answer)
     fake = FakeClient(script)
-    client = wrap(fake, redactor or Redactor(FINANCE),
-                  guardrail=BedrockGuardrail("a1b2c3d4e5f6", "2", "us-east-1", client=api))
+    client = wrap(fake, redactor or Redactor(FINANCE), guardrail=api)
     return client, fake, api
 
 
@@ -134,14 +153,13 @@ def test_only_new_text_is_checked():
 
 
 def test_a_request_it_stops_or_cant_check_is_never_sent():
-    blocked = {"action": "GUARDRAIL_INTERVENED", "outputs": [], "assessments": [
-        {"topicPolicy": {"topics": [{"name": "Investment advice", "type": "DENY", "action": "BLOCKED"}]}}]}
+    blocked = Findings(other=["the denied topic 'Investment advice'"])
     answers = [blocked]
     client, fake, api = _guarded(lambda source, texts: answers[-1], [_message("Fine.")])
     messages = [{"role": "user", "content": "Should I buy more of Fund III?"}]
     with pytest.raises(GuardrailError, match="flagged the denied topic 'Investment advice'. Nothing was sent."):
         client.messages.create(model="m", max_tokens=10, messages=messages)
-    answers.append(RuntimeError("boom"))
+    answers.append(GuardrailError("The guardrail couldn't run (boom)."))
     with pytest.raises(GuardrailError, match=r"couldn't run \(boom\). Nothing was sent."):
         client.messages.create(model="m", max_tokens=10, messages=messages)
     answers.append(pii("555 44 3333"))   # quoted differently from the text: can't be hidden
@@ -159,11 +177,10 @@ def test_a_number_in_a_reply_is_taken_out_and_a_reply_it_objects_to_is_replaced(
     ask = [{"role": "user", "content": "What's the fund's EIN?"}]
     assert client.messages.create(model="m", max_tokens=10, messages=ask).content[0].text == \
         f"Its EIN might be {TAX_ID_REMOVED}."
-    answers["OUTPUT"] = {"action": "GUARDRAIL_INTERVENED", "outputs": [], "assessments": [
-        {"contentPolicy": {"filters": [{"type": "INSULTS", "action": "BLOCKED"}]}}]}
+    answers["OUTPUT"] = Findings(other=["insults content"])
     assert client.messages.create(model="m", max_tokens=10, messages=ask).content[0].text == \
         "(The guardrail held back this reply: it flagged insults content.)"
-    answers["OUTPUT"] = RuntimeError("boom")
+    answers["OUTPUT"] = GuardrailError("The guardrail couldn't run (boom).")
     assert client.messages.create(model="m", max_tokens=10, messages=ask).content[0].text.startswith(
         "(This reply isn't shown, because the guardrail couldn't check it.")
 

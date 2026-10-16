@@ -30,11 +30,11 @@ the device where the data is, with nothing to host:
 - The model receives only text that has already been redacted, and replies
   are restored on the device.
 
-Two optional pieces send text off the device, so leave them out if
-everything must stay local:
+Two optional hooks run your own code, so they stay local only if that code
+does:
 
-- **`veil.bedrock`** sends text to AWS before it has been redacted. That is
-  how a second check works.
+- **`guardrail`** sees text before it has been redacted. A check that calls a
+  cloud service (Amazon Bedrock Guardrails, Google's DLP) sends it there.
 - **`name_finder`** runs wherever its code runs: a spaCy model loaded in the
   same process stays local, but a cloud NER API does not.
 
@@ -42,7 +42,7 @@ everything must stay local:
 
 ```
 pip install "git+https://github.com/waywaypay/veil"              # the redactor only
-pip install "veil[anthropic,bedrock] @ git+https://github.com/waywaypay/veil"
+pip install "veil[anthropic] @ git+https://github.com/waywaypay/veil"
 ```
 
 ## Use it with the Anthropic SDK
@@ -104,6 +104,38 @@ adds `NAME_001` adds the person by their full name). So when veil hides
 something that wasn't personal (a false positive), the model sees a
 placeholder, but nothing wrong is ever invented.
 
+## What the model can't do with a placeholder
+
+The model can move a placeholder around: put `NAME_001` in a name field, pass
+`SSN_001` to a tool, keep track of whose SSN is whose. All of that works,
+because your tool gets the real values back.
+
+What it can't do is look inside one. To the model, a placeholder is one
+solid block, and it comes back as the whole value it replaced:
+
+| You ask the model to | What your tool gets |
+|---|---|
+| Put the name in one field and the SSN in another | ✅ The full name and the full SSN |
+| Fill First Name and Last Name separately | ❌ The full name in both fields |
+| Enter the last 4 digits of the SSN | ❌ The full SSN, or a mangled field |
+| Write the SSN without dashes | ❌ The SSN as it was written, dashes included |
+| Fill City, State and ZIP | ❌ The whole address in every field |
+| Check that an SSN is valid, or that two spellings of a name match | ❌ Nothing it can check: it sees only placeholders |
+
+Splitting, reformatting and checking values belongs in your tool. Have the
+model pass the whole placeholder and do the work in code, after the real
+value is back:
+
+```python
+def fill_form(name: str, ssn: str, address: str):   # real values by the time this runs
+    first, *_, last = name.split()
+    ssn_last4 = ssn.replace("-", "")[-4:]
+    ...
+```
+
+If the model really does need to read a kind of value, leave that kind out
+of `detect` so it stays visible (see below).
+
 ## Profiles
 
 A profile tells veil which words in a kind of document look like names but
@@ -141,26 +173,29 @@ has no title or label before it. Pass a `name_finder` (any function from text
 to a list of names) to close that gap. Each name it returns gets every variant spelling covered,
 like names given to `add_person`.
 
-## A second check: Amazon Bedrock Guardrails
+## A second check: a guardrail
 
 ```python
-from veil.bedrock import BedrockGuardrail, RECOMMENDED_PII_TYPES, EIN_REGEX
+from veil.anthropic import Findings, GuardrailError, wrap
 
-guardrail = BedrockGuardrail("a1b2c3d4e5f6", "1", aws_region="us-east-1", aws_profile="team")
-client = wrap(anthropic.Anthropic(), Redactor(FINANCE), guardrail=guardrail)
+class MyGuardrail:
+    def check(self, texts: list[str], source: str) -> Findings:   # source: "INPUT" or "OUTPUT"
+        ...   # e.g. call Amazon Bedrock's ApplyGuardrail, Presidio or your own rules
+        return Findings(hidden=[("SSN", "555 4433 33")], other=[])
+
+client = wrap(anthropic.Anthropic(), Redactor(FINANCE), guardrail=MyGuardrail())
 ```
 
 With a guardrail set, each new text in a request is checked before it's
 sent:
 
-- Anything the guardrail finds that veil missed becomes a placeholder too.
-- If the guardrail objects to anything else, or can't be reached, the call
-  raises `GuardrailError` and nothing is sent.
+- Anything in `hidden` (a placeholder kind and the text as written) that
+  veil missed becomes a placeholder too.
+- If `other` names anything it objects to, or `check` raises
+  `GuardrailError`, the call raises `GuardrailError` and nothing is sent.
 
 Replies are checked too. A taxpayer ID in a reply is taken out, because the
-model only ever saw placeholders and shouldn't have written one. Anything
-with the same `check(texts, source)` method can stand in for the Bedrock
-guardrail.
+model only ever saw placeholders and shouldn't have written one.
 
 ## Development
 

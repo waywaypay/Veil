@@ -408,6 +408,22 @@ def test_a_name_typed_without_evidence_hides_only_there():
     assert r.redact_text(page) == page
 
 
+
+@pytest.mark.parametrize("verb", ["Call", "Text", "Message", "Invite", "Meet", "Pay", "Remind", "Contact",
+                                  "Introduce", "Welcome", "Notify", "Cc", "Schedule", "Book", "Email", "Phone"])
+@pytest.mark.parametrize("typed", [False, True])
+def test_a_verb_before_a_name_isnt_part_of_it(verb, typed):
+    r = Redactor()
+    assert r.redact_text(f"{verb} Priya Patel at 415-555-0134", typed=typed) == f"{verb} NAME_001 at PHONE_001"
+    assert r.restore_text("NAME_001") == "Priya Patel"
+
+
+def test_a_name_that_is_also_a_verb_is_still_hidden():
+    # Ping is a first name too: as a stop word, "Ping Zhang" would go out as it is.
+    assert hidden("Ping Zhang called") == ["Ping Zhang"]
+    assert hidden("Investor: Ping Zhang") == ["Ping Zhang"]
+
+
 def test_a_placeholder_before_digits_comes_back():
     r = PersonalInfoRedactor()
     r.add_person("Avery K. Mockridge")
