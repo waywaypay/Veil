@@ -20,11 +20,20 @@ Make your own with ``Profile(...)`` or ``FINANCE.extend("mine", stop_words=...)`
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, replace
+from importlib.resources import files
 
 
 def words(text: str) -> frozenset[str]:
     """A set of lower-case words from whitespace-separated ``text``."""
     return frozenset(text.casefold().split())
+
+
+def word_file(name: str, lines: bool = False) -> frozenset[str]:
+    """The words of ``veil/words/<name>.txt`` (or, with ``lines``, its lines), lower case.  Lines starting
+    with # are comments."""
+    text = files("veil").joinpath("words", f"{name}.txt").read_text(encoding="utf-8")
+    kept = [line.strip() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    return frozenset(k.casefold() for k in kept) if lines else words(" ".join(kept))
 
 
 @dataclass(frozen=True)
@@ -69,23 +78,7 @@ GENERIC = Profile("generic")
 
 FINANCE = GENERIC.extend(
     "finance",
-    stop_words=words("""
-account accounting accounts adjustment agreement alternative amount amounts analysis annual appendix approve
-assets audit audited auditor auditors balance balances bank begin book call called calls cap capital carried
-carta cash catch cents clawback close closes closing closings commitment commitments committee compliance
-contribution contributions county credit credits decrease desk detail details distribution distributions
-dividend dividends division dollars dpi draft drive dropbox earnings end ending entries entry equity escrow
-estate estimated estimates exchange exempt exhibit expense expenses fair fee fees final finals finance
-financing flow flows fund funded funds gain gains google gp gross group hold holds hurdle income increase
-instruction instructions interest investment investments investor investors irr journal ledger legal letter
-letters liabilities llc loss losses lp management market minimum moic monthly multiple multiples nav net
-notice notices office opening operations ownership partner partners partnership partnerships payment payments
-pct percent period plan portfolio preferred proceeds profit promote quarter quarterly quickbooks rate rates
-real record recorded relations rental report reporting reports reserve reserves return revenue room royalties
-royalty rvpi schedule schedules service share shares side stock summary support table tax taxes team total
-true tvpi unfunded up usd valuation valuations value values vintage waterfall wire wires withdrawals year-end
-yearly
-"""),
+    stop_words=word_file("finance"),
     after_cues=(
         r"\((?i:llc|lpi|lp|gp)\)",
         r",?[ \t]+(?i:(?:as|is)[ \t]+)?(?i:an?[ \t]+)?(?i:(?:llc|lpi|limited|general)[ \t]+)?(?i:member|partner)\b",
@@ -96,15 +89,7 @@ yearly
 
 US_TAX_K1 = FINANCE.extend(
     "us_tax_k1",
-    stop_words=words("""
-active activities activity adjusted allocation allocations amazon amended amendment amortization anthropic
-apportionment aws bedrock bonus box boxes carry certificate claude collectibles composite delaware depletion
-depreciation domestic drilling election elections employer employment excel extension extensions federal
-foreign gaap guaranteed harbor intangible interests internal irs k-1 k-1s k1 like-kind lpi nonrecourse
-nonresident ordinary passive pdf pdfs proc qualified recapture recourse reg regulation regulations resident
-rev ruling rulings safe section self splits statutory term treas treasury treaty underlying unrecaptured
-unrelated upload withheld withholding
-"""),
+    stop_words=word_file("us_tax_k1"),
     cues=(r"k-?1s?\s+(?:for|of)",),
     cue_ends=words("k-1 k1 k-1s"),
     after_cues=(r"'s[ \t]+(?i:k-?1)",),
