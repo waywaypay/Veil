@@ -86,6 +86,18 @@ yourself (`apt install tesseract-ocr`, `brew install tesseract`). The model
 then sees the words, not the picture or the layout. Each file is read once a
 conversation.
 
+OCR text is rebuilt from where Tesseract found each word, so the lines a page
+wrapped are joined again: an address, a name or an email split across two
+lines reads as one, while a form's short lines keep their own lines. Then
+OCR's usual misreadings around personal details are mended before
+redaction: commas, colons and spaces for an email's dots, a period or hyphen
+for the space in an address ("5678. Elm Street"), a misread street kind
+("Kristi Hil"), an initial's period read as a colon ("Claire Z: Thibault"),
+lookalike letters in a name ("Tarnmy"), and misread labels ("Phorie",
+"Employee 1D"). On Gretel's financial documents rendered as images, veil
+finds 94% of the personal details in clean OCR text and 90% in degraded
+scans, against 95% in the plain text (`benchmarks/`).
+
 A file sent as a URL or a Files API ID can't be read first (Anthropic fetches
 those, or already has them), so with `"read"` or `"refuse"` the request
 raises `FileError` and nothing is sent. Send its bytes as base64 instead.

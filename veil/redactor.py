@@ -235,16 +235,16 @@ _ID_LABEL = (
     r"|foreign(?:\s+tax)?\s*tin\b"
     rf"(?:\s*{_NO})?|(?:ni|nino|national\s+insurance)(?:\s*{_NO})?|pan(?:\s*(?:card|{_NO}))?"
     rf"|aadhaa?r(?:\s*{_NO})?")
-_DOB_LABEL = (r"(?:d\.?\s?o\.?\s?b\b\.?|date[\s_\\]*of[\s_\\]*birth|birth[\s_\\]*date|birthday|born(?:\s+on)?)"
+_DOB_LABEL = (r"(?:d\.?\s?o\.?\s?b\b\.?|date[\s_.\\]*of[\s_.\\]*birth|birth[\s_\\]*date|birthday|born(?:\s+on)?)"
               r"(?:\s+of\s+(?:the\s+)?(?:partner|member|investor|owner|holder|spouse|beneficiary))?"
               r"(?:[ \t]*\([^()\n]{0,20}\))?")
 _MONTHS = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
 _DATE = (r"\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|\d{1,2}[ ]\d{1,2}[ ]\d{4}|\d{4}[/.-]\d{1,2}[/.-]\d{1,2}"
          r"|(?:19|20)\d{6}(?!\d)"
-         rf"|{_MONTHS}[ \t]+\d{{1,2}}(?:st|nd|rd|th)?,?[ \t]+\d{{4}}"
+         rf"|{_MONTHS}[ \t]+\d{{1,2}}(?:st|nd|rd|th)?(?:,[ \t]*|[ \t]+)\d{{4}}"
          rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t/.-]*{_MONTHS},?[ \t/.-]*\d{{2,4}}")
 _SEP = (r"[\"'*\\_]*[ \t]*(?:\([^()\n]{0,20}\)[ \t]*)?"
-        r"(?:[:#.=|\u2013-][ \t]*|is[ \t]+|of[ \t]+|was[ \t]+|\((?:e\.g\.,?|i\.e\.,?)?[ \t]*)?(?:\*\*(?=\s))?[\"']*[ \t]*"
+        r"(?:[:#.=|\u2013-]{1,2}[ \t]*|is[ \t]+|of[ \t]+|was[ \t]+|\((?:e\.g\.,?|i\.e\.,?)?[ \t]*)?(?:\*\*(?=\s))?[\"']*[ \t]*"
         r"(?:\n[ \t]*){0,2}")
 # An account or ID number: letters, digits, masks and dashes, in up to six groups.
 _VALUE = r"[A-Za-z0-9*\u2022#][A-Za-z0-9*\u2022#/-]*(?:[ ][A-Za-z0-9*\u2022#/-]+){0,5}"
@@ -385,7 +385,7 @@ _STREET = re.compile(
     r"|cuesta|ronda|rambla|avinguda|passatge|borgo|salita|vico|canale|traves\u00eda)"
     r"(?:[ \t]+[a-z][\w'.-]*){1,4})|Broadway|BROADWAY)"
     rf"(?:[ \t]+{_DIRECTION}(?![\w]))?"
-    rf"(?:,?[ \t]*{_UNIT}\.?[ \t]*\#?[A-Za-z0-9-]+|,?[ \t]*\d+(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?)?"
+    rf"(?:[,;.]?[ \t]*{_UNIT}(?:[.:,]|[ \t]+[.:,]){{0,3}}(?:[ \t]|\n[ \t]*\n?)*\#?[A-Za-z0-9-]+|,?[ \t]*\d+(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?)?"
     # the city, state and ZIP on the same line; or the city alone, ending the address
     rf"(?:,?[ \t]+(?:[A-Z][\w'.-]*,?[ \t]+){{0,3}}{_STATE},?[ \t]+{_ZIP}"
     rf"|,[ \t]*(?:[A-Z][\w'\u00c0-\u024f-]*[ \t]+){{0,2}}[A-Z][\w'\u00c0-\u024f-]+(?=[ \t]*(?:[;|*\n\"<)/]|$|\.(?:\s|$))))?")
@@ -411,11 +411,11 @@ _POSTAL = (r"(?:\d{3}[ ]\d{2}(?![\d])|\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[
 # What may follow a street, piece by piece: ", 19821", ", New Shrewsbury", ", London, EC4M 2JR, UK", and lines
 # under it that are the rest of the address ("Toronto, ON M3H 2T6", "Canada").
 _TAIL_PIECE = re.compile(
-    rf",?[ \t]*{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
-    rf"|,[ \t]*(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
+    rf"[,;]?[ \t]*{_UNIT}(?:[.:,]|[ \t]+[.:,]){{0,3}}[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
+    rf"|[,;:][.,;:]?[ \t]*(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
     rf"|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
     rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\]|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
-    rf"|[ \t]*\n[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
+    rf"|[ \t]*\n(?:[ \t]*\n)?[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_POSTAL}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})|{_POSTAL}[ \t]+{_CITY_WORDS}"
     rf"|(?:{_COUNTRY_NAMES})"
@@ -958,6 +958,9 @@ class Redactor(TaxIdRedactor):
                 return "DOB"
             if re.fullmatch(r"(?i)user[ _-]?name|login(?:[ _-]?(?:id|name))?|user[ _-]?id|screen[ _-]?name|handle", key):
                 return "USERNAME"
+            if re.fullmatch(r"(?i)(?:(?:home|work|mobile|cell|contact|business|office|primary)[ _-]?)?(?:phone|telephone|tel"
+                            r"|mobile|cell|fax)(?:[ _-]?(?:number|no|num|nr))?", key):
+                return "PHONE"
             if _ID_KEY.fullmatch(key) and re.search(r"(?i)(?:id|identifier|number|no|num|nr|code|ref|passport)$", key):
                 return "ID"
             if _NAME_KEY.fullmatch(key) is not None and not _NOT_PERSON_KEY.search(key):
@@ -973,6 +976,10 @@ class Redactor(TaxIdRedactor):
             elif kind == "ADDRESS":
                 if re.search(r"\d", value) and re.search(r"[^\W\d_]{2}", value) and len(value) <= 160:
                     take(start + lead, start + lead + len(value), "ADDRESS")
+            elif kind == "PHONE":
+                digits = re.sub(r"\D", "", value)
+                if 9 <= len(digits) <= 16 and re.fullmatch(r"\+?[\d ().\-]+(?:[ ]?(?:x|ext\.?)[ ]?\d{1,6})?", value):
+                    take(start + lead, start + lead + len(value), "PHONE", "PHONE:" + digits)
             elif kind == "USERNAME":
                 if re.fullmatch(r"@?[A-Za-z0-9][\w.\-]{2,40}", value):
                     take(start + lead, start + lead + len(value), "ID", "ID:" + value.casefold())

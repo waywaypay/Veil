@@ -4,20 +4,9 @@ Each tool gets the raw document and returns redacted text. Scoring is tool-agnos
 words of the original are aligned against words of the output; a word missing from
 the output counts as redacted.
 
-  recall      = share of gold PII spans whose every word was redacted (no part leaks); titles (Mr., Dr.,
-                Captain) don't count
-  adjudicated = the same, leaving out gold spans that are no personal detail by fixed rules (is_noise): blank
-                template fields, bare labels, crypto wallets labelled as addresses, and for names a business's
-                name, a person's name inside one ("Taylor Healthcare Fund"), or only everyday words ("case
-                manager").  The word lists it uses are a fixed snapshot in benchmarks/lists, so the rules don't
-                move with veil's own lists.  Every tool is scored by the same rules.
-  over-redact = share of words outside all gold spans that were redacted.  The dataset leaves many real
-                details unlabelled (template addresses, phone numbers, names in CSV rows), so this counts
-                some correct redactions as mistakes.
+  recall      = share of gold PII spans whose every word was redacted (no part leaks)
+  over-redact = share of words outside all gold spans that were redacted
   kept        = share of company / generic-date spans left fully intact (utility)
-
-python benchmarks/gretel.py <gretel test parquet> <number of documents> <results.json>
-The data: https://huggingface.co/datasets/gretelai/synthetic_pii_finance_multilingual (data/test-*.parquet)
 """
 import difflib
 import json
@@ -120,17 +109,46 @@ def redacted_mask(orig, out):
     return a, kept
 
 
-def score(docs, fn):
+def word_map(orig, ocr):
+    """For each word of ``orig``, the index of the word OCR made of it in ``ocr`` (misread or not), or None when
+    OCR dropped it."""
+    a, b = words(orig), words(ocr)
+    sm = difflib.SequenceMatcher(None, [w.lower() for w, _, _ in a], [w.lower() for w, _, _ in b], autojunk=False)
+    out = [None] * len(a)
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal" or (op == "replace" and i2 - i1 == j2 - j1):
+            for k in range(i2 - i1):
+                out[i1 + k] = j1 + k
+        elif op == "replace":
+            for i in range(i1, i2):
+                best = max(range(j1, j2), key=lambda j: difflib.SequenceMatcher(None, a[i][0].lower(), b[j][0].lower()).ratio())
+                if difflib.SequenceMatcher(None, a[i][0].lower(), b[best][0].lower()).ratio() >= 0.6:
+                    out[i] = best
+    return out
+
+
+def score(docs, fn, inputs=None):
+    """``inputs``: what each tool is given instead of the document itself (its OCR text); the gold spans stay
+    on the original, and a word counts as kept when the word OCR made of it is kept."""
     hit, tot = defaultdict(int), defaultdict(int)
     keep_ok, keep_tot = defaultdict(int), defaultdict(int)
     fp = fp_tot = 0
     chit = ctot = 0
     chit_g, ctot_g = defaultdict(int), defaultdict(int)
+    inputs = inputs or [text for text, _ in docs]
     t0 = time.perf_counter()
-    outs = [fn(text) for text, _ in docs]
+    outs = [fn(x) for x in inputs]
     elapsed = time.perf_counter() - t0
-    for (text, spans), out in zip(docs, outs):
-        a, kept = redacted_mask(text, out)
+    for (text, spans), given, out in zip(docs, inputs, outs):
+        if given is text:
+            a, kept = redacted_mask(text, out)
+            seen = [True] * len(a)
+        else:
+            _, kept_given = redacted_mask(given, out)
+            a = words(text)
+            m = word_map(text, given)
+            kept = [j is not None and kept_given[j] for j in m]
+            seen = [j is not None for j in m]
         in_gold = [False] * len(a)
         for sp in spans:
             idx = [i for i, (w, s, e) in enumerate(a) if s < sp["end"] and e > sp["start"]]
@@ -152,10 +170,11 @@ def score(docs, fn):
                     chit_g[g] += ok
             elif lab in LABEL_KEEP:
                 g = LABEL_KEEP[lab]
-                keep_tot[g] += 1
-                keep_ok[g] += all(kept[i] for i in idx)
+                if all(seen[i] for i in idx):
+                    keep_tot[g] += 1
+                    keep_ok[g] += all(kept[i] for i in idx)
         for i, (w, _, _) in enumerate(a):
-            if not in_gold[i] and w.lower() not in TITLES:
+            if not in_gold[i] and w.lower() not in TITLES and seen[i]:
                 fp_tot += 1
                 fp += not kept[i]
     return {
