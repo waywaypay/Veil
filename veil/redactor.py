@@ -265,6 +265,11 @@ _MASKED_SSN = re.compile(r"(?<![\w*])(?:\*{3,4}|X{3}|x{3})-(?:\*{2}|X{2}|x{2})-\
 _ACCOUNT_NEAR = re.compile(
     r"(?<![^\W\d_])(?i:(?:credit|debit)?[ \t]*card[ \t]+(?:number|no\b\.?|#)s?|account[ \t]+(?:number|no\b\.?)|iban|bban)"
     r"(?:(?!\.\s)[^\n\d]){0,40}?(?<![\w-])(?P<value>\d{4}(?:[ -]\d{3,6}){2,4}|\d{12,24})(?![\w-])")
+# A username: after its label ("Username: mnewman", "User ID: JSMITH"), or an @handle.
+_USERNAME = re.compile(
+    r"(?<![^\W\d_])(?i:user[ \t_-]?name|login(?:[ \t_-]?(?:id|name))?|user[ \t_-]?id|screen[ \t_-]?name|handle)"
+    r"(?![^\W\d_])[\"'*]*[ \t]*[:=][ \t]*[\"'*]*[ \t]*(?P<value>@?[A-Za-z0-9][\w.\-]{2,40})(?![\w@])"
+    r"|(?<![\w@.])(?P<handle>@[A-Za-z][\w.]{2,30})(?![\w@])")
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
                 r"[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:)")
 _EXTENSION = r"(?:[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"
@@ -573,7 +578,7 @@ def _business_after(fold: str, end: int, v: _Vocab, typed: bool = False) -> bool
         return True
     rest = fold[end:end + 80]
     for n, m in enumerate(_TOKEN.finditer(rest)):
-        if n == 5 or re.search(r"[()\n:;<>|=\"]", rest[:m.start()]) or (n and "," in rest[:m.start()]):
+        if n == 5 or re.search(r"[()\n:;<>|=\"]|[a-z0-9]{2}\.\s", rest[:m.start()]) or (n and "," in rest[:m.start()]):
             return False   # a business's word only before any comma, or right after it ("..., Inc.")
         word = m.group().casefold()
         if word in _PERSONAL:
@@ -861,6 +866,8 @@ class Redactor(TaxIdRedactor):
         scan(_MASKED_SSN, lambda m: take(m.start(), m.end(), "SSN", "SSN:" + m.group()))
         scan(_LABELLED, lambda m: self._labelled(m, take, fold))
         scan(_DOB_NEAR, lambda m: take(m.start("value"), m.end("value"), "DOB"))
+        if "ID" in self._detect:
+            scan(_USERNAME, lambda m: self._username(m, fold, take))
         scan(_ACCOUNT_NEAR, lambda m: take(m.start("value"), m.end("value"), "ACCOUNT",
                                            "ACCOUNT:" + re.sub(r"\D", "", m.group("value"))))
 
@@ -933,7 +940,8 @@ class Redactor(TaxIdRedactor):
                 any(re.search(r"[a-z][A-Z]", w) and not re.match(r"(?:Mc|Mac|De|Di|Da|Du|La|Le|Van|Von|Fitz)[A-Z]", w)
                     for w in words):   # a code: GBP, MemberA, CPI-US
             return False
-        if any(f in self._v.business or f in self._v.stop or f in _PERSONAL for f in folds if len(f) > 1) or \
+        if any(f in self._v.business or f in _PERSONAL for f in folds if len(f) > 1) or \
+                (any(f in self._v.stop for f in folds) and not any(f in _GIVEN or f in _given_names() for f in folds)) or \
                 folds[0] in _ROLE_WORDS or any(f"{x} {y}" in _FIRMS for x, y in zip(folds, folds[1:])):
             return False
         return any(f in _GIVEN or f in _SURNAMES or f in _given_names() or f in _surname_list() or
@@ -948,6 +956,8 @@ class Redactor(TaxIdRedactor):
                 return "ADDRESS"
             if _DOB_KEY.fullmatch(key):
                 return "DOB"
+            if re.fullmatch(r"(?i)user[ _-]?name|login(?:[ _-]?(?:id|name))?|user[ _-]?id|screen[ _-]?name|handle", key):
+                return "USERNAME"
             if _ID_KEY.fullmatch(key) and re.search(r"(?i)(?:id|identifier|number|no|num|nr|code|ref|passport)$", key):
                 return "ID"
             if _NAME_KEY.fullmatch(key) is not None and not _NOT_PERSON_KEY.search(key):
@@ -963,6 +973,9 @@ class Redactor(TaxIdRedactor):
             elif kind == "ADDRESS":
                 if re.search(r"\d", value) and re.search(r"[^\W\d_]{2}", value) and len(value) <= 160:
                     take(start + lead, start + lead + len(value), "ADDRESS")
+            elif kind == "USERNAME":
+                if re.fullmatch(r"@?[A-Za-z0-9][\w.\-]{2,40}", value):
+                    take(start + lead, start + lead + len(value), "ID", "ID:" + value.casefold())
             elif kind == "ID":
                 if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 /-]{2,30}", value) and sum(c.isdigit() for c in value) >= 3:
                     take(start + lead, start + lead + len(value), "ID",
@@ -1023,6 +1036,16 @@ class Redactor(TaxIdRedactor):
                         put(at + lead, copy[at + lead:at + lead + len(inner)], kinds[k])
                     n += 1
                 break
+
+    @staticmethod
+    def _username(m: re.Match, fold: str, take) -> bool:
+        group = "handle" if m.group("handle") else "value"
+        value, start = m.group(group), m.start(group)
+        # "User Name: John Smith" is a person's name, for the names to find
+        if group == "value" and value[:1].isupper() and value[1:].islower() and \
+                re.match(r"[ \t]+[A-Z][a-z]", fold[m.end(group):m.end(group) + 3]):
+            return False
+        return take(start, start + len(value), "ID", "ID:" + value.casefold())
 
     @staticmethod
     def _phone(m: re.Match, take) -> bool:
@@ -1273,13 +1296,22 @@ class Redactor(TaxIdRedactor):
 
         # Mark Tiffany Fuentes: a first name that's an everyday word, before a name
         if t.fold in _WORD_GIVEN and t.case in ("title", "caps") and not t.dot and near(i) and \
-                toks[i + 1].case == t.case and not toks[i + 1].dot and \
-                (toks[i + 1].fold in _GIVEN or toks[i + 1].fold in _given_names() or
-                 toks[i + 1].fold in _SURNAMES or toks[i + 1].fold in surnames or
-                 (toks[i + 1].fold not in _common_words() and _surname_like(toks[i + 1].fold, surnames))):
+                ((toks[i + 1].case == "initial" and toks[i + 1].dot) or
+                 (toks[i + 1].case == t.case and
+                  (toks[i + 1].fold in _GIVEN or toks[i + 1].fold in _given_names() or
+                   toks[i + 1].fold in _SURNAMES or toks[i + 1].fold in surnames or toks[i + 1].fold in _top_surnames() or
+                   (toks[i + 1].fold not in _common_words() and _surname_like(toks[i + 1].fold, surnames))))):
             more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames), True)
             if more and ok(i, more[1]):
                 return found(i, more[1], t.word, more[0], toks[more[1]].word, True)
+        # "Thank you, Dean.", "No problem, Gabino.": a capitalized word after a greeting, before punctuation
+        if t.case == "title" and len(t.word) > 2 and t.fold not in self._v.not_names and t.fold not in _PLACES and \
+                (t.fold in _WORD_GIVEN or t.fold in _GIVEN or t.fold in _given_names() or t.fold not in _common_words()) and \
+                re.match(r"[ \t]*[,.!?]", fold[t.end:t.end + 2]) and \
+                re.search(r"(?i)(?:^|[^\w])(?:thank you|thanks|hello|hi|hey|dear|welcome|sorry|bye|goodbye|morning|afternoon"
+                          r"|evening|congratulations|no problem|of course|sure|great|okay|ok|yes|no)[,!]?[ \t]+\Z",
+                          fold[max(0, t.start - 40):t.start]) and ok(i, i):
+            return _Found(i, i, None, None, None)
         if t.fold in self._v.not_surnames:
             return None
         if t.dot and t.case != "initial":
@@ -1343,7 +1375,8 @@ class Redactor(TaxIdRedactor):
                 wordy = _wordlike(t.fold) and _wordlike(t.fold.split("-")[0])
                 more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames) and
                             (toks[k].fold not in _WORD_SURNAMES or (toks[k].fold in _top_surnames() and not wordy)) and
-                            (toks[k].fold not in _common_words() or (toks[k].fold in _common_surnames() and not wordy)),
+                            (toks[k].fold not in _common_words() or (toks[k].fold in _common_surnames() and not wordy) or
+                             _surname_list().get(toks[k].fold, 9) < 3.5),
                             True)
                 if (name := named(more, True)) is not None:
                     return name
