@@ -292,12 +292,12 @@ _STREET_SUFFIX_MORE = ("Alley Anex Annex Arcade Bayou Beach Bend Bluff Bluffs Bo
                        "Ridges River Roads Run Shoal Shoals Shore Shores Skyway Spring Springs Spur Spurs Squares Station "
                        "Stravenue Stream Streets Summit Throughway Trace Track Trafficway Tunnel Underpass Union Unions "
                        "Valley Valleys Viaduct View Views Village Villages Ville Vista Walks Wall Ways Well Wells Cross Gate Close "
-                       "Rise Parade Yard Embankment Grange Rue").split()
+                       "Rise Parade Yard Embankment Grange Rue Via").split()
 _ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:\\?!}+]|$|\.(?!\w)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
                 r"|[ \t]+(?:and|was|is|in|for|to|with|as|has|have|had|where|which|on|at|from|since|by)\b)")
 # A street name of one word with its kind in it, before or after the number: "Xaviweg 5", "36 Ringtorget".
 _EURO_STREET = (r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?i:strasse|stra\u00dfe|str\.|gasse|weg|platz|allee|ring|damm"
-                r"|straat|laan|gracht|plein|kade|singel|dijk|steeg|dreef|boulevard|markt|hof|gata|gatan|vagen|v\u00e4gen"
+                r"|straat|laan|baan|pad|gracht|plein|kade|singel|dijk|steeg|dreef|boulevard|markt|hof|gata|gatan|vagen|v\u00e4gen"
                 r"|v\u00e4g|vej|gade|torget|torg|stigen|gr\u00e4nd|grand|backe|veien|vegen|tie|katu|polku)")
 _STATE_CODES = ("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC "
                 "ND OH OK OR PA PR RI SC SD TN TX UT VT VA VI WA WV WI WY GU").split()
@@ -353,7 +353,8 @@ _UNIT = (r"(?:Suite|Ste|STE|SUITE|Apartment|Apartamento|Appartamento|Apt|APT|Uni
 _NUMBER_WORDS = "One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Fifteen Twenty Fifty Hundred".split()
 _STREET = re.compile(
     rf"(?:\d{{1,3}}(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?,?[ \t]+)?"
-    rf"(?:(?<![\w$.,/-])|(?<=[A-Za-z\"],)|(?<=Floor, )|(?<=FLOOR, )|(?<=Floor )|(?<=Fl\. ))(?:\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2)?"
+    rf"(?:(?<![\w$.,/-])|(?<=[A-Za-z\"],)|(?<=[A-Za-z:]/)|(?<=\d,)(?!\d{{3}}(?!\d))|(?<=Floor, )|(?<=FLOOR, )"
+    rf"|(?<=Floor )|(?<=Fl\. ))(?:\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2)?"
     rf"|{'|'.join(_NUMBER_WORDS)}),?[ \t]+"
     rf"(?:{_DIRECTION}[ \t]+)?(?:"
     rf"(?:(?:[A-Z][\w'.-]*|\d+(?:st|nd|rd|th))[ \t]+){{1,4}}"
@@ -364,7 +365,7 @@ _STREET = re.compile(
     r"|(?i:el[ \t]+camino[ \t]+real|(?:alameda|avenida|calle|camino|via|rue|avenue[ \t]+of[ \t]+the|boulevard|bd"
     r"|chemin|all\u00e9e|allee|impasse|place|quai|cours|pasaje|paseo|plaza|carrer|ronda|rambla|traves\u00eda|viale"
     r"|piazza|corso|vicolo|strada|largo|rua|avenue|contrada|travessa|glorieta|rotonda|stretto|callej\u00f3n|callejon"
-    r"|cuesta|ronda|rambla|avinguda|passatge|borgo|salita|vico|traves\u00eda)"
+    r"|cuesta|ronda|rambla|avinguda|passatge|borgo|salita|vico|canale|traves\u00eda)"
     r"(?:[ \t]+[a-z][\w'.-]*){1,4})|Broadway|BROADWAY)"
     rf"(?:[ \t]+{_DIRECTION}(?![\w]))?"
     rf"(?:,?[ \t]*{_UNIT}\.?[ \t]*\#?[A-Za-z0-9-]+|,?[ \t]*\d+(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?)?"
@@ -396,10 +397,11 @@ _TAIL_PIECE = re.compile(
     rf",?[ \t]*{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
     rf"|,[ \t]*(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
     rf"|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
-    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+]|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
+    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\]|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on)\b))"
     rf"|[ \t]*\n[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
-    rf"|{_CITY_WORDS},?[ \t]+{_POSTAL}|{_POSTAL}[ \t]+{_CITY_WORDS}|(?:{_COUNTRY_NAMES})"
+    rf"|{_CITY_WORDS},?[ \t]+(?:{_POSTAL}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})|{_POSTAL}[ \t]+{_CITY_WORDS}"
+    rf"|(?:{_COUNTRY_NAMES})"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|{_COUNTRY_NAMES})|\d{{5,6}}(?:-\d{{4}})?"
     rf"|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d|(?:[A-Z]{{1,2}}\d[A-Z\d]?)[ ]\d[ABD-HJLNP-UW-Z]{{2}})"
     rf"[ \t]*(?=\n|$)")
