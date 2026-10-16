@@ -4,9 +4,20 @@ Each tool gets the raw document and returns redacted text. Scoring is tool-agnos
 words of the original are aligned against words of the output; a word missing from
 the output counts as redacted.
 
-  recall      = share of gold PII spans whose every word was redacted (no part leaks)
-  over-redact = share of words outside all gold spans that were redacted
+  recall      = share of gold PII spans whose every word was redacted (no part leaks); titles (Mr., Dr.,
+                Captain) don't count
+  adjudicated = the same, leaving out gold spans that are no personal detail by fixed rules (is_noise): blank
+                template fields, bare labels, crypto wallets labelled as addresses, and for names a business's
+                name, a person's name inside one ("Taylor Healthcare Fund"), or only everyday words ("case
+                manager").  The word lists it uses are a fixed snapshot in benchmarks/lists, so the rules don't
+                move with veil's own lists.  Every tool is scored by the same rules.
+  over-redact = share of words outside all gold spans that were redacted.  The dataset leaves many real
+                details unlabelled (template addresses, phone numbers, names in CSV rows), so this counts
+                some correct redactions as mistakes.
   kept        = share of company / generic-date spans left fully intact (utility)
+
+python benchmarks/gretel.py <gretel test parquet> <number of documents> <results.json>
+The data: https://huggingface.co/datasets/gretelai/synthetic_pii_finance_multilingual (data/test-*.parquet)
 """
 import difflib
 import json
@@ -41,8 +52,58 @@ _BARE_LABEL = re.compile(r"(?i)^\W*(?:(?:full |first |last |your |customer |empl
                          r"(?:fixed|floating) rate payer|borrower|lender|tenant|landlord|employer|employee)\W*$")
 
 
-def is_noise(text):
-    return bool(_TEMPLATE.search(text) or _BARE_LABEL.match(text))
+_BUSINESS_WORDS = None
+_EVERYDAY = None
+
+
+def _lists():
+    global _BUSINESS_WORDS, _EVERYDAY
+    if _BUSINESS_WORDS is None:
+        import gzip
+        from pathlib import Path
+        root = Path(__file__).resolve().parent / "lists"
+        _BUSINESS_WORDS = set(open(root / "business_words.txt").read().split())
+        _EVERYDAY = set(gzip.open(root / "common_words.txt.gz", "rt").read().split())
+        _EVERYDAY -= set(open(root / "name_words.txt").read().split())
+    return _BUSINESS_WORDS, _EVERYDAY
+
+
+_ADDRESS_LABEL_WORDS = set("""address addresses street city state province postal zip code country mailing residential
+registered home permanent current billing wallet specified line apt suite unit""".split())
+
+
+def is_noise(text, label=None, after=""):
+    """A gold span that's no personal detail: a blank template field or a bare label; and, for a name, one
+    with a business's word in it ("Capecchi & Associates", "... Stock Index") or only everyday words that
+    are no name ("impartial expert", "The Shareholder"), or no letters at all."""
+    if _TEMPLATE.search(text) or _BARE_LABEL.match(text):
+        return True
+    if label == "street_address":
+        words = re.findall(r"[^\W\d_]+", text.casefold())
+        if not re.search(r"\d", text) and all(w in _ADDRESS_LABEL_WORDS for w in words):
+            return True   # "mailing address", "Street, City, State/Province, Postal Code"
+        if " " not in text.strip() and len(text.strip()) > 25:
+            return True   # a crypto wallet's address
+    if label in ("name", "first_name", "last_name"):
+        business, everyday = _lists()
+        words = [w.casefold() for w in re.findall(r"[^\W\d_]+", text)]
+        if not words or any(w in business for w in words):
+            return True
+        if all(w in everyday for w in words):
+            return True
+        if any(w.islower() and w.casefold() in everyday for w in re.findall(r"[^\W\d_]+", text)):
+            return True   # runs into ordinary words: "Penelope's business", "case manager"
+        # a person's name in a business's ("Taylor Healthcare Fund", "Capecchi & Associates")
+        following = [w.casefold() for w in re.findall(r"[^\W\d_]+", after)[:4]]
+        lead = re.match(r"[ \t]*(?:&|and\b|,)?", after)
+        if following and (following[0] in business or
+                          (lead and lead.group().strip() and any(w in business for w in following[:3]))):
+            return True
+        if following and any(w in business for w in following[:3]) and \
+                all(w[:1].isupper() for w in re.findall(r"[^\W\d_]+", after)[:following.index(next(
+                    w for w in following[:3] if w in business)) + 1]):
+            return True
+    return False
 
 
 def words(text):
@@ -64,6 +125,7 @@ def score(docs, fn):
     keep_ok, keep_tot = defaultdict(int), defaultdict(int)
     fp = fp_tot = 0
     chit = ctot = 0
+    chit_g, ctot_g = defaultdict(int), defaultdict(int)
     t0 = time.perf_counter()
     outs = [fn(text) for text, _ in docs]
     elapsed = time.perf_counter() - t0
@@ -83,9 +145,11 @@ def score(docs, fn):
                 ok = all(not kept[i] for i in idx)
                 tot[g] += 1
                 hit[g] += ok
-                if not is_noise(text[sp["start"]:sp["end"]]):
+                if not is_noise(text[sp["start"]:sp["end"]], lab, text[sp["end"]:sp["end"] + 60]):
                     ctot += 1
                     chit += ok
+                    ctot_g[g] += 1
+                    chit_g[g] += ok
             elif lab in LABEL_KEEP:
                 g = LABEL_KEEP[lab]
                 keep_tot[g] += 1
@@ -98,6 +162,7 @@ def score(docs, fn):
         "recall": {g: (hit[g], tot[g]) for g in GROUPS},
         "recall_all": (sum(hit.values()), sum(tot.values())),
         "recall_clean": (chit, ctot),
+        "recall_clean_by": {g: (chit_g[g], ctot_g[g]) for g in GROUPS},
         "over_redact": (fp, fp_tot),
         "kept": {g: (keep_ok[g], keep_tot[g]) for g in KEEP},
         "ms_per_doc": 1000 * elapsed / len(docs),

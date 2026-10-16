@@ -497,3 +497,40 @@ def test_ids_and_birth_dates_by_their_field_or_context(text, expected):
 @pytest.mark.parametrize("text", ["Balance USD52482349 at close", "ISIN US1234567890 traded", "employee benefits since 2019"])
 def test_amounts_isins_and_years_are_no_ids(text):
     assert hidden(text) == []
+
+
+@pytest.mark.parametrize("text, expected", [
+    # the second round on Gretel's synthetic financial documents
+    ("(\"Lender\"), and Damien, an individual", ["Damien"]),
+    ("Last Name: Thompson\n", ["Thompson"]),
+    ("Agent: Thank you, Dean. I have", ["Dean"]),
+    ("our new colleague, Valentine Perrin.\n", ["Valentine Perrin"]),
+    ("<UpdatedBy>Micheletto G. Ligorio</UpdatedBy>", ["Micheletto G. Ligorio"]),
+    (":62F:/A/CAB/N/YOLANDA RIOS\n", ["YOLANDA RIOS"]),
+    ("|554={Bernardini-Vezzali}|", ["Bernardini-Vezzali"]),
+    ("Net Income:\nLiliana Giner-Pera, Chief Financial Officer", ["Liliana Giner-Pera"]),
+    ("gratitude to the Le Gall family for", ["Le Gall"]),
+    ('"first\\_name": "Emma", "last\\_name": "Johnson"', ["Emma", "Johnson"]),
+    ("serving you at 5 Butler Manors, Flat 6.", ["5 Butler Manors, Flat 6"]),
+    ("located at 4th Floor, 123 Silicon Way, London, E14 5EU.", ["4th Floor, 123 Silicon Way, London, E14 5EU"]),
+    (":62F:/399 Patel Keys, Suite 208\n", ["399 Patel Keys, Suite 208"]),
+    ("<tax:streetAddress>91385 Jacob Island</tax:streetAddress>", ["91385 Jacob Island"]),
+    ("The employee's date of birth must be October 28, 1994 (the", ["October 28, 1994"]),
+    ("National Insurance Number: ZZ 99 50 17 T\n", ["ZZ 99 50 17 T"]),
+    ("Social Security Number: ***-**-1234", ["***-**-1234"]),
+    ("The credit card number on file is 3495-4026-3400-406. If", ["3495-4026-3400-406"]),
+    ("- Username: mnewman\n", ["mnewman"]),
+    ("follow @johnsmith on X", ["@johnsmith"]),
+])
+def test_what_the_second_gretel_round_found(text, expected):
+    assert hidden(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "Support Agent: You're welcome! I'm glad", "the laws of the Province of Ontario, Canada",
+    "<name>GBP</name>", "<name>MemberA</name>", "Dear Policyholder,", "my Wi-Fi connection at home. It keeps",
+    "Exhibit B. Total due", "Swift BIC code", "the Smith-Mann Automotive Fund", "Thank you, Sir.",
+    "Robert W. Baird & Co.", "Total 1,234 Main items",
+])
+def test_what_the_second_gretel_round_hid_by_mistake(text):
+    assert hidden(text) == []
