@@ -65,6 +65,16 @@ def test_amounts_dates_and_masked_numbers_are_left_alone():
     assert len(r) == 0
 
 
+def test_ip_addresses_and_any_part_of_one_are_left_alone():
+    r = TaxIdRedactor()
+    text = ("login from 14.47.149.44.  connect 68.32.130.60:8080  route 253.230.241.194/24  "
+            "src=203.113.149.44 dst=10.120.33.144  ::ffff:192.168.100.228")
+    assert r.redact(text) == text
+    assert r.redact("SSN 123-45-6789, IP 10.120.33.144") == "SSN SSN_001, IP 10.120.33.144"
+    # Dotted numbers that can't be an IP address are still taxpayer IDs typed oddly.
+    assert r.redact("TIN 518.20.61.94, SSN 987.65.4321") == "TIN TIN_001, SSN SSN_002"
+
+
 def test_placeholders_it_never_handed_out_are_left_as_written():
     r = TaxIdRedactor()
     r.redact("123-45-6789")

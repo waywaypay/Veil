@@ -26,7 +26,8 @@ when OCR has dropped or added one.  OCR misreads of a few digits as lookalike
 letters ("l23-45-6789", "6i94") are read as digits.
 
 What isn't: amounts (after a currency sign, with cents, thousands commas or
-a percent sign, or round like 125000000: no SSN ends in 0000), dates, and
+a percent sign, or round like 125000000: no SSN ends in 0000), dates, IP
+addresses (14.47.149.44, any part of one, or one with a port after it), and
 digits that touch a word made of other letters.  With a profile that sets
 ``form_box_max`` (``US_TAX_K1``), a 2-7 grouping split only by a space or a
 comma is left alone unless a label is near, because a form's box number
@@ -192,11 +193,15 @@ _DATE_TIME = re.compile(r"(?<!\d)(?:(?:19|20)\d{2}([-/.])(?:0?[1-9]|1[0-2])\1(?:
                         r"|(?:0?[1-9]|[12]\d|3[01])([-/.])(?:0?[1-9]|[12]\d|3[01])\2(?:19|20)\d{2}"
                         r"|(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?=[-T ]?\d{1,2}:\d{2}))(?!\d)"
                         r"|(?<![\d.])(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:[.,]\d{1,9})?)?(?!\d)")
+# IP addresses: 192.168.0.12, four numbers up to 255 joined by dots, with nothing dotted around them.
+_OCTET = r"(?:25[0-5]|2[0-4]\d|[01]?\d?\d)"
+_IPV4 = re.compile(rf"(?<!\d)(?<!\d\.){_OCTET}(?:\.{_OCTET}){{3}}(?!\d)(?!\.\d)")
 
 
 def _mark_amounts(copy: str, clusters) -> None:
-    """Groups written as money: 1,234,567 / 1234.56 / 12.5% / a decimal like 25.1234567; and dates and times."""
-    spans = [(m.start(), m.end()) for m in _DATE_TIME.finditer(copy)]
+    """Groups written as money: 1,234,567 / 1234.56 / 12.5% / a decimal like 25.1234567; dates and times; and
+    IP addresses."""
+    spans = [(m.start(), m.end()) for pattern in (_DATE_TIME, _IPV4) for m in pattern.finditer(copy)]
     if spans:
         for groups, _ in clusters:
             for group in groups:
