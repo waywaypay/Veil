@@ -12,7 +12,8 @@ dependencies = []
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.40"]
-dev = ["pytest>=8", "ruff>=0.5", "anthropic>=0.40"]
+files = ["pypdf>=4", "pytesseract>=0.3.10", "Pillow>=10.1"]
+dev = ["pytest>=8", "ruff>=0.5", "anthropic>=0.40", "pypdf>=4", "pytesseract>=0.3.10", "Pillow>=10.1"]
 
 [tool.setuptools]
 packages = ["veil"]

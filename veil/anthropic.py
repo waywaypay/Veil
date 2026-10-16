@@ -12,8 +12,14 @@
 Each request goes out as a copy with placeholders in place of the real values
 (what the user typed, tool results, the system prompt and the model's earlier
 turns), and the reply's text and tool-call inputs come back with the real
-values.  Use one redactor per conversation.  Images and PDFs sent as files
-pass through as they are; thinking blocks go back exactly as they came.
+values.  Use one redactor per conversation.  Thinking blocks go back exactly
+as they came.
+
+A request with an image or PDF in it is refused (``FileError``) unless you
+say otherwise: ``files="read"`` reads their text on this machine
+(``veil.files.read_text``) and sends that, redacted, in their place;
+``files="send"`` sends them as they are; or pass your own
+``reader(data, media_type) -> str``.
 
 With a ``guardrail`` (any object with a ``check(texts, source) -> Findings``
 method, raising GuardrailError when it can't check), each new text in a
@@ -26,10 +32,11 @@ Streaming isn't supported yet: ``stream=True`` raises.
 
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from veil.redactor import Redactor
 from veil.tax_ids import TAX_ID_KINDS
@@ -38,10 +45,16 @@ TAX_ID_REMOVED = "[taxpayer ID removed]"
 _WHAT = {"SSN": "a taxpayer ID", "EIN": "a taxpayer ID", "TIN": "a taxpayer ID", "NAME": "a name",
          "ADDRESS": "an address", "EMAIL": "an email address", "PHONE": "a phone number",
          "ACCOUNT": "an account number", "DOB": "a birth date", "ID": "personal information"}
+FILE_UNREAD = "[No text could be read from this file.]"
 
 
 class GuardrailError(Exception):
     """The guardrail stopped a request, or couldn't check it.  The message is for the user."""
+
+
+class FileError(Exception):
+    """An image or PDF in a request couldn't be sent without what's in it, so nothing was sent.  The message is
+    for the user."""
 
 
 @dataclass
@@ -67,11 +80,19 @@ def _as_dict(block: Any) -> Any:
 class Session:
     """One conversation's redactor and guardrail, and the request and reply handling ``wrap`` uses."""
 
-    def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True):
+    def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
+                 files: str | Callable[[bytes, str], str] = "refuse"):
         self.redactor = redactor if redactor is not None else Redactor()
         self.guardrail = guardrail
         self.redact_system = redact_system
+        if files == "read":
+            from veil.files import read_text
+            files = read_text
+        elif files not in ("send", "refuse") and not callable(files):
+            raise ValueError('files must be "send", "read", "refuse" or a function (data, media_type) -> text')
+        self.files = files
         self._checked: set[str] = set()   # digests of texts the guardrail has passed
+        self._read: dict[str, str] = {}   # each file's text, by digest, so a file is read once a conversation
 
     # -- requests ----------------------------------------------------------------------------------------
 
@@ -116,9 +137,60 @@ class Session:
             if isinstance(content, list):
                 return {**b, "content": [self._block(c, None) for c in content]}
             return b
-        if kind == "document" and isinstance(b.get("source"), dict) and b["source"].get("type") == "text":
-            return {**b, "source": {**b["source"], "data": r.redact_text(b["source"].get("data", ""))}}
-        return b   # thinking, images, files: as they are
+        if kind == "document":
+            b = {**b, **{k: r.redact_text(b[k]) for k in ("title", "context") if isinstance(b.get(k), str)}}
+            source = b.get("source") if isinstance(b.get("source"), dict) else {}
+            if source.get("type") == "text":
+                return {**b, "source": {**source, "data": r.redact_text(source.get("data", ""))}}
+            if source.get("type") == "content":
+                inner = source.get("content")
+                inner = r.redact_text(inner) if isinstance(inner, str) else [self._block(c, None) for c in inner or []]
+                return {**b, "source": {**source, "content": inner}}
+            return self._file(b, role)
+        if kind == "image":
+            return self._file(b, role)
+        return b   # thinking and the like: as they are
+
+    def _file(self, b: dict, role: str | None) -> dict:
+        """An image or PDF block, as ``files`` says: as it is, or its text redacted in its place."""
+        if self.files == "send":
+            return b
+        name = "An image" if b.get("type") == "image" else "A PDF"
+        if self.files == "refuse":
+            raise FileError(f"{name} in this request would have reached the model with any personal information "
+                            'in it. Nothing was sent. Pass files="read" to send its text redacted, or files="send" '
+                            "to send it as it is.")
+        source = b.get("source") if isinstance(b.get("source"), dict) else {}
+        if source.get("type") != "base64":
+            how = {"url": "a link, which Anthropic would fetch", "file": "an uploaded file ID"}.get(
+                source.get("type"), f"a {source.get('type')!r} source")
+            raise FileError(f"{name} in this request was given as {how}, so veil can't read it first. Send the "
+                            "file's bytes (base64) instead. Nothing was sent.")
+        text = self._read_file(source, name)
+        text = self.redactor.redact_text(text) if text.strip() else FILE_UNREAD
+        title = "Text read from an image" if b.get("type") == "image" else None
+        if role != "user":   # inside a tool result or another document: plain text
+            out = {"type": "text", "text": f"[{title}]\n{text}" if title else text}
+        else:
+            out = {"type": "document", "source": {"type": "text", "media_type": "text/plain", "data": text}}
+            for key in ("title", "context", "citations"):
+                if key in b:
+                    out[key] = b[key]
+            if title and "title" not in out:
+                out["title"] = title
+        if "cache_control" in b:
+            out["cache_control"] = b["cache_control"]
+        return out
+
+    def _read_file(self, source: dict, name: str) -> str:
+        data, media_type = source.get("data") or "", source.get("media_type") or ""
+        key = self._digest(f"{media_type}\n{data}")
+        if key not in self._read:
+            try:
+                self._read[key] = self.files(base64.b64decode(data), media_type)
+            except Exception as exc:
+                raise FileError(f"{name} in this request couldn't be read ({exc}). Nothing was sent.") from exc
+        return self._read[key]
 
     def _texts(self, request: dict) -> list[str]:
         texts: list[str] = []
@@ -264,7 +336,11 @@ class VeiledClient:
         return getattr(self._client, name)
 
 
-def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True) -> VeiledClient:
+def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
+         files: str | Callable[[bytes, str], str] = "refuse") -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
-    on the way back.  Use one per conversation, or pass the conversation's ``redactor``."""
-    return VeiledClient(client, Session(redactor, guardrail, redact_system))
+    on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
+
+    ``files`` says what happens to images and PDFs: "refuse" the request (the default), "read" their text
+    here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them."""
+    return VeiledClient(client, Session(redactor, guardrail, redact_system, files))
