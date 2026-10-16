@@ -173,7 +173,7 @@ _CUE_PATTERN = (
     r"|(?:named|members?|partners?|limited\s+partner|general\s+partner|investor|shareholder|stockholder"
     r"|beneficiary|trustee|custodian|grantor|spouse|client|contact(?:\s+person)?|attn|attention|dear|fbo|c/o"
     r"|for\s+the\s+benefit\s+of|(?:prepared|issued|mailed|sent|registered)\s+(?:for|to)|prepared\s+by"
-    r"|registration|signed{extra})"
+    r"|registration|signed|i'm|i[ \t]+am|this[ \t]+is{extra})"
     r"(?:'s)?[ \t]*(?:[:.,-][ \t]*)?(?:/s/[ \t]*)?(?:(?<=:)\n[ \t]*)?"
     r"|(?:by|to|from|re|cc|bcc)[ \t]*:[ \t]*(?:/s/[ \t]*)?(?:\n[ \t]*)?"
     # a party's role, then a colon: "Shipper: Tassilo M. Hess", "Borrower: Pedro"
@@ -184,7 +184,7 @@ _CUE_PATTERN = (
     r"(?:'s)?[ \t]*:[ \t]*(?:\*\*[ \t]*)?(?:\n[ \t]*)?)\Z")
 # The last word of each of those: the label is looked for only after one of them.
 _CUE_ENDS = _words("""
-name is code signatory signature regards sincerely cordially respectfully owner holder executor executrix administrator
+name is i'm am code signatory signature regards sincerely cordially respectfully owner holder executor executrix administrator
 guardian conservator representative individual attorney attorney-in-fact poa named member members partner partners
 investor shareholder stockholder beneficiary trustee custodian grantor spouse client contact person attn attention
 dear fbo o of for to registration signed by from re cc bcc s
@@ -195,7 +195,8 @@ customer claimant sender recipient debtor creditor witness physician doctor user
 # After a name, in what the user types: what says it's a person's (a profile adds its own).
 _AFTER_CUES = (r",?[ \t]+(?i:ttee|trustee|custodian|cust|executor|executrix)\b",
                # "Leone Toselli, an individual", "Carolyn S. Day, residing at", "Jane Doe (Spouse)"
-               r",[ \t]+(?i:an[ \t]+individual|residing[ \t]+at|who[ \t]+resides|resident[ \t]+of|born[ \t]+on)\b",
+               r",[ \t]+(?i:an[ \t]+individual|who[ \t]+resides|resident[ \t]+of|born[ \t]+on)\b",
+               r",?[ \t]+(?i:residing|who[ \t]+lives)[ \t]+at\b",
                r"[ \t]+\((?i:spouse|husband|wife|son|daughter|child|mother|father|parent|sibling|brother|sister)\)")
 
 # A word: letters, with apostrophes (O'Brien, but not a possessive 's) and hyphens inside.
@@ -1295,13 +1296,14 @@ class Redactor(TaxIdRedactor):
             elif t.case != "title" or t.fold in _WORD_SURNAMES or \
                     not (t.fold in _GIVEN or (t.fold in _given_names() and not _wordlike(t.fold))):
                 return None
-            if re.match(r"[ \t]*(?:&|and[ \t])", fold[t.end:t.end + 5]):
+            if re.match(r"[ \t]*(?:&|and[ \t])", fold[t.end:t.end + 5]) and \
+                    not (t.fold in _GIVEN and re.match(r"[ \t]+and[ \t]+[a-z]", copy[t.end:t.end + 12])):
                 return None
             if i > 0 and toks[i - 1].case in ("title", "caps") and near(i - 1) and not cued and \
                     toks[i - 1].fold not in _GREETINGS and not (toks[i - 1].dot and toks[i - 1].case != "initial"):
                 # "Provided Rahel with": an everyday word starting the line before it
                 p = toks[i - 1]
-                line_start = re.search(r"(?:^|\n)[ \t]*(?:[-*\u2022]|\d{1,2}[.)])?[ \t]*\Z", fold[:p.start])
+                line_start = re.search(r"(?:^|\n)[ \t]*(?:[-*\u2022]|\d{1,2}[.)])?[ \t]*(?:\*\*|__)?[ \t]*\Z", fold[:p.start])
                 if not (line_start and p.fold in _common_words() and not _name_listed(p.fold, surnames) and
                         f"{p.fold} {t.fold}" not in _FIRMS):
                     return None
@@ -1327,6 +1329,12 @@ class Redactor(TaxIdRedactor):
                           r"|evening|congratulations|no problem|of course|sure|great|okay|ok|yes|no)[,!]?[ \t]+\Z",
                           fold[max(0, t.start - 40):t.start]) and ok(i, i):
             return _Found(i, i, None, None, None)
+        # "I understand your concern, Liana.": a first name called by, after a comma, ending the sentence
+        if t.case == "title" and len(t.word) > 2 and t.fold not in self._v.not_names and t.fold not in _PLACES and \
+                (t.fold in _GIVEN or (t.fold in _given_names() and not _wordlike(t.fold))) and \
+                re.search(r"[^\W\d_],[ \t]+\Z", fold[max(0, t.start - 3):t.start]) and \
+                re.match(r"[ \t]*[.!?](?:[ \t]|$)", fold[t.end:t.end + 2]) and ok(i, i):
+            return _Found(i, i, None, None, None)
         if t.fold in self._v.not_surnames:
             return None
         if t.dot and t.case != "initial":
@@ -1344,6 +1352,13 @@ class Redactor(TaxIdRedactor):
                     return found(i, more[1], t.word, more[0], toks[more[1]].word, remember)
                 return None
 
+            # Gustavo G. Cases, Carolyn S. Day: a common first name, an initial, and any capitalized word
+            if (t.fold in _GIVEN or t.fold.split("-")[0] in _GIVEN) and t.case == "title" and \
+                    toks[i + 1].case == "initial" and toks[i + 1].dot and i + 2 < len(toks) and near(i + 1) and \
+                    toks[i + 2].case == "title" and len(toks[i + 2].word) > 2 and \
+                    toks[i + 2].fold not in self._v.business and toks[i + 2].fold not in _HONORIFICS and \
+                    not (i + 3 < len(toks) and near(i + 2) and toks[i + 3].case in ("title", "caps")) and ok(i, i + 2):
+                return found(i, i + 2, t.word, [toks[i + 1].word], toks[i + 2].word, True)
             # Avery K. Mockridge: a common first name
             if t.fold in _GIVEN or t.fold.split("-")[0] in _GIVEN:
                 more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames), True)
