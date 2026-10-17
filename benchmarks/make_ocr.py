@@ -10,15 +10,16 @@ import textwrap
 from multiprocessing import Pool
 
 import pandas as pd
-import pytesseract
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+from veil.files import ocr_data
 
 KEYS = ("block_num", "par_num", "line_num", "word_num", "left", "top", "width", "height", "conf", "text")
 
 
 def data(img):
-    """Tesseract's words with their boxes, as veil.files reads them."""
-    d = pytesseract.image_to_data(img.convert("RGB"), output_type=pytesseract.Output.DICT)
+    """Tesseract's words with their boxes, read as veil.files reads an image."""
+    d = ocr_data(img)
     return {k: d[k] for k in KEYS}
 
 

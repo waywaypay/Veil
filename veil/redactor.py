@@ -389,9 +389,16 @@ _STREET = re.compile(
     rf"(?:{_DIRECTION}[ \t]+)?(?:"
     rf"(?:(?:[A-Z][\w'.-]*|\d+(?:st|nd|rd|th))[ \t]+){{1,4}}"
     rf"(?:(?:{'|'.join(_STREET_SUFFIX + [s.upper() for s in _STREET_SUFFIX])})\.?(?![\w])"
-    rf"|(?:{'|'.join(_STREET_SUFFIX_MORE + [s.upper() for s in _STREET_SUFFIX_MORE])})(?![\w]){_ADDRESS_END})"
+    rf"|(?:{'|'.join(_STREET_SUFFIX_MORE + [s.upper() for s in _STREET_SUFFIX_MORE])})(?:s|S)?(?![\w]){_ADDRESS_END})"
     r"|(?:[a-z][\w'.-]*[ \t]+){1,3}(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|court|ct|place"
     r"|parkway|pkwy|highway|hwy|terrace|circle)\.?(?![\w])"
+    # 93 Incrocio Cecilia, 2 Plaza de Roxana Paniagua: the street's kind first, then its name in capitals
+    r"|(?:(?:Incrocio|Ca\u00f1ada|Vial|Acceso|Calle|Viale|Piazza|Strada|Contrada|Rotonda|Vicolo|Borgo|Ronda|Rambla"
+    r"|Paseo|Pasaje|Avenida|Rua|Travessa|Chemin|All\u00e9e|Impasse|Salita|Glorieta)"
+    r"(?:[ \t]+(?:de|del|della|di|da|do|dos|la|las|los|le|les|du|des|el))*"
+    r"|(?:Plaza|Via|Rue|Camino|Corso|Largo|Quai)(?:[ \t]+(?:de|del|della|di|da|do|dos|la|las|los|le|les|du|des|el))+)"
+    r"(?:[ \t]+(?:(?:de|del|della|di|da|do|dos|la|las|los|le|les|du|des|el)[ \t]+){0,2}"
+    r"[A-Z\u00c0-\u00de][\w\u00c0-\u024f'-]*){1,4}(?=[ \t]*(?:[,;|\n\"'<)/]|$|\.(?!\w)))"
     r"|(?i:el[ \t]+camino[ \t]+real|(?:alameda|avenida|calle|camino|via|rue|avenue[ \t]+of[ \t]+the|boulevard|bd"
     r"|chemin|all\u00e9e|allee|impasse|place|quai|cours|pasaje|paseo|plaza|carrer|ronda|rambla|traves\u00eda|viale"
     r"|piazza|corso|vicolo|strada|largo|rua|avenue|contrada|travessa|glorieta|rotonda|stretto|callej\u00f3n|callejon"
@@ -418,7 +425,7 @@ _POSTCODES = re.compile(r"(?<![A-Za-z0-9])(?:[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV
                         r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})(?![A-Za-z0-9])")
 _COUNTRY_NAMES = ("USA|U\\.S\\.A\\.|US|United States(?: of America)?|UK|U\\.K\\.|United Kingdom|Great Britain|England"
                   "|Scotland|Wales|Ireland|Canada|Australia|New Zealand|" + "|".join(_COUNTRIES))
-_CITY_WORDS = r"(?:[A-Z][\w'\u00c0-\u024f.-]*[ \t]+){0,2}[A-Z][\w'\u00c0-\u024f.-]*"
+_CITY_WORDS = r"(?:[A-Z\u00c0-\u00de][\w'\u00c0-\u024f.-]*[ \t]+){0,2}[A-Z\u00c0-\u00de][\w'\u00c0-\u024f.-]*"
 _POSTAL = (r"(?:\d{3}[ ]\d{2}(?![\d])|\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d"
            r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})")
 # What may follow a street, piece by piece: ", 19821", ", New Shrewsbury", ", London, EC4M 2JR, UK", and lines
@@ -428,7 +435,7 @@ _TAIL_PIECE = re.compile(
     rf"|(?:[,;:][.,;:]?[ \t]*(?:\n[ \t]*)?|/(?=[A-Z0-9]))(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
     rf"|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
     rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\\]]|\[|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on|has|had|have|may|will|shall|can|could|would"
-    rf"|should|must|are|were|or|but|at|from|by|if|which|where|that)\b))"
+    rf"|should|must|are|were|or|but|at|from|by|if|which|where|that|within|until|before|after|so)\b))"
     rf"|[ \t]*\n(?:[ \t]*\n)?[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_POSTAL}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})|{_POSTAL}[ \t]+{_CITY_WORDS}"
@@ -596,6 +603,8 @@ def _business_after(fold: str, end: int, v: _Vocab, typed: bool = False) -> bool
     member-interest word ("LLC") alone after a name is a member's interest ("add Jane Doe LLC")."""
     if _LEGAL_ENDING.match(fold, end):
         return True
+    if re.search(r"[a-z]{4,}\.\Z", fold[max(0, end - 12):end]):
+        return False   # "874 Morrison Highway. Financial institutions": the sentence ended
     rest = fold[end:end + 80]
     for n, m in enumerate(_TOKEN.finditer(rest)):
         if n == 5 or re.search(r"[()\n:;<>|=\"!?]|(?:^|[a-z0-9]{2})\.\s", rest[:m.start()]) or (n and "," in rest[:m.start()]):

@@ -54,11 +54,28 @@ def _open_image(data: bytes):
 
 
 def _ocr(image) -> str:
+    return reflow(ocr_data(image))
+
+
+def ocr_data(image) -> dict:
+    """Tesseract's words and their boxes (``image_to_data``) for an image.  A scan's speckle is taken out first
+    (a median filter), and a page whose letters are small, as a scan at a low resolution has them, is read again
+    twice the size: Tesseract reads letters best some 20 pixels high."""
     try:
         import pytesseract
+        from PIL import Image, ImageFilter
     except ImportError as exc:
         raise ImportError('Reading images needs pytesseract: pip install "veil[files]"') from exc
-    return reflow(pytesseract.image_to_data(image.convert("RGB"), output_type=pytesseract.Output.DICT))
+
+    def read(img) -> dict:
+        return pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+
+    gray = image.convert("L").filter(ImageFilter.MedianFilter(3))
+    data = read(gray)
+    heights = sorted(h for h, t, c in zip(data["height"], data["text"], data["conf"]) if t.strip() and float(c) > 60)
+    if heights and heights[len(heights) // 2] < 20:
+        data = read(gray.resize((gray.width * 2, gray.height * 2), Image.LANCZOS))
+    return data
 
 
 def reflow(data: dict) -> str:
