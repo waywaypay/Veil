@@ -1239,6 +1239,15 @@ class Redactor(TaxIdRedactor):
             return [toks[m].word for m in range(j, end) if toks[m].fold not in _PARTICLES], end
 
         def ok(a: int, b: int) -> bool:
+            # an acronym before a word in title case is no name: "API Key", "CRM Lead"
+            if b > a and toks[a].case == "caps" and len(toks[a].word) <= 4 and \
+                    any(toks[k].case == "title" for k in range(a + 1, b + 1)):
+                return False
+            # a city before its state or ZIP: "Oakland, CA", "Leeds, LS1 4AP"
+            if re.match(rf"[ \t]*,[ \t]*(?:{_STATE}(?:[ \t]+{_ZIP})?|{_ZIP}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})(?![\w])",
+                        copy[toks[b].end:toks[b].end + 20]) and \
+                    not re.search(r"(?i)name[ \t]*:?[ \t]*\Z", fold[max(0, toks[a].start - 20):toks[a].start]):
+                return False
             words = [toks[k].fold for k in range(a, b + 1)]
             if any(f"{x} {y}" in _FIRMS for x, y in zip(words, words[1:])) or tuple(words) in self._businesses:
                 return False
