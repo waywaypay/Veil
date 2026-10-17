@@ -41,8 +41,29 @@ def _pdf(data: bytes) -> str:
         text = page.extract_text() or ""
         if not text.strip():   # a scanned page: read the pictures on it
             text = "\n".join(_ocr(image.image) for image in page.images)
-        pages.append(text.strip())
+        pages.append(_rewrap(text.strip()))
     return "\n\n".join(p for p in pages if p)
+
+
+def _rewrap(text: str) -> str:
+    """A PDF's text with the lines its page wrapped joined again, as ``reflow`` joins OCR's: a line about as long
+    as the page's longest, then one that carries on the sentence (no list mark or label starts it)."""
+    lines = text.split("\n")
+    counts = sorted(len(line) for line in lines if line.strip())
+    if len(counts) < 5:
+        return text
+    longest = counts[int(0.95 * (len(counts) - 1))]
+    out = [lines[0]]
+    for line in lines[1:]:
+        prev = out[-1]
+        first = line.strip().split(" ")[0] if line.strip() else ""
+        if first and len(prev) >= 0.75 * longest and len(prev) + 1 + len(first) > 0.9 * longest and \
+                not re.match(r"[-*\u2022|#>]|\d{1,2}[.)]|[A-Z][\w ]{0,30}:", line.strip()) and \
+                not prev.rstrip().endswith(":") and prev.count(",") + prev.count("|") < 3:
+            out[-1] = prev.rstrip() + ("" if prev.rstrip().endswith("-") else " ") + line.strip()
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def _open_image(data: bytes):
@@ -58,9 +79,11 @@ def _ocr(image) -> str:
 
 
 def ocr_data(image) -> dict:
-    """Tesseract's words and their boxes (``image_to_data``) for an image.  A scan's speckle is taken out first
-    (a median filter), and a page whose letters are small, as a scan at a low resolution has them, is read again
-    twice the size: Tesseract reads letters best some 20 pixels high."""
+    """Tesseract's words and their boxes (``image_to_data``) for an image, read the way that reads best.  A page
+    on its side or upside down is turned upright first.  A page whose letters are small, as a scan at a low
+    resolution or small print has them, is read enlarged: Tesseract reads letters best some 25 pixels high.
+    And it's read both as it is and with a scan's speckle taken out (a median filter, which would wear away
+    small clean letters), and an enlarged page smoothed too, keeping whichever Tesseract is surest of."""
     try:
         import pytesseract
         from PIL import Image, ImageFilter
@@ -70,12 +93,34 @@ def ocr_data(image) -> dict:
     def read(img) -> dict:
         return pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
 
-    gray = image.convert("L").filter(ImageFilter.MedianFilter(3))
-    data = read(gray)
-    heights = sorted(h for h, t, c in zip(data["height"], data["text"], data["conf"]) if t.strip() and float(c) > 60)
-    if heights and heights[len(heights) // 2] < 20:
-        data = read(gray.resize((gray.width * 2, gray.height * 2), Image.LANCZOS))
-    return data
+    def sure(data: dict) -> float:   # how much Tesseract is sure it read: its confident words' confidence
+        return sum(float(c) - 50 for t, c in zip(data["text"], data["conf"]) if t.strip() and float(c) > 50)
+
+    gray = image.convert("L")
+    first = read(gray)
+    words = sum(1 for t in first["text"] if t.strip())
+    if words and sure(first) < 15 * words:   # hardly a word read with confidence: maybe the page is turned
+        try:
+            angle = int(re.search(r"Rotate: (\d+)", pytesseract.image_to_osd(gray)).group(1))
+        except Exception:   # too little text for Tesseract to tell
+            angle = 0
+        if angle:
+            gray = gray.rotate(-angle, expand=True, fillcolor=255)
+            first = read(gray)
+    heights = sorted(h for h, t, c in zip(first["height"], first["text"], first["conf"]) if t.strip() and float(c) > 30)
+    height = heights[len(heights) // 2] if heights else 0
+    scale = min(4, max(2, round(30 / height))) if 0 < height < 20 else 1
+    if scale > 1:
+        gray = gray.resize((gray.width * scale, gray.height * scale), Image.LANCZOS)
+    candidates = [read(gray) if scale > 1 else first]
+    cleaned = (image.convert("L").filter(ImageFilter.MedianFilter(3)) if gray.size == image.size else None)
+    if cleaned is None:   # turned or enlarged: take the speckle out of what's read, at its own size first
+        cleaned = gray.resize((max(1, gray.width // scale), max(1, gray.height // scale)), Image.LANCZOS) \
+            .filter(ImageFilter.MedianFilter(3)).resize(gray.size, Image.LANCZOS)
+    candidates.append(read(cleaned))
+    if scale > 1:   # enlarged, a fax's or a low resolution's jagged edges read better smoothed
+        candidates.append(read(gray.filter(ImageFilter.GaussianBlur(scale / 2))))
+    return max(candidates, key=sure)
 
 
 def reflow(data: dict) -> str:
