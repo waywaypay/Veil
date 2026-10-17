@@ -110,6 +110,8 @@ def _norm(c: str) -> str:
         return " "
     if category == "Pd" or c in _DASH_LIKE:
         return "-"
+    if c in "\u201c\u201d\u201e\u201f\u00ab\u00bb":   # a word processor's curly quotes, as typed straight
+        return '"'
     folded = unicodedata.normalize("NFKC", c)
     return folded if len(folded) == 1 else c
 

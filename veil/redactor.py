@@ -1155,7 +1155,7 @@ class Redactor(TaxIdRedactor):
                     take(start + lead, start + lead + len(value), "ADDRESS")
             elif kind == "PHONE":
                 digits = re.sub(r"\D", "", value)
-                if 9 <= len(digits) <= 16 and re.fullmatch(r"\+?[\d ().\-]+(?:[ ]?(?:x|ext\.?)[ ]?\d{1,6})?", value):
+                if 7 <= len(digits) <= 16 and re.fullmatch(r"\+?[\d ().\-]+(?:[ ]?(?:x|ext\.?)[ ]?\d{1,6})?", value):
                     take(start + lead, start + lead + len(value), "PHONE", "PHONE:" + digits)
             elif kind == "USERNAME":
                 if re.fullmatch(r"@?[A-Za-z0-9][\w.\-]{2,40}", value):
@@ -1196,6 +1196,20 @@ class Redactor(TaxIdRedactor):
                 continue   # a line someone said ("Agent: Thank you, Dean."), not a name
             if kind in ("NAME", "PLACE", "DOB", "PHONE", "ID"):
                 put(m.start("value"), copy[m.start("value"):m.end("value")], kind)
+        # A form two or more fields to a row: "| First Name | Jane | Last Name | Doe |"
+        for m in re.finditer(r"(?m)^[ \t]*\|(?:[^|\n]*\|){4,}[ \t]*$", fold):
+            cells, at = [], m.start() + m.group().index("|") + 1
+            for cell in m.group().strip().strip("|").split("|"):
+                cells.append((at, cell))
+                at += len(cell) + 1
+            if len(cells) % 2:
+                continue
+            for (k_at, key), (v_at, value) in zip(cells[::2], cells[1::2]):
+                kind = key_kind(key.strip().strip("*_: ")) if key.strip() else None
+                inner = value.strip()
+                if kind in ("NAME", "PLACE", "DOB", "PHONE", "ID", "ADDRESS") and inner:
+                    lead = value.index(inner)
+                    put(v_at + lead, copy[v_at + lead:v_at + lead + len(inner)], kind)
         # Tables: a header line names the columns; each line after it with as many cells is a row.
         lines, pos = [], 0
         for line in fold.split("\n"):
@@ -1328,6 +1342,12 @@ class Redactor(TaxIdRedactor):
                         continue
                     if not written[0].isupper() and (len(written) < 4 or written.casefold() in _WORD_SURNAMES):
                         continue
+                # "Priya" known, then "Priya Natarajan": the surname after it goes with it
+                after = re.match(r"[ \t]+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?![\w'-])", fold[m.end():m.end() + 40])
+                if after and written[0].isupper() and after.group(1).casefold() not in self._v.not_names and \
+                        not _business_after(fold, m.end() + after.end(), self._v, typed) and \
+                        take(m.start(), m.end() + after.end(), "NAME"):
+                    continue
                 take(m.start(), m.end(), "NAME")
 
     # -- names it finds --------------------------------------------------------
