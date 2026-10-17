@@ -445,7 +445,9 @@ _POSTCODES = re.compile(r"(?<![A-Za-z0-9])(?:[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV
                         r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})(?![A-Za-z0-9])")
 _COUNTRY_NAMES = ("USA|U\\.S\\.A\\.|US|United States(?: of America)?|UK|U\\.K\\.|United Kingdom|Great Britain|England"
                   "|Scotland|Wales|Ireland|Canada|Australia|New Zealand|" + "|".join(_COUNTRIES))
-_CITY_WORDS = r"(?:[A-Z\u00c0-\u00de][\w'\u00c0-\u024f.-]*[ \t]+){0,2}[A-Z\u00c0-\u00de][\w'\u00c0-\u024f.-]*"
+# a town's words; a period only after a short one ("St. Louis"), so "Israel. Please" is no town
+_CITY_WORDS = (r"(?:(?:[A-Z][a-z]{0,2}\.|[A-Z\u00c0-\u00de][\w'\u00c0-\u024f-]*)[ \t]+){0,2}"
+               r"[A-Z\u00c0-\u00de][\w'\u00c0-\u024f-]*\.?")
 _POSTAL = (r"(?:\d{3}[ ]\d{2}(?![\d])|\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d"
            r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})")
 # What may follow a street, piece by piece: ", 19821", ", New Shrewsbury", ", London, EC4M 2JR, UK", and lines
@@ -647,6 +649,65 @@ def _business_after(fold: str, end: int, v: _Vocab, typed: bool = False) -> bool
         if word not in _ROMAN and word not in ("and", "of", "the") and not m.group()[0].isupper():
             return False
     return False
+
+
+def _mostly_lower(text: str) -> bool:
+    """Whether a text is written in lower case: hardly a word capitalized, of enough words to tell."""
+    words = re.findall(r"[^\W\d_]{2,}", text)
+    return len(words) >= 8 and sum(w[0].isupper() for w in words) < 0.03 * len(words)
+
+
+_LOWER_SUFFIXES = None
+
+
+def _recase(text: str) -> str:
+    """``text`` with the capitals a careful writer would have given its names: a listed first name, and the
+    names after it ("jane smith" is "Jane Smith"); a street's name and kind after its number, and the town and
+    state after it ("12 main street, springfield, il" is "12 Main Street, Springfield, IL").  Same length."""
+    global _LOWER_SUFFIXES
+    if _LOWER_SUFFIXES is None:
+        _LOWER_SUFFIXES = "|".join(sorted({w.lower() for w in _STREET_SUFFIX + _STREET_SUFFIX_MORE}, key=len,
+                                          reverse=True))
+    chars = list(text)
+
+    def cap(start: int, end: int, upper: bool = False) -> None:
+        chars[start:end] = text[start:end].upper() if upper else text[start].upper() + text[start + 1:end]
+
+    def given(w: str) -> bool:
+        return w in _GIVEN or (w in _given_names() and not _wordlike(w) and w not in _common_words())
+
+    def name(w: str) -> bool:
+        return w in _GIVEN or w in _SURNAMES or w in _top_surnames() or w in _common_surnames() or \
+            ((w in _given_names() or w in _surname_list()) and w not in _common_words())
+
+    toks = list(re.finditer(r"[^\W\d_]+(?:['-][^\W\d_]+)*", text))
+    k = 0
+    while k < len(toks):
+        w = _ascii(toks[k].group()).casefold()
+        if given(w) and w not in _STOP:
+            run = [k]
+            while len(run) < 4 and run[-1] + 1 < len(toks) and \
+                    re.fullmatch(r"[ \t]{1,2}|[ \t]*\.[ \t]*", text[toks[run[-1]].end():toks[run[-1] + 1].start()]):
+                nxt = _ascii(toks[run[-1] + 1].group()).casefold()
+                if not (len(nxt) == 1 or (name(nxt) and nxt not in _STOP)):
+                    break
+                run.append(run[-1] + 1)
+            if len(run) > 1 or re.search(r"(?i)(?:name|dear|hi|hello|thanks|patient|customer|client|agent)\W{0,3}\Z",
+                                         text[max(0, toks[k].start() - 12):toks[k].start()]):
+                for j in run:
+                    cap(toks[j].start(), toks[j].end())
+            k = run[-1] + 1
+            continue
+        k += 1
+    for m in re.finditer(rf"(?<![\w.])\d{{1,6}}[ \t]+((?:[a-z][\w'-]*[ \t]+){{1,3}}?)({_LOWER_SUFFIXES})\b\.?"
+                         rf"(?:,?[ \t]+((?:[a-z][\w'-]*[ \t]+){{0,2}}[a-z][\w'-]*),?[ \t]+([a-z]{{2}})(?=[ \t]+\d{{5}}))?", text):
+        for g in (1, 2, 3):
+            if m.group(g):
+                for w in re.finditer(r"[a-z][\w'-]*", m.group(g)):
+                    cap(m.start(g) + w.start(), m.start(g) + w.end())
+        if m.group(4) and m.group(4).upper() in _STATE_CODES:
+            cap(m.start(4), m.end(4), upper=True)
+    return "".join(chars)
 
 
 @dataclass
@@ -895,6 +956,11 @@ class Redactor(TaxIdRedactor):
         copy, starts, ends = _shadow(text)
         if not copy:
             return text
+        # A text written all in lower case, as a chat or a careless form: likely names and streets are given
+        # their capitals here to be found, and put back as written.
+        recased = _mostly_lower(copy)
+        if recased:
+            copy = _recase(copy)
         fold = _ascii(copy)
         covered = bytearray(len(copy))
         for start, end in self._placeholder_spans(copy):
@@ -904,6 +970,8 @@ class Redactor(TaxIdRedactor):
         def take(start: int, end: int, kind: str, key: str | None = None, real: str | None = None) -> bool:
             if start >= end or any(covered[start:end]) or (kind in KINDS and kind not in self._detect):
                 return False
+            if recased:
+                real = None   # put back as written, not as recased
             covered[start:end] = b"\x01" * (end - start)
             found.append((start, end, kind, key or f"{kind}:{_fold(copy[start:end])}", real))
             return True

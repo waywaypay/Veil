@@ -59,7 +59,7 @@ def _rewrap(text: str) -> str:
         first = line.strip().split(" ")[0] if line.strip() else ""
         if first and len(prev) >= 0.75 * longest and len(prev) + 1 + len(first) > 0.9 * longest and \
                 not re.match(r"[-*\u2022|#>]|\d{1,2}[.)]|[A-Z][\w ]{0,30}:", line.strip()) and \
-                not prev.rstrip().endswith(":") and prev.count(",") + prev.count("|") < 3:
+                not prev.rstrip().endswith(":") and len(re.findall(r",(?! )|\|", prev)) < 3:
             out[-1] = prev.rstrip() + ("" if prev.rstrip().endswith("-") else " ") + line.strip()
         else:
             out.append(line)
@@ -158,7 +158,7 @@ def reflow(data: dict) -> str:
             full = right - prev_right < width + 2.5 * char or \
                 (len(prev_text) >= 0.8 * longest and len(prev_text) + 1 + len(words[0][4]) > longest)
             # rows of a CSV or a table are each their own line, however long
-            records = all(t.count(",") + t.count("|") + t.count(";") >= 3 for t in (prev_text, text))
+            records = all(len(re.findall(r"[,;](?! )|\|", t)) >= 3 for t in (prev_text, text))
             wrapped = full and not records and top - prev_bottom < 1.8 * line_height and \
                 abs(left - min(x for x, *_ in prev_words)) < 4 * char and \
                 not re.match(r"[-*\u2022]|\d{1,2}[.)]|[A-Z][\w ]{0,30}:", text) and not prev_words[-1][4].endswith(":")

@@ -278,3 +278,13 @@ def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
 def test_ocr_tidying_leaves_ordinary_text_alone(text):
     from veil.files import _tidy
     assert _tidy(text) == text
+
+
+def test_a_pdf_s_wrapped_lines_are_joined():
+    from veil.files import _rewrap
+    text = "\n".join(["The tenant, Avery Mockridge, lives at 1234 Main Street, Anytown, DE 12345, and she pays the",
+                     "rent each month by bank transfer to the landlord, who lives at 55 Oak Avenue, Springfield,",
+                     "IL 62701, as the lease says it shall be paid, with any late fee added to it when due.",
+                     "Name: Avery Mockridge", "Phone: 415-555-0134", "Date: 2024-01-01"])
+    out = _rewrap(text)
+    assert "Springfield, IL 62701" in out and "\nName: Avery Mockridge\nPhone: 415-555-0134" in out
