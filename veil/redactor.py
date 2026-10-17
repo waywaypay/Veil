@@ -622,6 +622,7 @@ class _Person:
     suffix: str = ""          # Jr., III ...
     whole: list[str] = field(default_factory=list)   # a business's, trust's or joint account's name, word by word
     bare: bool = False        # hide the surname alone too
+    single: bool = False      # a name of one word, found alone: hidden wherever it's written so
 
 
 @dataclass
@@ -822,6 +823,9 @@ class Redactor(TaxIdRedactor):
                 alone.append((re.compile(rf"(?<![^\W\d_])(?:(?:{'|'.join(_HONORIFICS)})\.?[ \t]+){optional}"
                                          rf"{particles}{word(p.last)}(?![^\W\d_])", re.IGNORECASE), None))
             first = p.first.casefold()
+            if p.single:
+                alone.append((re.compile(rf"(?<![^\W\d_])(?-i:{word(p.first)})(?![^\W\d_])"), None))
+                continue
             if p.first and p.bare and len(first) > 3 and first not in _GIVEN | _WORD_SURNAMES | self._v.not_names:
                 # Thandiwe alone: a first name that's no common one or ordinary word
                 alone.append((re.compile(rf"(?<![^\W\d_]){word(p.first)}(?![^\W\d_])", re.IGNORECASE), None))
@@ -1322,7 +1326,12 @@ class Redactor(TaxIdRedactor):
                     return None
             if i + 1 < len(toks) and toks[i + 1].case in ("title", "caps") and near(i) and not t.dot:
                 return None
-            return _Found(i, i, None, None, None) if ok(i, i) else None
+            if not ok(i, i):
+                return None
+            # hidden wherever else it's written, as it's written here: "Hi Margaret," ... "notify Margaret"
+            single = t.case == "title" and len(t.word) > 3 and t.fold not in _common_words() and \
+                not _wordlike(t.fold) and t.fold not in _WORD_GIVEN | _WORD_SURNAMES | self._v.not_names
+            return _Found(i, i, None, None, _Person(f"NAME:{t.fold}", w(i), first=t.word, single=True) if single else None)
 
         # Mark Tiffany Fuentes: a first name that's an everyday word, before a name
         if t.fold in _WORD_GIVEN and t.case in ("title", "caps") and not t.dot and near(i) and \
