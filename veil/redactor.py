@@ -1301,6 +1301,14 @@ class Redactor(TaxIdRedactor):
                 more = rest(j + 1, toks[j].case, True, lambda k: True, True) if near(j) else None
                 if more and ok(j, more[1]):
                     return found(j, more[1], toks[j].word, more[0], toks[more[1]].word, True)
+                # Mr. Alan Gross, Ms. Sarah Day: after a title and a first name, a capitalized word ending the
+                # name is its surname, everyday word or not
+                k = j + 1
+                if k < len(toks) and near(j) and toks[k].case == toks[j].case and len(toks[k].word) > 1 and \
+                        (toks[j].fold in _GIVEN or toks[j].fold in _given_names()) and \
+                        toks[k].fold not in self._v.business and toks[k].fold not in _HONORIFICS and \
+                        not (k + 1 < len(toks) and near(k) and toks[k + 1].case in ("title", "caps")) and ok(j, k):
+                    return found(j, k, toks[j].word, [], toks[k].word, True)
                 if ok(j, j):
                     return _Found(i, j, None, None, None)
             return None
