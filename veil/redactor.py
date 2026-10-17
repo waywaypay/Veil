@@ -1390,6 +1390,17 @@ class Redactor(TaxIdRedactor):
                     toks[i + 2].fold not in self._v.business and toks[i + 2].fold not in _HONORIFICS and \
                     not (i + 3 < len(toks) and near(i + 2) and toks[i + 3].case in ("title", "caps")) and ok(i, i + 2):
                 return found(i, i + 2, t.word, [toks[i + 1].word], toks[i + 2].word, True)
+            # Ashley Mary Good, Julius Rosalinde Killer: two first names, then any capitalized word for the surname
+            def first_name(k: int) -> bool:
+                f = toks[k].fold
+                return toks[k].case == "title" and not toks[k].dot and f not in self._v.not_names and \
+                    f not in _PLACES and (f in _GIVEN or (f in _given_names() and not _wordlike(f) and
+                                                          f not in _common_words()))
+            if first_name(i) and i + 2 < len(toks) and first_name(i + 1) and near(i + 1) and \
+                    toks[i + 2].case == "title" and len(toks[i + 2].word) > 2 and \
+                    toks[i + 2].fold not in self._v.not_surnames and toks[i + 2].fold not in _PLACES and \
+                    not (i + 3 < len(toks) and near(i + 2) and toks[i + 3].case in ("title", "caps")) and ok(i, i + 2):
+                return found(i, i + 2, t.word, [toks[i + 1].word], toks[i + 2].word, True)
             # Avery K. Mockridge: a common first name
             if t.fold in _GIVEN or t.fold.split("-")[0] in _GIVEN:
                 more = rest(i + 1, t.case, True, lambda k: _surname_like(toks[k].fold, surnames), True)
