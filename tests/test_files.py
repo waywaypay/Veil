@@ -257,6 +257,13 @@ def test_reflow_joins_the_lines_a_page_wrapped_and_keeps_a_forms_lines():
     ("address of 49249 Phillip junction, Katherineport", "address of 49249 Phillip Junction, Katherineport"),
     ("SSN: 384.35-2296\n", "SSN: 384-35-2296\n"),
     ("54652 Monica Mali (the", "54652 Monica Mall (the"),
+    ("Telephone: +44 118 322 S111\n", "Telephone: +44 118 322 5111\n"),
+    ("Email Address: johndoe@emai!.com\n", "Email Address: johndoe@email.com\n"),
+    ("[a.b@email.com](mailto:a b@email.com)", "[a.b@email.com](mailto:a.b@email.com)"),
+    ("Port Lauraberg, AB T2V 5}7, Canada", "Port Lauraberg, AB T2V 5J7, Canada"),
+    ("at 1234 Main Street. Anytown. USA (", "at 1234 Main Street, Anytown, USA ("),
+    ("located at 8905 johnson Fords, New Dennis", "located at 8905 Johnson Fords, New Dennis"),
+    ("Dear isidro Armando Diego,", "Dear Isidro Armando Diego,"),
 ])
 def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
     from veil.files import _tidy
@@ -266,7 +273,7 @@ def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
 @pytest.mark.parametrize("text", [
     "1. Introduction", "We hired John. The team grew.", "Meeting at 10:30 Monday", "See www.Example.com",
     "Total: 1,234.56 at 2021.09.01", "We sold 500 Apple Pies, and", "<phone>819.496.2354</phone>", "Note: Payment due",
-    "Maria lives here", "John loves it", "I live at 12 Oak Street. Then we left", "Wow! Great", "costs 1.240 Euro", "Big Strake", "Bob jumped", "Sarah just left",
+    "Maria lives here", "John loves it", "I live at 12 Oak Street. Then we left", "Wow! Great", "Dear friends,", "Phone Option: SOLO", "costs 1.240 Euro", "Big Strake", "Bob jumped", "Sarah just left",
 ])
 def test_ocr_tidying_leaves_ordinary_text_alone(text):
     from veil.files import _tidy

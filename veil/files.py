@@ -209,6 +209,10 @@ def _tidy_labels(text: str) -> str:
         number = re.sub(r"(?<=\d)[ ]*[:\u00b0.][ ]*(?=\d)|(?<=[)])[ ]*[:.][ ]*(?=\d)", " ", m.group(3))
         return label + number
 
+    # +44 118 322 S111: an S or an O OCR read for a digit in a phone number
+    text = re.sub(r"(?i)\b((?:tele)?phone|tel|mobile|fax)\b([^\n]{0,30})",
+                  lambda m: m.group(1) + re.sub(r"(?<=[\d ])S(?=\d)|(?<=\d)S(?=[ \d])", "5",
+                                                re.sub(r"(?<=\d)O(?=[\d ])|(?<=[\d ])O(?=\d)", "0", m.group(2))), text)
     text = _PHONE_AFTER_LABEL.sub(phone, text)
     return re.sub(r"(?<=[A-Z0-9])[:](?=\d{3,}-\d)", "-", text)   # a license number's dash read as a colon
 
@@ -279,6 +283,9 @@ def _tidy_names(text: str) -> str:
                   lambda m: m.group(1) + "l" if given(m.group(1) + "l") or known(m.group(1) + "l") else m.group(), text)
     text = re.sub(r"\b([A-Z][a-z]{1,15} )([A-Z][a-z]{1,15})[8&](?=[ ,.:;\]]|$)",
                   lambda m: f"{m.group(1)}{m.group(2)}\u00df" if given(m.group(1).strip()) else m.group(), text)
+    text = re.sub(r"\b(Dear|Hello|Hi) ([a-z])([a-z]{2,})(?= [A-Z]|,)",
+                  lambda m: f"{m.group(1)} {m.group(2).upper()}{m.group(3)}"
+                  if given(m.group(2).upper() + m.group(3)) else m.group(), text)                  # Dear isidro Armando
     text = re.sub(r"\b(Dear|Hello|Hi|Thanks|welcome|Name:|you,) j([a-z]{2,})\b",
                   lambda m: f"{m.group(1)} J{m.group(2)}" if given("J" + m.group(2)) else m.group(), text)
     # A period or colon after a first name, before another name: "Melanie. Robin Jordan", "Bas: Timo Evers"
@@ -305,9 +312,15 @@ def _tidy(text: str) -> str:
     # a space OCR put inside an email's domain: "@emai l.com", "@email.c om"
     text = re.sub(r"(?<=@)([\w-]{2,}) ([\w-]{1,3}\.(?:com|org|net|co|io)\b)", r"\1\2", text)
     text = re.sub(r"(?<=@)([\w.-]+\.c) ?(o) ?(m)\b", r"\1\2\3", text)
+    text = re.sub(r"(?<=@)([\w.-]*?)!(?=[\w.-]*\.[a-z]{2,4}\b)", r"\1l", text)                # @emai!.com
+    text = re.sub(r"(?<=mailto:)([\w-]+) (?=[\w.-]+@)", r"\1.", text)                       # mailto:mike johnson@
     text = _BROKEN_EMAIL.sub(email, text)
+    # "charlie brown@yahoo.com" where the same email is written with its dot elsewhere
+    for e in set(re.findall(r"[\w-]+\.[\w.-]+@[\w.-]+\.[a-z]{2,6}", text)):
+        local, domain = e.split("@", 1)
+        text = re.sub(rf"(?<![\w.]){re.escape(local.replace('.', ' '))}@{re.escape(domain)}", e, text)
     # Stra\u00dfe read StraBe, StraRe, Strake: its \u00df
-    text = re.sub(r"(?<=[A-Za-z\u00c0-\u024f-])([Ss])tra(?:B|R|k|&|8)e\b", "\\1tra\u00dfe", text)
+    text = re.sub(r"(?<=[A-Za-z\u00c0-\u024f-])([Ss])tra(?:B|R|k|&|8|G|f)e\b", "\\1tra\u00dfe", text)
     # SE1 12Z, RHSW 5RQ: a UK postcode with a 2 for a Z, an S for a 5
     text = re.sub(r"\b([A-Z]{1,2})l( \d[A-Z\d]{2})\b", r"\g<1>1\2", text)                     # SEl 122
     text = re.sub(r"\b([A-Z]{1,2}\d[A-Z\d]?) (\d)([A-Z2])([A-Z2])\b",
@@ -325,6 +338,8 @@ def _tidy(text: str) -> str:
     text = re.sub(r"(?<![\w.,$])(\d{1,2})\.[ ]?(?=(?:Rue|Calle|Via|Avenida|Avenue|Plaza|Piazza)\b)", r"\1 ", text)  # 45.Rue
     text = re.sub(r"(?<![\w.,$])(\d{2,6}):[ ]?\n(?=[A-Z][a-z])", r"\1 ", text)                 # 642:\nAnderson Rapid
     text = re.sub(r"(?<=[:(\s])[.\-+]{1,2}(?=\d{2,6}[ ][A-Z][a-z])", "", text)                   # -.708 Sandra Burgs
+    text = re.sub(r"\b([ABCEGHJ-NPRSTVXY]\d[A-Z]) (\d)[}\]](\d)\b", r"\1 \2J\3", text)            # T2V 5}7
+    text = re.sub(r"\b([ABCEGHJ-NPRSTVXY])S[)}](?= \d[A-Z]\d\b)", r"\g<1>5J", text)                # MS) 2H7
     text = re.sub(r"\b([ABCEGHJ-NPRSTVXY]\d[A-Z])[.\-)]?[ ]?(\d[A-Z]\d)\b", r"\1 \2", text)   # V6B.1C3
     # the street's own words split by a colon or a period: "7190 Peter:Crossing", "34611 Canyon. View"
     text = re.sub(r"\b(\d{1,6}[ ]+[A-Z][a-z]{2,})(?:[:.][ ]?)(?=([A-Z][a-z]+)\b)",
@@ -333,6 +348,15 @@ def _tidy(text: str) -> str:
     # 456 Oak Street. Anytown, USA: a period read for the comma before the town
     text = re.sub(rf"(\b\d{{1,6}}[ ]+(?:[A-Z][\w'-]+[ ]+){{1,3}}(?:{'|'.join(_SUFFIXES)}))\.[ ]"
                   r"(?=[A-Z][\w'-]+(?:[ ][A-Z][\w'-]+)?(?:,|[ ]*\n|[ ]*$))", r"\1, ", text)
+    # Toronto. ON, Canada; Lodge. 02116, Beasleytown: more periods for commas in an address's line
+    def commas(m: re.Match) -> str:
+        line = re.sub(rf"^(.*?\b(?:{'|'.join(_SUFFIXES)}))\.[ ](?=[A-Z][\w'-]+(?:[ ][A-Z][\w'-]+)?[.,][ ])", r"\1, ",
+                      m.group())
+        return re.sub(r"(?<=[A-Za-z])\.[ ](?=(?:[A-Z]{2}\b|\d{4,6}\b|USA\b|Canada\b|UK\b|United\b|[A-Z]\d[A-Z]))",
+                      ", ", line)
+    text = re.sub(rf"\b\d{{1,6}}[ ]+(?:[A-Z][\w'-]+[ ]+){{1,3}}(?:{'|'.join(_SUFFIXES)})\b[^\n]{{0,80}}", commas, text)
+    # 8905 johnson Fords: a street's name with its first letter read small
+    text = re.sub(rf"(\b\d{{1,6}}[ ]+)j(?=[a-z]+[ ]+(?:{'|'.join(_SUFFIXES)})\b)", r"\1J", text)
     # a lower case j for the J starting a street's kind or a name after a capitalized word: "Phillip junction"
     text = re.sub(rf"(\b\d{{1,6}}[ ]+[A-Z][\w'-]+[ ])j(?=(?:{'|'.join(w[1:] for w in _SUFFIXES if w[0] == 'J')})\b)",
                   r"\1J", text)
