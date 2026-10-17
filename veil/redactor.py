@@ -284,12 +284,14 @@ _USERNAME = re.compile(
     r"(?P<value>@?[A-Za-z0-9][\w.\-]{2,40}?)(?=[\"'*]*(?:[\s,;:)]|\.(?:\s|$)|$))(?![\w@])"
     r"|(?<![\w@.])(?P<handle>@[A-Za-z][\w.]{2,30})(?![\w@])")
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
-                r"(?:[ \t]+is)?[ \t]*\**[ \t]*[:.#-]?|contact[ \t]*(?:number|no\b\.?|\#)[ \t]*[:.#-]?|(?:direct|office|work|home|main)[ \t]*:"
+                r"(?:[ \t]+is)?[ \t]*\**[ \t]*[:.#-]?|contact[ \t]*(?:number|no\b\.?|\#)?[ \t]*\**[ \t]*:|(?:direct|office|work|home|main)[ \t]*:"
                 r"|(?:call|text|phone|ring|fax|reach|reached|contact|contacting)(?:[ \t]+(?:us|me|him|her|them))?[ \t]+(?:at|on)"
                 r"|(?:by|via)[ \t]+(?:phone|telephone|fax)(?:[ \t]+(?:at|on))?)")
 _EXTENSION = r"(?:[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"
 _END = r"(?![\d]|[.,]\d)"
 # anything after "Phone:", "Tel", "Fax", "Work:", "call us at" ...
+# (0131) 4960506, (028) 9018 0669: a national number with its area code's trunk 0 in brackets
+_BRACKETED_TRUNK_PHONE = re.compile(rf"(?<![\w(])\(0\d{{1,4}}\)[ ]?\d{{3,4}}[ -]?\d{{3,4}}{_END}")
 _LABELLED_PHONE = re.compile(rf"{_PHONE_LABEL}[ \t]*\**[ \t]*(?P<value>(?:\(\+\d{{1,3}}\)[ ]?)?\+?[\d(][\d ().-]{{6,22}}\d{_EXTENSION}){_END}")
 # A national number with its trunk 0, as the UK and Europe write them: 0800 123 4567, 020-7946-0958
 _TRUNK_PHONE = re.compile(rf"(?<![\w$.,+/:-])0\d{{1,4}}(?:[ -]\d{{2,4}}){{2,4}}{_EXTENSION}{_END}")
@@ -306,6 +308,11 @@ _PHONES = [
 
     _LABELLED_PHONE,
     _TRUNK_PHONE,
+    _BRACKETED_TRUNK_PHONE,
+    # 001-873-829-0395: a North American number with the international prefix 00
+    re.compile(rf"(?<![\w+])001[ .-]\d{{3}}[ .-]\d{{3}}[ .-]\d{{4}}{_EXTENSION}{_END}"),
+    # 07728712027: a UK mobile, written whole
+    re.compile(rf"(?<![\w$.,+/:-])07\d{{9}}{_END}"),
 ]
 # In what the user types: 415 555 0134, 1 415 555 0134 and 4155550134 too.
 _TYPED_PHONES = [re.compile(rf"(?<![\d.,$])(?:1[ .-])?[2-9]\d{{2}} [2-9]\d{{2}} \d{{4}}{_END}"),
@@ -328,7 +335,7 @@ _STREET_SUFFIX_MORE = ("Alley Anex Annex Arcade Bayou Beach Bend Bluff Bluffs Bo
                        "Ridges River Roads Run Shoal Shoals Shore Shores Skyway Spring Springs Spur Spurs Squares Station "
                        "Stravenue Stream Streets Summit Throughway Trace Track Trafficway Tunnel Underpass Union Unions "
                        "Valley Valleys Viaduct View Views Village Villages Ville Vista Walks Wall Ways Well Wells Cross Gate Close "
-                       "Rise Parade Yard Embankment Grange Rue Via").split()
+                       "Rise Parade Yard Embankment Grange Rue Via Nagar Chowk Marg Zila Colony Layout Enclave Vihar Bagh Ganj").split()
 _ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:\\?!}+\]]|$|\.(?!\w)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
                 r"|[ \t]+(?:and|was|is|in|for|to|with|as|has|have|had|where|which|on|at|from|since|by)\b)")
 # A street name of one word with its kind in it, before or after the number: "Xaviweg 5", "36 Ringtorget".
@@ -404,7 +411,7 @@ _NUMBER_WORDS = "One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve 
 _STREET = re.compile(
     rf"(?:\d{{1,3}}(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?,?[ \t]+)?"
     rf"(?:(?<![\w$.,/-])|(?<=[a-z])(?=\d{{3,6}}[ \t]+[A-Z])|(?<=[A-Za-z\"],)|(?<=[A-Za-z:]/)|(?<=\d,)(?!\d{{3}}(?!\d))|(?<=Floor, )|(?<=FLOOR, )"
-    rf"|(?<=Floor )|(?<=Fl\. ))(?:\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2)?"
+    rf"|(?<=Floor )|(?<=Fl\. ))(?:(?:H\.[ ]?No\.?[ \t]*)?\d{{1,6}}(?:[A-Za-z]|-\d{{1,5}}|-[A-Za-z]|[ ]1/2|/\d{{1,4}})?"
     rf"|{'|'.join(_NUMBER_WORDS)}),?[ \t]+"
     rf"(?:{_DIRECTION}[ \t]+)?(?:"
     rf"(?:(?:[A-Z][\w'.-]*|\d+(?:st|nd|rd|th))[ \t]+){{1,4}}"
