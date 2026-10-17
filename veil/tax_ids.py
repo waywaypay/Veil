@@ -185,6 +185,8 @@ def _joins(gap: str) -> bool:
     if not gap or len(gap) > 10 or gap.count("\n") > 2 or any(c in _MONEY for c in gap):
         return False
     marks = gap.replace(" ", "").replace("\n", "")
+    if ":" in marks:
+        return False   # a field's tag between them, as SWIFT writes ":64:/130929"
     return len(marks) <= 6 and len(gap.replace("\n", "")) <= 8 and not any(c.isalnum() for c in marks)
 
 
@@ -362,6 +364,8 @@ class TaxIdRedactor:
         if any(g.money for g in run):   # an amount or a date, even one whose digits match a number caught
             return None
         known = self._known(digits)
+        if known and digits not in self._by_digits and len(set(digits)) == 1:
+            known = False   # 000000000 is one digit off 000000001, but no number
         lookalikes = sum(g.lookalikes for g in run)
         # A comma is a weak separator, like a space: in a CSV row "20,1250000" is a box and an amount.
         punct = all(j.strip(" \n,") for j in joins)
@@ -382,9 +386,14 @@ class TaxIdRedactor:
             return any(0 <= start - label_end <= before or 0 <= label_start - end <= after
                        for label_start, label_end in labels)
 
+        if len(set(digits)) == 1 and not near(_LABEL_BEFORE, _LABEL_AFTER):
+            return None   # 0,0,0,0,0,0,0,0,0: a row of empty fields, no number
+
         if len(digits) == 9:
             if digits.endswith("0000") and sizes != (3, 2, 4) and sizes != (2, 7):
                 return None   # no SSN ends in 0000: a round amount such as 125000000
+            if digits.startswith("00") and not near(_LABEL_BEFORE, _LABEL_AFTER):
+                return None   # no SSN, EIN or ITIN starts 00: a counter such as 000000001
             if sizes in ((9,), (3, 2, 4)):
                 return ("SSN" if sizes == (3, 2, 4) else "TIN"), 80, dashed and sizes == (3, 2, 4)
             if sizes == (2, 7):
@@ -394,8 +403,8 @@ class TaxIdRedactor:
                         or int(run[0].digits) > box_max:
                     return "EIN", 80, dashed
                 return None
-            if all(s == 1 for s in sizes) and all(len(j) <= 3 and "," not in j for j in joins):
-                return "TIN", 75, False   # one digit per box (a list "1,2,3,...,9" isn't)
+            if all(s == 1 for s in sizes) and all(len(j) <= 3 and "," not in j and "\n" not in j for j in joins):
+                return "TIN", 75, False   # one digit per box on a line (a list "1,2,3,...,9" isn't)
             # "518 206 194" typed with single spaces; a table's column of small amounts is spaced wider.
             if sizes == (3, 3, 3) and all(j == " " for j in joins):
                 return "TIN", 70, False

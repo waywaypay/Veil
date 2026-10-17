@@ -73,3 +73,7 @@ lan tuan huong trang thanh hung phuong quang khanh xin ming wei hao jun jian hui
 ling raj ravi rakesh ramesh rohit sachin vivek naveen ashwin harish ganesh lakshman sanjeev rajiv kavita
 sunita meera rekha shalini nisha pooja preeti swati anita aarav vihaan ishaan arnav reyansh aditi diya saanvi
 mateus joao thiago gustavo rodrigo leonardo bruna larissa camila luana
+# Common US first names (1990 Census) that are words too, but read as names first.
+harry billy bernice lewis gilbert franklin lonnie mae morris patty willis christie eula spencer benny gregg
+terrell leola jolene teddy jess gracie lea mickey virgie monte jasper vance buddy reggie suzette kris romeo
+lakeisha jack terry charlie sally mike nick matt pam

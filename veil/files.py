@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import re
+import unicodedata
 
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/gif", "image/webp")
 
@@ -53,11 +54,28 @@ def _open_image(data: bytes):
 
 
 def _ocr(image) -> str:
+    return reflow(ocr_data(image))
+
+
+def ocr_data(image) -> dict:
+    """Tesseract's words and their boxes (``image_to_data``) for an image.  A scan's speckle is taken out first
+    (a median filter), and a page whose letters are small, as a scan at a low resolution has them, is read again
+    twice the size: Tesseract reads letters best some 20 pixels high."""
     try:
         import pytesseract
+        from PIL import Image, ImageFilter
     except ImportError as exc:
         raise ImportError('Reading images needs pytesseract: pip install "veil[files]"') from exc
-    return reflow(pytesseract.image_to_data(image.convert("RGB"), output_type=pytesseract.Output.DICT))
+
+    def read(img) -> dict:
+        return pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+
+    gray = image.convert("L").filter(ImageFilter.MedianFilter(3))
+    data = read(gray)
+    heights = sorted(h for h, t, c in zip(data["height"], data["text"], data["conf"]) if t.strip() and float(c) > 60)
+    if heights and heights[len(heights) // 2] < 20:
+        data = read(gray.resize((gray.width * 2, gray.height * 2), Image.LANCZOS))
+    return data
 
 
 def reflow(data: dict) -> str:
@@ -78,6 +96,9 @@ def reflow(data: dict) -> str:
     # the text's right margin: most lines that run full end there (one overlong line doesn't move it)
     ends = sorted(max(left + width for left, _, width, _, _ in words) for words in ordered)
     right = ends[int(0.95 * (len(ends) - 1))] if len(ends) >= 5 else ends[-1]
+    # and in letters, for a page wrapped by its letters' count rather than their width
+    counts = sorted(len(" ".join(w for *_, w in words)) for words in ordered)
+    longest = counts[int(0.95 * (len(counts) - 1))] if len(counts) >= 5 else counts[-1]
     out, prev = [], None
     for key, words in zip(sorted(lines), ordered):
         text = " ".join(w for *_, w in words)
@@ -88,7 +109,12 @@ def reflow(data: dict) -> str:
             prev_bottom = max(y + h for _, y, _, h, _ in prev_words)
             char = sum(w for _, _, w, _, _ in prev_words) / max(1, sum(len(t) for *_, t in prev_words))
             line_height = max(h for _, _, _, h, _ in prev_words)
-            wrapped = right - prev_right < width + 2.5 * char and top - prev_bottom < 1.8 * line_height and \
+            prev_text = " ".join(w for *_, w in prev_words)
+            full = right - prev_right < width + 2.5 * char or \
+                (len(prev_text) >= 0.8 * longest and len(prev_text) + 1 + len(words[0][4]) > longest)
+            # rows of a CSV or a table are each their own line, however long
+            records = all(t.count(",") + t.count("|") + t.count(";") >= 3 for t in (prev_text, text))
+            wrapped = full and not records and top - prev_bottom < 1.8 * line_height and \
                 abs(left - min(x for x, *_ in prev_words)) < 4 * char and \
                 not re.match(r"[-*\u2022]|\d{1,2}[.)]|[A-Z][\w ]{0,30}:", text) and not prev_words[-1][4].endswith(":")
             if wrapped:
@@ -105,8 +131,9 @@ def reflow(data: dict) -> str:
 # OCR's usual misreadings around what veil looks for: an email with a comma, a colon or spaces for its dots
 # ("john:smith@example. com"), a house number with a period after it ("5678. Elm Street"), a period for the
 # space before a unit ("Plains.Apt. 519"), and a stray opening quote glued to a word ("1331\u2018James").
-_DOTS = r"(?:[ ]?\.[ ]?|[,:](?=[\w+-]))"   # a dot with spaces round it, or a comma or a colon for one
-_BROKEN_EMAIL = re.compile(rf"(?<![\w.@])([\w+-]+(?:{_DOTS}[\w+-]+)*)[ ]?@[ ]?([\w-]+(?:{_DOTS}[\w-]+)*{_DOTS}[A-Za-z]{{2,6}})"
+# a dot with spaces round it, or a comma or a colon for one, or a dot and a comma both ("mobilemoney,.com")
+_DOTS = r"(?:[ ]?\.[ ]?|[,:]\.?(?=[\w+-])|\.[,:](?=\w))"
+_BROKEN_EMAIL = re.compile(rf"(?<![\w.@])(?!mailto:)([\w+-]+(?:{_DOTS}[\w+-]+)*)[ ]?@[ ]?([\w-]+(?:{_DOTS}[\w-]+)*{_DOTS}[A-Za-z]{{2,6}})"
                            r"(?![\w@])")
 
 
@@ -131,7 +158,11 @@ _SUFFIXES = ("Street Avenue Road Boulevard Lane Drive Court Place Way Terrace Ci
              "Flat Flats Garden Gardens Gateway Landing Light Lights Locks Neck Orchard Prairie Rest Spur Throughway "
              "Trace Track Trafficway Turnpike Underpass Burg Burgs Bypass Camp Canyon Cape Causeway Cliff Cliffs Course "
              "Courts Crest Curve Dale Dam Expressway Extension Extensions Ferry Field Fields Freeway Hollow Inlet Key Keys "
-             "Mission Motorway Mountain Mountains Overpass Radial Shoal Shoals Skyway Squares Stravenue Streets Ways").split()
+             "Mission Motorway Mountain Mountains Overpass Radial Shoal Shoals Skyway Squares Stravenue Streets Ways "
+             "Annex Arcade Bayou Beach Bend Bluff Bluffs Bottom Bridge Bridges Brook Brooks Centers Circles Commons "
+             "Concourse Corners Coves Crossroad Crossroads Drives Esplanade Ford Fords Forest Forges Glens Groves "
+             "Junctions Knolls Mall Manors Mews Parks Parkways Passage Pier Ports Promenade Quay Roads Route Spurs "
+             "Valleys Viaduct Walks Wall Wharf Yards").split()
 _STREET_WORDS = re.compile(r"(?<![\w.])(\d{1,6}[ ]+[A-Z][a-z]+[ ]+)([A-Z][a-z]{1,11})(?=[ ]?[,.;:(\n\"]|[ ]+(?:Apt|Suite)\b|$)")
 
 
@@ -178,6 +209,10 @@ def _tidy_labels(text: str) -> str:
         number = re.sub(r"(?<=\d)[ ]*[:\u00b0.][ ]*(?=\d)|(?<=[)])[ ]*[:.][ ]*(?=\d)", " ", m.group(3))
         return label + number
 
+    # +44 118 322 S111: an S or an O OCR read for a digit in a phone number
+    text = re.sub(r"(?i)\b((?:tele)?phone|tel|mobile|fax)\b([^\n]{0,30})",
+                  lambda m: m.group(1) + re.sub(r"(?<=[\d ])S(?=\d)|(?<=\d)S(?=[ \d])", "5",
+                                                re.sub(r"(?<=\d)O(?=[\d ])|(?<=[\d ])O(?=\d)", "0", m.group(2))), text)
     text = _PHONE_AFTER_LABEL.sub(phone, text)
     return re.sub(r"(?<=[A-Z0-9])[:](?=\d{3,}-\d)", "-", text)   # a license number's dash read as a colon
 
@@ -192,7 +227,7 @@ def _tidy_names(text: str) -> str:
         w = _ascii(word).casefold()
         return w in _GIVEN or w in _WORD_GIVEN or (w in _given_names() and not _wordlike(w))
 
-    from veil.redactor import _SURNAMES, _common_surnames, _common_words, _surname_list, _top_surnames
+    from veil.redactor import _SURNAMES, _common_surnames, _common_words, _name_listed, _surname_list, _top_surnames
 
     def known(word: str) -> bool:
         w = _ascii(word).casefold()
@@ -202,7 +237,7 @@ def _tidy_names(text: str) -> str:
         # Tarnmy -> Tammy, Leoriard -> Leonard, lda -> Ida: lookalike letters, when that makes a name and the word
         # read is none
         w = m.group()
-        if w[0] == "l" and not known(w) and known("I" + w[1:]) and m.end() < len(text) and \
+        if w[0] == "l" and known("I" + w[1:]) and w.casefold() not in _common_words() and m.end() < len(text) and \
                 re.match(r"[ ]+[A-Z][a-z]+[ ]+[A-Z]|[ ]+[A-Z]\.", text[m.end():m.end() + 30]):
             return "I" + w[1:]   # lan Pamela Turner, lda G. Lopresti: an I read as an l, before more of a name
         if w.casefold() in _common_words() or known(w):
@@ -229,10 +264,28 @@ def _tidy_names(text: str) -> str:
                   lambda m: m.group(1) + " " if given(m.group(1)) and (known(m.group(2)) or m.group(2).casefold() in
                                                                         _common_surnames()) else m.group(), text)
     text = re.sub(r"(?<=\b(?:Mr|Ms|Dr))\.?:[ ]?(?=[A-Z])|(?<=\bMrs)\.?:[ ]?(?=[A-Z])", ". ", text)  # Mr.:Smith
+    # Tiziano Paolo loppi: an I read as an l, starting the surname after a first name
+    text = re.sub(r"\b([A-Z][a-z]{2,}[ ](?:[A-Z][a-z]{2,}[ ])?)l([a-z]{3,})\b",
+                  lambda m: m.group(1) + "I" + m.group(2) if given(m.group(1).split()[0]) and
+                  ("l" + m.group(2)) not in _common_words() else m.group(), text)
+    text = re.sub(r"\b([A-Z][a-z]{2,} )\|\.(?= [A-Z][a-z])", r"\1I.", text)                 # Insa |. Salz
     text = re.sub(r"(?<=[a-z])[\u2018\u2019'](?=[ ]?[A-Z](?:[a-z]|\.))", "", text)            # Emil' Winkler
     text = re.sub(r"(?<=[a-z])-[ ]+-?(?=[A-Z][a-z])|(?<=[a-z])[ ]+-[ ]?-(?=[A-Z][a-z])", "-", text)   # Payne- -Gilbert
     text = re.sub(r"\bj([a-z]{2,})\b(?=[ ,.]+[A-Z]|,)", lambda m: "J" + m.group(1) if given("J" + m.group(1)) else
                   m.group(), text)                                                          # john Doe, Hello john,
+    # Melanie Robin jordan, "Bob","johnson": a surname's J read small, after a first name
+    text = re.sub(r"\b([A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20})?(?: |\",\s?\"))j([a-z]{2,})\b",
+                  lambda m: f"{m.group(1)}J{m.group(2)}" if given(m.group(1).strip(' ",').split()[0]) and
+                  _name_listed(_ascii("j" + m.group(2)), set()) and ("j" + m.group(2)) not in _common_words()
+                  else m.group(), text)
+    # Rahe! for Rahel, No\u00e9! for No\u00ebl, He8 or He& for He\u00df: the last letter of a name misread
+    text = re.sub(r"\b([A-Z][a-z\u00c0-\u024f]{1,15})!(?=[ ,.:;]|$)",
+                  lambda m: m.group(1) + "l" if given(m.group(1) + "l") or known(m.group(1) + "l") else m.group(), text)
+    text = re.sub(r"\b([A-Z][a-z]{1,15} )([A-Z][a-z]{1,15})[8&](?=[ ,.:;\]]|$)",
+                  lambda m: f"{m.group(1)}{m.group(2)}\u00df" if given(m.group(1).strip()) else m.group(), text)
+    text = re.sub(r"\b(Dear|Hello|Hi) ([a-z])([a-z]{2,})(?= [A-Z]|,)",
+                  lambda m: f"{m.group(1)} {m.group(2).upper()}{m.group(3)}"
+                  if given(m.group(2).upper() + m.group(3)) else m.group(), text)                  # Dear isidro Armando
     text = re.sub(r"\b(Dear|Hello|Hi|Thanks|welcome|Name:|you,) j([a-z]{2,})\b",
                   lambda m: f"{m.group(1)} J{m.group(2)}" if given("J" + m.group(2)) else m.group(), text)
     # A period or colon after a first name, before another name: "Melanie. Robin Jordan", "Bas: Timo Evers"
@@ -244,12 +297,40 @@ def _tidy_names(text: str) -> str:
                   lambda m: m.group(1) + " " if given(m.group(1)) and name_next(m) else m.group(), text)
 
 
+def _unaccent(text: str) -> str:
+    """An email's letters without the accents OCR puts on them ("mobilem\u00e9ney")."""
+    return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
+
+
 def _tidy(text: str) -> str:
     def email(m: re.Match) -> str:
-        return f"{re.sub(_DOTS, '.', m.group(1))}@{re.sub(_DOTS, '.', m.group(2))}"
+        domain = re.sub(r"\.c(?:orn|orm|om[nr])$", ".com", re.sub(_DOTS, ".", m.group(2)))   # .corn: rn for m
+        return _unaccent(f"{re.sub(_DOTS, '.', m.group(1))}@{domain}")
 
+    text = text.replace("\u201c", '"').replace("\u201d", '"')   # curly quotes, as OCR reads a JSON's or a CSV's
     text = _tidy_labels(text)
+    # a space OCR put inside an email's domain: "@emai l.com", "@email.c om"
+    text = re.sub(r"(?<=@)([\w-]{2,}) ([\w-]{1,3}\.(?:com|org|net|co|io)\b)", r"\1\2", text)
+    text = re.sub(r"(?<=@)([\w.-]+\.c) ?(o) ?(m)\b", r"\1\2\3", text)
+    text = re.sub(r"(?<=@)([\w.-]*?)!(?=[\w.-]*\.[a-z]{2,4}\b)", r"\1l", text)                # @emai!.com
+    text = re.sub(r"(?<=mailto:)([\w-]+) (?=[\w.-]+@)", r"\1.", text)                       # mailto:mike johnson@
     text = _BROKEN_EMAIL.sub(email, text)
+    # "charlie brown@yahoo.com" where the same email is written with its dot elsewhere
+    for e in set(re.findall(r"[\w-]+\.[\w.-]+@[\w.-]+\.[a-z]{2,6}", text)):
+        local, domain = e.split("@", 1)
+        text = re.sub(rf"(?<![\w.]){re.escape(local.replace('.', ' '))}@{re.escape(domain)}", e, text)
+    # Stra\u00dfe read StraBe, StraRe, Strake: its \u00df
+    text = re.sub(r"(?<=[A-Za-z\u00c0-\u024f-])([Ss])tra(?:B|R|k|&|8|G|f)e\b", "\\1tra\u00dfe", text)
+    # SE1 12Z, RHSW 5RQ: a UK postcode with a 2 for a Z, an S for a 5
+    text = re.sub(r"\b([A-Z]{1,2})l( \d[A-Z\d]{2})\b", r"\g<1>1\2", text)                     # SEl 122
+    text = re.sub(r"\b([A-Z]{1,2}\d[A-Z\d]?) (\d)([A-Z2])([A-Z2])\b",
+                  lambda m: f"{m.group(1)} {m.group(2)}{m.group(3).replace('2', 'Z')}{m.group(4).replace('2', 'Z')}"
+                  if "2" in m.group(3) + m.group(4) else m.group(), text)
+    text = re.sub(r"\b([A-Z]{2})S([A-Z]?) (\d[A-Z]{2})\b", r"\g<1>5\2 \3", text)
+    # 67.240. Nolan Junction: a street's number with a dot in it
+    text = re.sub(rf"(?<![\w.,$])(\d{{1,3}})\.(\d{{3}})\.?[ ]?(?=(?:[A-Z][\w'-]+[ ]){{1,3}}(?:{'|'.join(_SUFFIXES)})\b)",
+                  r"\1\2 ", text)
+    text = re.sub(r"(?<=\w),[:;.][ ]?(?=[A-Z0-9])", ", ", text)                              # Anytown,:AB
     text = re.sub(r"(?<![\w.,$])(\d{3,6})\.[ ]?(?=[A-Z][a-z])", r"\1 ", text)
     text = re.sub(r"(?<![\w.,$])(\d{1,2})\.[ ]?(?=[A-Z][a-z]+ (?:Street|St|Road|Avenue|Lane|Drive|Way|Place|Court)\b)",
                   r"\1 ", text)                                                            # 43. High Street
@@ -257,11 +338,29 @@ def _tidy(text: str) -> str:
     text = re.sub(r"(?<![\w.,$])(\d{1,2})\.[ ]?(?=(?:Rue|Calle|Via|Avenida|Avenue|Plaza|Piazza)\b)", r"\1 ", text)  # 45.Rue
     text = re.sub(r"(?<![\w.,$])(\d{2,6}):[ ]?\n(?=[A-Z][a-z])", r"\1 ", text)                 # 642:\nAnderson Rapid
     text = re.sub(r"(?<=[:(\s])[.\-+]{1,2}(?=\d{2,6}[ ][A-Z][a-z])", "", text)                   # -.708 Sandra Burgs
+    text = re.sub(r"\b([ABCEGHJ-NPRSTVXY]\d[A-Z]) (\d)[}\]](\d)\b", r"\1 \2J\3", text)            # T2V 5}7
+    text = re.sub(r"\b([ABCEGHJ-NPRSTVXY])S[)}](?= \d[A-Z]\d\b)", r"\g<1>5J", text)                # MS) 2H7
     text = re.sub(r"\b([ABCEGHJ-NPRSTVXY]\d[A-Z])[.\-)]?[ ]?(\d[A-Z]\d)\b", r"\1 \2", text)   # V6B.1C3
     # the street's own words split by a colon or a period: "7190 Peter:Crossing", "34611 Canyon. View"
     text = re.sub(r"\b(\d{1,6}[ ]+[A-Z][a-z]{2,})(?:[:.][ ]?)(?=([A-Z][a-z]+)\b)",
                   lambda m: m.group(1) + " " if m.group(2) in _SUFFIXES else m.group(), text)
     text = _STREET_WORDS.sub(_street_word, text)
+    # 456 Oak Street. Anytown, USA: a period read for the comma before the town
+    text = re.sub(rf"(\b\d{{1,6}}[ ]+(?:[A-Z][\w'-]+[ ]+){{1,3}}(?:{'|'.join(_SUFFIXES)}))\.[ ]"
+                  r"(?=[A-Z][\w'-]+(?:[ ][A-Z][\w'-]+)?(?:,|[ ]*\n|[ ]*$))", r"\1, ", text)
+    # Toronto. ON, Canada; Lodge. 02116, Beasleytown: more periods for commas in an address's line
+    def commas(m: re.Match) -> str:
+        line = re.sub(rf"^(.*?\b(?:{'|'.join(_SUFFIXES)}))\.[ ](?=[A-Z][\w'-]+(?:[ ][A-Z][\w'-]+)?[.,][ ])", r"\1, ",
+                      m.group())
+        return re.sub(r"(?<=[A-Za-z])\.[ ](?=(?:[A-Z]{2}\b|\d{4,6}\b|USA\b|Canada\b|UK\b|United\b|[A-Z]\d[A-Z]))",
+                      ", ", line)
+    text = re.sub(rf"\b\d{{1,6}}[ ]+(?:[A-Z][\w'-]+[ ]+){{1,3}}(?:{'|'.join(_SUFFIXES)})\b[^\n]{{0,80}}", commas, text)
+    # 8905 johnson Fords: a street's name with its first letter read small
+    text = re.sub(rf"(\b\d{{1,6}}[ ]+)j(?=[a-z]+[ ]+(?:{'|'.join(_SUFFIXES)})\b)", r"\1J", text)
+    # a lower case j for the J starting a street's kind or a name after a capitalized word: "Phillip junction"
+    text = re.sub(rf"(\b\d{{1,6}}[ ]+[A-Z][\w'-]+[ ])j(?=(?:{'|'.join(w[1:] for w in _SUFFIXES if w[0] == 'J')})\b)",
+                  r"\1J", text)
+    text = re.sub(r"(?<=\d)\.(?=\d{2}-\d{4}\b)", "-", text)                                 # SSN: 384.35-2296
     text = re.sub(r"(?<=[a-z])\.(?=(?:Apt|Suite|Ste|Unit|Flat)\b)", " ", text)
     text = re.sub(r"(?<!www)(?<=[a-z])\.(?!(?:Com|Org|Net|Edu|Gov|Io|Co|Uk)\b)(?=[A-Z][a-z]{2,}(?![\w-]*\.[A-Za-z]))",
                   " ", text)                                                               # Kelly.Ramp
