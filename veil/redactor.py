@@ -984,10 +984,29 @@ class Redactor(TaxIdRedactor):
         for start, end in self._placeholder_spans(copy):
             covered[start:end] = b"\x01" * (end - start)
         found: list[tuple[int, int, str, str, str | None]] = []   # start, end, kind, key, put back as
+        known: dict[int, tuple[int, int, str, str, str | None]] = {}   # what the known names took, by its start
 
-        def take(start: int, end: int, kind: str, key: str | None = None, real: str | None = None) -> bool:
-            if start >= end or any(covered[start:end]) or (kind in KINDS and kind not in self._detect):
+        def take(start: int, end: int, kind: str, key: str | None = None, real: str | None = None,
+                 over_known: bool = False) -> bool:
+            if start >= end or (kind in KINDS and kind not in self._detect):
                 return False
+            if any(covered[start:end]):
+                # A longer name found over a known one, or a part of one: "Luigi Clelia Togliatti" with "Luigi" or
+                # "Clelia Togliatti" known.  The whole is one name, with a placeholder of its own.
+                if not over_known or b"\x01" in covered[start:end]:   # the known names' are marked 2
+                    return False
+                first = start
+                while covered[first] and first not in known:
+                    first -= 1
+                under = [known[k] for k in range(first, end) if k in known]
+                if any(f[0] <= start and end <= f[1] for f in under):
+                    return False
+                for f in under:
+                    found.remove(f)
+                    del known[f[0]]
+                if under[0][0] < start or under[-1][1] > end:
+                    start, end = min(start, under[0][0]), max(end, under[-1][1])
+                    key = real = None   # put back as written
             if recased:
                 real = None   # put back as written, not as recased
             covered[start:end] = b"\x01" * (end - start)
@@ -1073,13 +1092,21 @@ class Redactor(TaxIdRedactor):
                  take(m.start(), m.end(), "ID", "ID:" + m.group()))
         if "NAME" in self._detect:
             self._field_names(copy, fold, take)
-        known = len(self._people)
+
+        def take_known(start: int, end: int, kind: str, key: str | None = None, real: str | None = None) -> bool:
+            if not take(start, end, kind, key, real):
+                return False
+            covered[start:end] = b"\x02" * (end - start)
+            known[start] = found[-1]
+            return True
+
+        people = len(self._people)
         for _ in range(2 if "NAME" in self._detect else 0):   # names found in this text are hidden wherever else it says them
-            self._known_names(fold, take, typed)
+            self._known_names(fold, take_known, typed)
             self._found_names(copy, fold, take, typed)
-            if len(self._people) == known:
+            if len(self._people) == people:
                 break
-            known = len(self._people)
+            people = len(self._people)
         scan(_LONG_NUMBER, lambda m: not (_TIMESTAMP.fullmatch(m.group()) and
                                           re.search(r":\d{2}[A-Z]?:\Z", copy[max(0, m.start() - 6):m.start()])) and
              take(m.start(), m.end(),
@@ -1378,7 +1405,7 @@ class Redactor(TaxIdRedactor):
             start, stop = toks[found.first_tok].start, toks[found.last_tok].end
             if toks[found.last_tok].case == "initial" and toks[found.last_tok].dot:
                 stop += 1
-            if take(start, stop, "NAME", found.key, found.display) and found.person is not None:
+            if take(start, stop, "NAME", found.key, found.display, over_known=True) and found.person is not None:
                 self._remember(found.person)
                 surnames = self._surnames()
                 self._shared_surname(copy, fold, toks, found, take)
