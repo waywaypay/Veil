@@ -112,7 +112,9 @@ def reflow(data: dict) -> str:
             prev_text = " ".join(w for *_, w in prev_words)
             full = right - prev_right < width + 2.5 * char or \
                 (len(prev_text) >= 0.8 * longest and len(prev_text) + 1 + len(words[0][4]) > longest)
-            wrapped = full and top - prev_bottom < 1.8 * line_height and \
+            # rows of a CSV or a table are each their own line, however long
+            records = all(t.count(",") + t.count("|") + t.count(";") >= 3 for t in (prev_text, text))
+            wrapped = full and not records and top - prev_bottom < 1.8 * line_height and \
                 abs(left - min(x for x, *_ in prev_words)) < 4 * char and \
                 not re.match(r"[-*\u2022]|\d{1,2}[.)]|[A-Z][\w ]{0,30}:", text) and not prev_words[-1][4].endswith(":")
             if wrapped:
@@ -131,7 +133,7 @@ def reflow(data: dict) -> str:
 # space before a unit ("Plains.Apt. 519"), and a stray opening quote glued to a word ("1331\u2018James").
 # a dot with spaces round it, or a comma or a colon for one, or a dot and a comma both ("mobilemoney,.com")
 _DOTS = r"(?:[ ]?\.[ ]?|[,:]\.?(?=[\w+-])|\.[,:](?=\w))"
-_BROKEN_EMAIL = re.compile(rf"(?<![\w.@])([\w+-]+(?:{_DOTS}[\w+-]+)*)[ ]?@[ ]?([\w-]+(?:{_DOTS}[\w-]+)*{_DOTS}[A-Za-z]{{2,6}})"
+_BROKEN_EMAIL = re.compile(rf"(?<![\w.@])(?!mailto:)([\w+-]+(?:{_DOTS}[\w+-]+)*)[ ]?@[ ]?([\w-]+(?:{_DOTS}[\w-]+)*{_DOTS}[A-Za-z]{{2,6}})"
                            r"(?![\w@])")
 
 
@@ -227,7 +229,7 @@ def _tidy_names(text: str) -> str:
         # Tarnmy -> Tammy, Leoriard -> Leonard, lda -> Ida: lookalike letters, when that makes a name and the word
         # read is none
         w = m.group()
-        if w[0] == "l" and not known(w) and known("I" + w[1:]) and m.end() < len(text) and \
+        if w[0] == "l" and known("I" + w[1:]) and w.casefold() not in _common_words() and m.end() < len(text) and \
                 re.match(r"[ ]+[A-Z][a-z]+[ ]+[A-Z]|[ ]+[A-Z]\.", text[m.end():m.end() + 30]):
             return "I" + w[1:]   # lan Pamela Turner, lda G. Lopresti: an I read as an l, before more of a name
         if w.casefold() in _common_words() or known(w):
@@ -286,6 +288,9 @@ def _tidy(text: str) -> str:
 
     text = text.replace("\u201c", '"').replace("\u201d", '"')   # curly quotes, as OCR reads a JSON's or a CSV's
     text = _tidy_labels(text)
+    # a space OCR put inside an email's domain: "@emai l.com", "@email.c om"
+    text = re.sub(r"(?<=@)([\w-]{2,}) ([\w-]{1,3}\.(?:com|org|net|co|io)\b)", r"\1\2", text)
+    text = re.sub(r"(?<=@)([\w.-]+\.c) ?(o) ?(m)\b", r"\1\2\3", text)
     text = _BROKEN_EMAIL.sub(email, text)
     # Stra\u00dfe read StraBe, StraRe, Strake: its \u00df
     text = re.sub(r"(?<=[A-Za-z\u00c0-\u024f-])([Ss])tra(?:B|R|k|&|8)e\b", "\\1tra\u00dfe", text)

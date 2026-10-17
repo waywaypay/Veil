@@ -246,6 +246,9 @@ def test_reflow_joins_the_lines_a_page_wrapped_and_keeps_a_forms_lines():
     ("Dear Mr. Tiziano Paolo loppi,", "Dear Mr. Tiziano Paolo Ioppi,"),
     ("Dear Insa |. Salz,", "Dear Insa I. Salz,"),
     ("\u201clast_name\u201d: \u201cSmith\u201d", '"last_name": "Smith"'),
+    ("(mailto:mike.johnson@emai l.com)", "(mailto:mike.johnson@email.com)"),
+    ("[olivia.davis@email.c om](mailto", "[olivia.davis@email.com](mailto"),
+    ("Apt. 92806,lan Pamela Turner,9486", "Apt. 92806,Ian Pamela Turner,9486"),
 ])
 def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
     from veil.files import _tidy
