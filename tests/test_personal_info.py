@@ -471,8 +471,18 @@ def test_what_the_gretel_benchmark_found_hidden_by_mistake(text):
     assert hidden(text) == []
 
 
-def test_an_ip_address_label_takes_no_sentence_with_it():
-    assert hidden("IP address: 14.47.149.44. This information is confidential.") == ["14.47.149.44"]
+def test_an_address_label_takes_no_sentence_with_it():
+    assert hidden("Address: 88 Kearny St, San Francisco. This information is confidential.") == \
+        ["88 Kearny St, San Francisco"]
+
+
+@pytest.mark.parametrize("text", [
+    "IP address: 14.47.149.44. This information is confidential.", "IP Address: 203.0.113.7",
+    "IPv6 address: 2001:db8::1", "MAC Address: 00:1A:2B:3C:4D:5E", "Server address: 10.0.0.12",
+    "Wallet Address: 1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+])
+def test_an_ip_mac_or_wallet_address_label_is_no_street_address_however_capitalized(text):
+    assert hidden(text) == []
 
 
 def test_an_amount_with_the_digits_of_a_number_caught_stays_an_amount():

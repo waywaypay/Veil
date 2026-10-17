@@ -371,9 +371,10 @@ _FOREIGN = re.compile(
     r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?:[ \t]+[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*){0,3}(?=[ \t]*(?:[,.;:)\n]|$))"
     rf"|(?<![\w-])\d{{3,5}}(?:-\d{{4}})?[ \t]+(?:[A-Z][\w'.-]*[ \t]+){{0,3}}[A-Z][\w'.-]*,[ \t]+"
     rf"(?:{'|'.join(_COUNTRIES)})\b")
-# "Mailing address: 88 Kearny": the rest of the line, when it has a number.
-_ADDRESS_LABEL = re.compile(r"(?<![^\W\d_])(?<!ip\s)(?<!ipv4\s)(?<!ipv6\s)(?<!mac\s)(?<!email\s)(?<!e-mail\s)"
-                            r"(?<!web\s)(?<!wallet\s)(?<!bitcoin\s)(?<!crypto\s)(?<!server\s)(?<!network\s)"
+# "Mailing address: 88 Kearny": the rest of the line, when it has a number.  Not an IP, MAC, email, web,
+# wallet or server address, however it's capitalized.
+_ADDRESS_LABEL = re.compile(r"(?<![^\W\d_])(?i:(?<!ip\s)(?<!ipv4\s)(?<!ipv6\s)(?<!mac\s)(?<!email\s)(?<!e-mail\s)"
+                            r"(?<!web\s)(?<!wallet\s)(?<!bitcoin\s)(?<!crypto\s)(?<!server\s)(?<!network\s))"
                             r"(?i:(?:mailing|street|home|residential|permanent|billing|registered|"
                             r"partner'?s?|investor'?s?)[ \t]+address|address)[ \t]*(?::|\#|[ \t]-[ \t])[ \t]*\**[ \t]*"
                             r"(?P<value>(?:(?!\.[ \t]+[A-Z]|[ \t]\(|;)[^\n]){0,120}?\d"
