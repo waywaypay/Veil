@@ -49,6 +49,21 @@ not built for other languages.
 | two columns | 85.5% | 88.4% | 0.29% |
 | turned sideways | 74.9% | **89.2%** | 0.18% (was 5.57%) |
 
+Word documents (`.docx`, read with the standard library; made with python-docx, with each paragraph's runs
+cut inside words as Word cuts them, or written by LibreOffice):
+
+| Condition | Found | Other words hidden |
+|---|---|---|
+| Word document | 89.9% | 0.12% |
+| Word form (a two-column table) | 89.1% | 0.13% |
+| Word form, two fields a row, labels without colons | 89.2% | 0.12% |
+| Word form, labels lined up with tabs | 89.9% | 0.12% |
+| Word header and footer | 90.4% | 0.12% |
+| Word text boxes (with the copy Word keeps for old readers) | 89.9% | 0.12% |
+| Word tracked changes (deleted text left out) | 89.9% | 0.12% |
+| Word written by LibreOffice | 89.9% | 0.12% |
+| Word with a scanned page pasted in (OCR) | 91.2% | 0.13% |
+
 The fax's and the sideways page's earlier figures were propped up by hiding over 5% of every word.
 
 ## Other checks
@@ -57,4 +72,5 @@ The fax's and the sideways page's earlier figures were propped up by hiding over
   differs from the original in a handful, all a known person's name written another way (`jack.walsh`
   for Jack Walsh) and put back as known, as veil intends.
 * Speed: a 560,000-character document (600 documents joined) redacts in 7 seconds; it took 25.
-* Not read: Word (`.docx`) files and other office formats; `veil.files` reads PDFs, images and text.
+* Not read: the older Word `.doc`, and other office formats (spreadsheets, slides); `veil.files` reads PDFs,
+  Word `.docx`, images and text.

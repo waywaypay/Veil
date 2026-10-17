@@ -79,12 +79,20 @@ client = wrap(anthropic.Anthropic(), Redactor(FINANCE), files="send")     # send
 client = wrap(anthropic.Anthropic(), Redactor(FINANCE), files=my_reader)  # (data, media_type) -> text
 ```
 
-With `files="read"`, each image and PDF is read on this machine and its text,
-with placeholders in it, is sent in its place. A PDF's own text is read with
-pypdf; images and scanned pages are read with Tesseract OCR, which you install
-yourself (`apt install tesseract-ocr`, `brew install tesseract`). The model
-then sees the words, not the picture or the layout. Each file is read once a
-conversation.
+With `files="read"`, each image, PDF and Word document is read on this
+machine and its text, with placeholders in it, is sent in its place. A PDF's
+own text is read with pypdf; images and scanned pages are read with Tesseract
+OCR, which you install yourself (`apt install tesseract-ocr`, `brew install
+tesseract`). The model then sees the words, not the picture or the layout.
+Each file is read once a conversation.
+
+A Word document (`.docx`, sent as a `document` block with its media type,
+which the API itself doesn't accept) is read with the standard library alone:
+its body, tables (a row to a line, its cells between bars, so a form's
+`| First Name | Jane |` is found as one), text boxes, headers and footers,
+footnotes and comments. Text a tracked change deleted is left out, and a
+pasted scan of a page is read with OCR. The older `.doc` isn't read: save it
+as `.docx`.
 
 OCR text is rebuilt from where Tesseract found each word, so the lines a page
 wrapped are joined again: an address, a name or an email split across two

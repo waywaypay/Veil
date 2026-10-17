@@ -1,4 +1,4 @@
-"""Images and PDFs: read here and sent as redacted text, refused, or sent as they are, as ``files`` says."""
+"""Images, PDFs and Word documents: read here and sent as redacted text, refused, or sent as they are, as ``files`` says."""
 
 import base64
 import io
@@ -288,3 +288,105 @@ def test_a_pdf_s_wrapped_lines_are_joined():
                      "Name: Avery Mockridge", "Phone: 415-555-0134", "Date: 2024-01-01"])
     out = _rewrap(text)
     assert "Springfield, IL 62701" in out and "\nName: Avery Mockridge\nPhone: 415-555-0134" in out
+
+
+# -- Word documents ---------------------------------------------------------------------------------------
+
+_NS = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+       'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+       'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '
+       'xmlns:v="urn:schemas-microsoft-com:vml"')
+
+
+def _docx(body, header="", footer="", footnotes="", comments=""):
+    """A .docx of the given WordprocessingML, as Word lays its parts out."""
+    import zipfile
+
+    parts = {"word/document.xml": f"<w:document {_NS}><w:body>{body}</w:body></w:document>"}
+    if header:
+        parts["word/header1.xml"] = f"<w:hdr {_NS}>{header}</w:hdr>"
+    if footer:
+        parts["word/footer1.xml"] = f"<w:ftr {_NS}>{footer}</w:ftr>"
+    if footnotes:
+        parts["word/footnotes.xml"] = f"<w:footnotes {_NS}>{footnotes}</w:footnotes>"
+    if comments:
+        parts["word/comments.xml"] = f"<w:comments {_NS}>{comments}</w:comments>"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        for name, xml in parts.items():
+            z.writestr(name, xml)
+    return buf.getvalue()
+
+
+def _p(*runs):
+    return "<w:p>" + "".join(f"<w:r><w:t xml:space='preserve'>{r}</w:t></w:r>" for r in runs) + "</w:p>"
+
+
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def test_a_word_documents_text_is_read_from_all_its_parts():
+    from veil.files import read_text
+
+    box = ("<w:p><w:r><mc:AlternateContent><mc:Choice Requires='wps'><w:drawing><wps:txbx><w:txbxContent>"
+           + _p("Boxed: 12 Oak Lane") + "</w:txbxContent></wps:txbx></w:drawing></mc:Choice><mc:Fallback><w:pict>"
+           "<v:textbox><w:txbxContent>" + _p("Boxed: 12 Oak Lane") + "</w:txbxContent></v:textbox></w:pict>"
+           "</mc:Fallback></mc:AlternateContent></w:r></w:p>")
+    body = (_p("Dear Ave", "ry Mock", "ridge,")   # Word cuts runs inside words
+            + "<w:p><w:r><w:t>Phone:</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>415-555-0134</w:t></w:r></w:p>"
+            + "<w:p><w:r><w:t>Was </w:t></w:r><w:del><w:r><w:delText>Jane Roe</w:delText></w:r></w:del>"
+              "<w:ins><w:r><w:t>John Doe</w:t></w:r></w:ins></w:p>"
+            + "<w:p><w:r><w:instrText> MERGEFIELD Email </w:instrText></w:r><w:r><w:t>a@b.com</w:t></w:r></w:p>"
+            + "<w:tbl><w:tr><w:tc>" + _p("First Name") + "</w:tc><w:tc>" + _p("Priya") + "</w:tc></w:tr></w:tbl>"
+            + box)
+    text = read_text(_docx(body, header=_p("Letterhead Ltd"), footer=_p("Page 1"),
+                           footnotes="<w:footnote w:id='1'>" + _p("A note on Lisandro") + "</w:footnote>",
+                           comments="<w:comment w:id='0'>" + _p("Check with Kwame") + "</w:comment>"), DOCX)
+    assert "Dear Avery Mockridge," in text
+    assert "Phone:\t415-555-0134" in text
+    assert "Was John Doe" in text and "Jane Roe" not in text   # a tracked deletion is gone
+    assert "MERGEFIELD" not in text and "a@b.com" in text
+    assert "| First Name | Priya |" in text
+    assert text.count("Boxed: 12 Oak Lane") == 1   # the copy for old readers isn't read twice
+    for part in ("Letterhead Ltd", "Page 1", "A note on Lisandro", "Check with Kwame"):
+        assert part in text
+
+
+def test_what_veil_hides_in_a_word_form():
+    from veil.files import read_text
+
+    body = ("<w:tbl><w:tr><w:tc>" + _p("First Name") + "</w:tc><w:tc>" + _p("Wei") + "</w:tc><w:tc>"
+            + _p("Last Name") + "</w:tc><w:tc>" + _p("Tan") + "</w:tc></w:tr></w:tbl>"
+            + _p("The applicant, Avery Mockridge, lives at 1234 Main Street, Anytown, DE 12345."))
+    out = Redactor(FINANCE).redact_text(read_text(_docx(body), DOCX))
+    for secret in ("Wei", "Tan", "Mockridge", "1234 Main"):
+        assert secret not in out
+
+
+@pytest.mark.parametrize("data, media_type, message", [
+    (b"not a zip", DOCX, "isn't a Word"), (b"\xd0\xcf\x11\xe0", "application/msword", "save it as .docx")])
+def test_a_file_that_isnt_a_docx_says_so(data, media_type, message):
+    from veil.files import read_text
+
+    with pytest.raises(ValueError, match=message):
+        read_text(data, media_type)
+
+
+def test_files_read_sends_a_word_document_as_its_text_with_placeholders():
+    fake = FakeClient([_message("ok")])
+    client = wrap(fake, Redactor(FINANCE), files="read")
+    data = _docx(_p("Partner: Avery Mockridge") + _p("SSN 123-45-6789"))
+    block = {"type": "document", "source": {"type": "base64", "media_type": DOCX, "data": _b64(data)}}
+    client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": [block]}])
+    sent = _sent(fake)
+    assert "Mockridge" not in sent and "6789" not in sent
+    doc = fake.requests[0]["messages"][0]["content"][0]
+    assert doc["source"]["type"] == "text" and "NAME_001" in doc["source"]["data"]
+
+
+def test_a_word_document_is_refused_by_name():
+    client = wrap(FakeClient([_message("ok")]))
+    block = {"type": "document", "source": {"type": "base64", "media_type": DOCX, "data": _b64(b"x")}}
+    with pytest.raises(FileError, match="A Word document"):
+        client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": [block]}])

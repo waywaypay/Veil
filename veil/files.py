@@ -18,12 +18,18 @@ import re
 import unicodedata
 
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/gif", "image/webp")
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 def read_text(data: bytes, media_type: str) -> str:
-    """The text in a PDF or image.  A PDF page with no text of its own (a scan) is read with OCR."""
+    """The text in a PDF, a Word document or an image.  A PDF page with no text of its own (a scan) is read
+    with OCR, and so is a page-sized picture in a Word document."""
     if media_type == "application/pdf":
         return _pdf(data)
+    if media_type == DOCX_TYPE:
+        return _docx(data)
+    if media_type == "application/msword":
+        raise ValueError("veil reads Word's .docx files, not the older .doc: save it as .docx first")
     if media_type in IMAGE_TYPES:
         return _ocr(_open_image(data))
     if media_type.startswith("text/"):
@@ -64,6 +70,111 @@ def _rewrap(text: str) -> str:
         else:
             out.append(line)
     return "\n".join(out)
+
+
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
+
+
+def _docx(data: bytes) -> str:
+    """A Word document's text, read with the standard library: its body, tables (a row to a line, its cells
+    between bars, as a form's "| Name | Jane Doe |"), text boxes, headers and footers, footnotes, endnotes and
+    comments, in that order.  Text a tracked change deleted is left out, as Word shows it struck through
+    and the document no longer says it; field codes are left out, their results kept.  A picture big enough
+    to be a pasted page is read with OCR, when Tesseract is there."""
+    import zipfile
+
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile as exc:
+        raise ValueError("this isn't a Word (.docx) document") from exc
+    with archive:
+        names = archive.namelist()
+        if "word/document.xml" not in names:
+            raise ValueError("this isn't a Word (.docx) document")
+
+        def part(pattern: str) -> list[str]:
+            return sorted((n for n in names if re.fullmatch(pattern, n)),
+                          key=lambda n: [int(d) if d.isdigit() else d for d in re.split(r"(\d+)", n)])
+
+        texts = [_wordml(archive.read(n)) for n in
+                 ["word/document.xml"] + part(r"word/header\d*\.xml") + part(r"word/footer\d*\.xml") +
+                 part(r"word/(?:footnotes|endnotes|comments)\.xml")]
+        for name in part(r"word/media/[^/]+\.(?:png|jpe?g|gif|bmp|tiff?)"):
+            try:
+                image = _open_image(archive.read(name))
+                if image.width >= 800 and image.height >= 500:   # a page, not a logo or a signature
+                    texts.append(_ocr(image))
+            except ImportError:
+                break   # no OCR here: the document's own text is all there is
+            except Exception:
+                continue   # a picture Pillow can't open
+    return "\n\n".join(t.strip() for t in texts if t.strip())
+
+
+def _wordml(xml: bytes) -> str:
+    """The text of one part of a Word document (its body, a header, the footnotes ...)."""
+    import xml.etree.ElementTree as ET
+
+    root = ET.fromstring(xml)
+    lines: list[str] = []
+
+    def runs(node, out: list[str], boxes: list) -> None:
+        for child in node:
+            tag = child.tag
+            if tag == f"{_MC}Fallback" or tag in (f"{_W}del", f"{_W}moveFrom", f"{_W}instrText", f"{_W}delText"):
+                continue   # a drawing's copy for old readers; deleted or moved-away text; a field's code
+            if tag == f"{_W}t":
+                out.append(child.text or "")
+            elif tag == f"{_W}tab":
+                out.append("\t")
+            elif tag in (f"{_W}br", f"{_W}cr"):
+                out.append("\n")
+            elif tag == f"{_W}noBreakHyphen":
+                out.append("-")
+            elif tag == f"{_W}txbxContent":
+                boxes.append(child)   # a text box: its paragraphs on their own lines, after this one
+            else:
+                runs(child, out, boxes)
+
+    def paragraph(p) -> None:
+        out: list[str] = []
+        boxes: list = []
+        runs(p, out, boxes)
+        lines.append("".join(out))
+        for box in boxes:
+            block(box)
+
+    def cell_text(tc) -> str:
+        parts = []
+        for p in tc.iter(f"{_W}p"):
+            out: list[str] = []
+            runs(p, out, [])
+            parts.append("".join(out).strip())
+        return " ".join(x for x in parts if x).replace("|", "/")
+
+    def table(tbl) -> None:
+        for tr in tbl.findall(f"{_W}tr"):
+            cells = [cell_text(tc) for tc in tr.findall(f"{_W}tc")]
+            if any(cells):
+                lines.append("| " + " | ".join(cells) + " |")
+        lines.append("")
+
+    def block(node) -> None:
+        for child in node:
+            if child.tag == f"{_W}p":
+                paragraph(child)
+            elif child.tag == f"{_W}tbl":
+                table(child)
+            elif child.tag in (f"{_W}sdt", f"{_W}sdtContent", f"{_W}body", f"{_W}customXml", f"{_W}hdr",
+                               f"{_W}ftr", f"{_W}footnote", f"{_W}endnote", f"{_W}comment", f"{_W}txbxContent",
+                               f"{_W}ins", f"{_W}moveTo"):
+                block(child)
+
+    body = root.find(f"{_W}body")
+    block(body if body is not None else root)
+    text = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", text)
 
 
 def _open_image(data: bytes):

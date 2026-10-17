@@ -15,9 +15,10 @@ turns), and the reply's text and tool-call inputs come back with the real
 values.  Use one redactor per conversation.  Thinking blocks go back exactly
 as they came.
 
-A request with an image or PDF in it is refused (``FileError``) unless you
-say otherwise: ``files="read"`` reads their text on this machine
-(``veil.files.read_text``) and sends that, redacted, in their place;
+A request with an image, a PDF or a Word document in it is refused
+(``FileError``) unless you say otherwise: ``files="read"`` reads their text on
+this machine (``veil.files.read_text``) and sends that, redacted, in their
+place (so a .docx, which the API doesn't take, can be sent as its text);
 ``files="send"`` sends them as they are; or pass your own
 ``reader(data, media_type) -> str``.
 
@@ -155,7 +156,9 @@ class Session:
         """An image or PDF block, as ``files`` says: as it is, or its text redacted in its place."""
         if self.files == "send":
             return b
-        name = "An image" if b.get("type") == "image" else "A PDF"
+        media = (b.get("source") or {}).get("media_type", "") if isinstance(b.get("source"), dict) else ""
+        name = "An image" if b.get("type") == "image" else "A Word document" if "wordprocessingml" in media \
+            else "A PDF"
         if self.files == "refuse":
             raise FileError(f"{name} in this request would have reached the model with any personal information "
                             'in it. Nothing was sent. Pass files="read" to send its text redacted, or files="send" '

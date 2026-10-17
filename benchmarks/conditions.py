@@ -20,6 +20,7 @@ from multiprocessing import Pool
 
 import external
 import gretel as bench
+import word
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from veil import FINANCE, Redactor
@@ -135,6 +136,15 @@ FILES = {
     "grey page": lambda t, i: (png(grey(page(t), i)), "image/png"),
     "two columns": lambda t, i: (png(page(t, columns=2, width=2400, chars=150)), "image/png"),
     "turned sideways": lambda t, i: (png(page(t).rotate(90, expand=True, fillcolor=255)), "image/png"),
+    "Word document": lambda t, i: word.plain(t, i),
+    "Word form (a table)": lambda t, i: word.form(t, i),
+    "Word header and footer": lambda t, i: word.header_footer(t, i),
+    "Word form with two fields a row": lambda t, i: word.wide_form(t, i),
+    "Word form aligned with tabs": lambda t, i: word.tab_form(t, i),
+    "Word text boxes": lambda t, i: word.text_boxes(t, i),
+    "Word tracked changes": lambda t, i: word.tracked(t, i),
+    "Word from LibreOffice": lambda t, i: word.libreoffice(t, i),
+    "Word with a pasted scan": lambda t, i: word.pasted_scan(t, i, page),
 }
 
 
