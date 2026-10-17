@@ -1479,8 +1479,8 @@ class Redactor(TaxIdRedactor):
                     (listed or t.fold not in _common_words()) and _surname_like(toks[i + 2].fold, surnames) and \
                     not (t.fold in _common_words() and toks[i + 2].fold in _common_words()) and ok(i, i + 2):
                 return found(i, i + 2, t.word, [n.word], toks[i + 2].word, True)
-            # Sarah K.: a first name and an initial
-            if n.case == "initial" and n.dot and listed and (t.fold in _given_names() or t.fold in _GIVEN) and \
+            # Sarah K.: a first name and an initial; "Martyn J" ending a line
+            if n.case == "initial" and (n.dot or re.match(r"[ \t]*(?:\n|$)", fold[n.end:n.end + 2])) and listed and (t.fold in _given_names() or t.fold in _GIVEN) and \
                     not (i + 2 < len(toks) and near(i + 1) and toks[i + 2].case in ("title", "caps")) and ok(i, i + 1):
                 return _Found(i, i + 1, None, None, None)
         # MISTY LEE DEAN, YOLANDA RIOS: capitals, a first name then a surname that's no everyday word
