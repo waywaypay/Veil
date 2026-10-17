@@ -392,7 +392,7 @@ class TaxIdRedactor:
         if len(digits) == 9:
             if digits.endswith("0000") and sizes != (3, 2, 4) and sizes != (2, 7):
                 return None   # no SSN ends in 0000: a round amount such as 125000000
-            if digits.startswith("00") and not near(_LABEL_BEFORE, _LABEL_AFTER):
+            if digits.startswith("00") and sizes == (9,) and not near(_LABEL_BEFORE, _LABEL_AFTER):
                 return None   # no SSN, EIN or ITIN starts 00: a counter such as 000000001
             if sizes in ((9,), (3, 2, 4)):
                 return ("SSN" if sizes == (3, 2, 4) else "TIN"), 80, dashed and sizes == (3, 2, 4)

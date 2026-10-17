@@ -152,7 +152,8 @@ wellington york
 """)
 _PLACES = _PLACE_NAMES | word_file("places")
 _HONORIFICS = _words("mr mrs ms miss mx dr prof sir dame agent captain capt officer detective inspector sergeant "
-                     "sgt lieutenant lt judge coach nurse pastor rev reverend rabbi imam professor")
+                     "sgt lieutenant lt judge coach nurse pastor rev reverend rabbi imam professor mister mistress "
+                     "madam madame mayor mayoress monsieur mademoiselle herr frau senor senora signor signora")
 _NAME_SUFFIXES = _words("jr sr ii iii iv md phd cpa esq")
 _ROMAN = _words("i ii iii iv v vi vii viii ix x xi xii xiii xiv xv")
 _PARTICLES = _words("van von de da del della der den di du la le st bin binti ibn abu al el ni nic mac dos das do "
@@ -166,7 +167,7 @@ _CUE_PATTERN = (
     r"|name\s+of\s+(?:the\s+)?(?:partner|investor|member|owner|holder|beneficiary)"
     r"|(?<!bank\s)(?<!fund\s)(?<!firm\s)(?<!file\s)(?<!user\s)(?<!company\s)(?<!entity\s)(?<!business\s)"
     r"(?<!product\s)(?<!chemical\s)(?<!substance\s)(?<!instrument\s)(?<!item\s)(?<!brand\s)(?<!project\s)(?<!event\s)(?<!venue\s)(?<!vessel\s)(?<!ship\s)(?<!plan\s)(?<!program\s)(?<!course\s)(?<!trade\s)(?<!model\s)(?<!device\s)(?<!drug\s)(?<!medication\s)(?<!domain\s)(?<!host\s)(?<!server\s)(?<!street\s)(?<!city\s)(?<!country\s)(?<!state\s)(?<!branch\s)(?<!team\s)(?<!campaign\s)name(?:(?:(?<=my\sname)|(?<=last\sname)|(?<=first\sname)|(?<=full\sname)|(?<=surname))[ \t]+is)?"
-    r"|zip\s+code|signatory|signature|regards|sincerely|cordially|respectfully"
+    r"|zip\s+code|signatory|signature|regards|sincerely|cordially|respectfully|(?<![^\n>])best(?=,)|cheers(?=,)"
     r"|(?:beneficial\s+)?owner|(?:account\s+)?holder|executor|executrix|administrator|guardian|conservator"
     r"|(?:partnership\s+)?representative|(?:designated|named)\s+individual|attorney(?:-in-fact)?|poa)"
     r"[ \t]*(?:\*{1,2}[ \t]*)?(?:[:.,-][ \t]*)?(?:\*{1,2}[ \t]*)?(?:\n[ \t]*){0,2}"
@@ -184,7 +185,7 @@ _CUE_PATTERN = (
     r"(?:'s)?[ \t]*:[ \t]*(?:\*\*[ \t]*)?(?:\n[ \t]*){0,2})\Z")
 # The last word of each of those: the label is looked for only after one of them.
 _CUE_ENDS = _words("""
-name is i'm am code signatory signature regards sincerely cordially respectfully owner holder executor executrix administrator
+name is i'm am best cheers code signatory signature regards sincerely cordially respectfully owner holder executor executrix administrator
 guardian conservator representative individual attorney attorney-in-fact poa named member members partner partners
 investor shareholder stockholder beneficiary trustee custodian grantor spouse client contact person attn attention
 dear fbo o of for to registration signed by from re cc bcc s
@@ -244,7 +245,8 @@ _ID_LABEL = (
     rf"|aadhaa?r(?:\s*{_NO})?"
     rf"|tax[\s_\\]*(?:id(?:entification)?\b\.?|identification)(?:[\s_\\]*{_NO})?|national[\s_\\]*id(?:entity)?(?:[\s_\\]*card)?(?:[\s_\\]*{_NO})?"
     rf"|(?:certificate|licen[cs]e|permit)(?:[\s_\\]+licen[cs]e)?[\s_\\]*{_NO}"
-    r"|cuit|cuil|npwp|nif|nie|cif|rfc|cpf|curp|dni|nric|pesel|bsn|tfn|sin\b(?=\s*[:#])")
+    r"|cuit|cuil|npwp|nif|nie|cif|rfc|cpf|curp|dni|nric|pesel|bsn|tfn|sin\b(?=\s*[:#])"
+    rf"|id(?=\s*[:#]\s*[A-Z]{{1,4}}\d)|social[\s_]+(?:number|no\b\.?)|(?<!employer\s)(?<!employer\s\s)identification[\s_]+(?:code|{_NO})")
 _DOB_LABEL = (r"(?:d\.?\s?o\.?\s?b\b\.?|date[\s_.\\]*of[\s_.\\]*birth|birth[\s_\\]*date|birthday|born(?:\s+on)?)"
               r"(?:\s+of\s+(?:the\s+)?(?:partner|member|investor|owner|holder|spouse|beneficiary))?"
               r"(?:[ \t]*\([^()\n]{0,20}\))?")
@@ -280,7 +282,7 @@ _ACCOUNT_NEAR = re.compile(
 # A username: after its label ("Username: mnewman", "User ID: JSMITH"), or an @handle.
 _USERNAME = re.compile(
     r"(?<![^\W\d_])(?i:user[ \t_-]?name|login(?:[ \t_-]?(?:id|name))?|user[ \t_-]?id|screen[ \t_-]?name|handle)"
-    r"(?![^\W\d_])[\"'*]*[ \t]*(?:[:=]|,?[ \t]+(?:which[ \t]+)?is|[ \t]+(?:of|was)|[ \t]+to)[ \t]*[\"'*]*[ \t]*"
+    r"(?![^\W\d_])[\"'*]*[ \t]*(?:[:=]|,?[ \t]+(?:which[ \t]+)?is|[ \t]+to)[ \t]*[\"'*]*[ \t]*"
     r"(?P<value>@?[A-Za-z0-9][\w.\-]{2,40}?)(?=[\"'*]*(?:[\s,;:)]|\.(?:\s|$)|$))(?![\w@])"
     r"|(?<![\w@.])(?P<handle>@[A-Za-z][\w.]{2,30})(?![\w@])")
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
@@ -452,6 +454,9 @@ _POSTCODES = re.compile(r"(?<![A-Za-z0-9])(?:[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV
                         r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})(?![A-Za-z0-9])")
 _COUNTRY_NAMES = ("USA|U\\.S\\.A\\.|US|United States(?: of America)?|UK|U\\.K\\.|United Kingdom|Great Britain|England"
                   "|Scotland|Wales|Ireland|Canada|Australia|New Zealand|" + "|".join(_COUNTRIES))
+_COUNTRY_WORDS = frozenset(w.casefold() for w in re.findall(r"[A-Za-z]+", _COUNTRY_NAMES) if len(w) > 2) | \
+    frozenset("india china japan brazil mexico russia nigeria egypt kenya pakistan bangladesh indonesia malaysia "
+              "thailand vietnam philippines singapore israel turkey iran iraq argentina chile peru colombia".split())
 # a town's words; a period only after a short one ("St. Louis"), so "Israel. Please" is no town
 _CITY_WORDS = (r"(?:(?:[A-Z][a-z]{0,2}\.|[A-Z\u00c0-\u00de][\w'\u00c0-\u024f-]*)[ \t]+){0,2}"
                r"[A-Z\u00c0-\u00de][\w'\u00c0-\u024f-]*\.?")
@@ -794,7 +799,7 @@ class Redactor(TaxIdRedactor):
             self.register_kind(kind)
             self._custom.append((kind, pattern if isinstance(pattern, re.Pattern) else re.compile(pattern)))
         self._people: dict[str, _Person] = {}
-        self._patterns: list[tuple[re.Pattern, _Person | None]] | None = None
+        self._patterns: list[tuple[re.Pattern, _Person | None, str]] | None = None
         self._businesses: set[tuple[str, ...]] = set()   # every run of two to five words of a fund's name
         self._kinds_changed()
 
@@ -889,7 +894,7 @@ class Redactor(TaxIdRedactor):
         return {p.last.casefold() for p in self._people.values()
                 if p.last and (p.first or p.bare) and p.last.casefold() not in _WORD_SURNAMES | self._v.not_surnames}
 
-    def _compiled(self) -> list[tuple[re.Pattern, _Person | None]]:
+    def _compiled(self) -> list[tuple[re.Pattern, _Person | None, str]]:
         """Each known person's ways of being written; a None person is put back as written."""
         if self._patterns is not None:
             return self._patterns
@@ -902,8 +907,9 @@ class Redactor(TaxIdRedactor):
         def word(w: str) -> str:
             return r"[-\s]?".join(re.escape(part) for part in w.split("-")).replace("'", r"['\s]?")
 
-        patterns: list[tuple[re.Pattern, _Person | None]] = []
-        alone: list[tuple[re.Pattern, _Person | None]] = []
+        # each with a word it can't match without, so a long text is searched only for the people it names
+        patterns: list[tuple[re.Pattern, _Person | None, str]] = []
+        alone: list[tuple[re.Pattern, _Person | None, str]] = []
         for p in sorted(self._people.values(), key=lambda p: -len(p.display)):
             forms = []
             if p.whole:
@@ -921,22 +927,27 @@ class Redactor(TaxIdRedactor):
                     forms.append(rf"(?-i:{re.escape(p.first[0].upper())})\.?{gap}(?:(?-i:[A-Z])\.?{gap})?"
                                  rf"{last}{suffix}")
             if forms:
-                patterns.append((re.compile(rf"(?<![^\W\d_])(?:{'|'.join(forms)})(?![^\W\d_])", re.IGNORECASE), p))
+                patterns.append((re.compile(rf"(?<![^\W\d_])(?:{'|'.join(forms)})(?![^\W\d_])", re.IGNORECASE), p,
+                                 p.last or (p.whole[0] if p.whole else "")))
             if p.last and len(p.last) > 2 and p.last.casefold() not in self._v.stop:
                 # Mr. Mockridge; and Mockridge alone, when that's no ordinary word.  Put back as written.
                 optional = "?" if p.bare and p.last.casefold() not in _GIVEN | _WORD_SURNAMES else ""
                 particles = "".join(rf"(?:{word(x)}[ \t]+)?" for x in p.particles)
                 # not inside a key or a tag's name: "Branch" of Erin Branch isn't in <Branch_Name>
                 alone.append((re.compile(rf"(?<![^\W\d])(?:(?:{'|'.join(_HONORIFICS)})\.?[ \t]+){optional}"
-                                         rf"{particles}{word(p.last)}(?![^\W\d])", re.IGNORECASE), None))
+                                         rf"{particles}{word(p.last)}(?![^\W\d])", re.IGNORECASE), None, p.last))
             first = p.first.casefold()
             if p.single:
-                alone.append((re.compile(rf"(?<!\w)(?-i:{word(p.first)})(?!\w)"), None))
+                alone.append((re.compile(rf"(?<!\w)(?-i:{word(p.first)})(?!\w)"), None, p.first))
                 continue
             if p.first and p.bare and len(first) > 3 and first not in _GIVEN | _WORD_SURNAMES | self._v.not_names:
                 # Thandiwe alone: a first name that's no common one or ordinary word
-                alone.append((re.compile(rf"(?<![^\W\d_]){word(p.first)}(?![^\W\d_])", re.IGNORECASE), None))
-        self._patterns = patterns + alone
+                alone.append((re.compile(rf"(?<![^\W\d_]){word(p.first)}(?![^\W\d_])", re.IGNORECASE), None, p.first))
+        def probe(word: str) -> str:   # its longest run of letters, as the fold writes it
+            runs = re.findall(r"[^\W\d_]+", _ascii(word))
+            return max(runs, key=len).casefold() if runs else ""
+
+        self._patterns = [(pattern, person, probe(word)) for pattern, person, word in patterns + alone]
         return self._patterns
 
     # -- finding it ------------------------------------------------------------
@@ -1234,7 +1245,9 @@ class Redactor(TaxIdRedactor):
         if group == "value" and value[:1].isupper() and value[1:].islower() and \
                 re.match(r"[ \t]+[A-Z][a-z]", fold[m.end(group):m.end(group) + 3]):
             return False
-        return take(start, start + len(value), "ID", "ID:" + value.casefold())
+        if group == "value" and value.casefold() in _common_words() and not any(c.isdigit() for c in value):
+            return False   # "the username is required", "Username: The ..."
+        return take(start, start + len(value), "ID", "ID:" + value)
 
     @staticmethod
     def _phone(m: re.Match, take) -> bool:
@@ -1277,10 +1290,27 @@ class Redactor(TaxIdRedactor):
         return False
 
     def _known_names(self, fold: str, take, typed: bool) -> None:
-        for pattern, person in self._compiled():
+        low = fold.casefold()
+
+        def matches(pattern: re.Pattern, word: str):
+            """The pattern's matches, looked for only around where its word is written."""
+            if not word:
+                yield from pattern.finditer(fold)
+                return
             pos = 0
-            while (m := pattern.search(fold, pos)) is not None:
-                pos = m.end()
+            at = low.find(word)
+            while at >= 0:
+                start, end = max(pos, at - 80), min(len(fold), at + len(word) + 80)
+                while start < end and (m := pattern.search(fold, start, end)) is not None:
+                    if m.end() > m.start():
+                        yield m
+                    start = pos = max(m.end(), m.start() + 1)
+                at = low.find(word, max(at + 1, pos))
+
+        for pattern, person, word in self._compiled():
+            if word and word not in low:
+                continue
+            for m in matches(pattern, word):
                 if person is not None:
                     if not person.whole and _business_after(fold, m.end(), self._v, typed):
                         take(m.start(), m.end(), "NAME")   # "Avery Mockridge Holdings": put back as written
@@ -1666,7 +1696,15 @@ class Redactor(TaxIdRedactor):
                     not all(t2.fold in _common_words() for t2 in toks[i:j + 1]):
                 return _Found(i, j, None, None, None)
         # Mockridge, Avery K.
-        if i + 1 < len(toks) and _COMMA_GAP.fullmatch(_gap(fold, toks, i)) and name_word(i):
+        # Not a greeting or an everyday word before the comma ("Congratulations, Cory"), not a place either
+        # side ("Ain, France", "Jones, NASDAQ" isn't a name turned round), and both written alike
+        if i + 1 < len(toks) and _COMMA_GAP.fullmatch(_gap(fold, toks, i)) and name_word(i) and \
+                t.fold not in _GREETINGS and t.fold not in _PLACES and toks[i + 1].fold not in _PLACES and \
+                toks[i + 1].fold not in _COUNTRY_WORDS and toks[i + 1].case == t.case and \
+                toks[i + 1].word not in _STATE_NAMES and \
+                not re.match(r"[ \t]+(?i:county|parish|borough|province|state|region|district)\b",
+                             fold[toks[i + 1].end:toks[i + 1].end + 12]) and \
+                not (t.fold in _common_words() and t.fold not in _common_surnames() and t.fold not in _SURNAMES):
             n = toks[i + 1]
             if name_word(i + 1) and not n.dot and \
                     (n.fold in _GIVEN or t.fold in _SURNAMES or t.fold in surnames or
