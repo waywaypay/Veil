@@ -903,6 +903,11 @@ class Redactor(TaxIdRedactor):
                 if p.last and (p.first or p.bare) and not p.guess and
                 p.last.casefold() not in _WORD_SURNAMES | self._v.not_surnames}
 
+    def _lone_names(self) -> set[str]:
+        """The surnames known only from a name of one word ("Rubén", "Okonkwo"), never with a first name."""
+        return {p.last.casefold() for p in self._people.values() if p.last and not p.first} - \
+            {p.last.casefold() for p in self._people.values() if p.last and p.first}
+
     def _compiled(self) -> list[tuple[re.Pattern, _Person | None, str, bool]]:
         """Each known person's ways of being written; a None person is put back as written.  Each says whether
         it's the name finder's guess."""
@@ -1702,6 +1707,18 @@ class Redactor(TaxIdRedactor):
                 name = named(rest(i + 1, t.case, True, lambda k: toks[k].fold in _SURNAMES or toks[k].fold in surnames,
                                   True), True)
                 if name is not None:
+                    e = name.last_tok
+                    if toks[e].fold not in _SURNAMES and near(e) and \
+                            (toks[e + 1].case == "initial" or name_word(e + 1)) and toks[e].fold in self._lone_names():
+                        # "Consuelo Rubén R. Camacho", "I'm Camille Adam" with "Rubén" or "Camille" known alone: a
+                        # name of one word may be a first or a middle name, so the name may go on past it.  The
+                        # longer of the names found without it, from here or from that word, if either goes on.
+                        fewer = surnames - {toks[e].fold}
+                        longer = [n for n in (self._name_at(copy, fold, toks, i, cued, typed, fewer),
+                                              self._name_at(copy, fold, toks, e, False, typed, fewer))
+                                  if n is not None and n.last_tok > e]
+                        if longer:
+                            return max(longer, key=lambda n: (n.last_tok, -n.first_tok))
                     return name
             # After a label or cue, before "as an LLC member", or in what the user typed: any capitalized words
             if t.case == "title" or cued or typed:
