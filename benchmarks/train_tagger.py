@@ -15,7 +15,7 @@ python train_tagger.py fetch
 python train_tagger.py gretel <base> <out dir> <offset|all> [steps]
 python train_tagger.py mixed <base> <out dir> <offset> [heavy]
 python train_tagger.py dev <model>[@threshold] ...
-python train_tagger.py export <model dir> <out dir>      model.onnx and model_w8.onnx (8-bit weights)"""
+python train_tagger.py export <model dir> <out dir>      model.onnx and model_f16.onnx (16-bit weights)"""
 
 import ast
 import json
@@ -252,19 +252,28 @@ def dev(models):
 
 
 def export(model_dir, out):
-    """model.onnx, and model_w8.onnx: the weights of its multiplies in 8 bits (blocks of 32), the arithmetic still in
-    float.  ONNX Runtime's usual int8 (quantize_dynamic, which quantizes activations too) moved this model's scores,
-    many of them just over the threshold, enough to lose a fifth of what it finds; weights alone agree with full
-    precision on 99.4% of spans.  Needs onnx and onnx_ir."""
+    """model.onnx, and model_f16.onnx: the same with its weights stored in 16 bits, cast back to 32 as ONNX Runtime
+    loads it, so half the file and the same arithmetic (the same spans as full precision, and as fast).  ONNX
+    Runtime's usual int8 (quantize_dynamic, which quantizes activations too) moved this model's scores, many of them
+    just over the threshold, enough to lose a fifth of what it finds."""
+    import numpy as np
     import onnx
     from gliner import GLiNER
-    from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
+    from onnx import TensorProto, helper, numpy_helper
     GLiNER.from_pretrained(model_dir).export_to_onnx(out)
-    q = MatMulNBitsQuantizer(onnx.load(f"{out}/model.onnx"), bits=8, block_size=32, is_symmetric=True,
-                             op_types_to_quantize=("MatMul",))
-    q.process()
-    q.model.save_model_to_file(f"{out}/model_w8.onnx", False)
-    print(f"{out}/model.onnx, {out}/model_w8.onnx")
+    m = onnx.load(f"{out}/model.onnx")
+    casts = []
+    for init in list(m.graph.initializer):
+        if init.data_type == TensorProto.FLOAT and int(np.prod(init.dims)) >= 1024:
+            half = numpy_helper.from_array(numpy_helper.to_array(init).astype(np.float16), init.name + "__f16")
+            casts.append(helper.make_node("Cast", [half.name], [init.name], to=TensorProto.FLOAT,
+                                          name=init.name + "__cast"))
+            m.graph.initializer.remove(init)
+            m.graph.initializer.append(half)
+    for node in reversed(casts):
+        m.graph.node.insert(0, node)
+    onnx.save(m, f"{out}/model_f16.onnx")
+    print(f"{out}/model.onnx, {out}/model_f16.onnx")
 
 
 if __name__ == "__main__":

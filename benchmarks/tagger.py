@@ -2,7 +2,7 @@
 of adding what it marks to what veil hides.  Shared by tagger_sets.py, chats.py and train_tagger.py.
 
 A model is a Hugging Face name ("knowledgator/gliner-pii-edge-v1.0"), a directory a model was saved to, or an ONNX
-file in such a directory, written "dir::model_w8.onnx".  What a model marks in a text is kept in
+file in such a directory, written "dir::model_f16.onnx".  What a model marks in a text is kept in
 $VEIL_BENCH_DATA/cache (benchmarks/data/cache by default), so each model reads each text once.  Needs gliner, torch
 and onnxruntime."""
 

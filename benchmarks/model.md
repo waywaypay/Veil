@@ -18,7 +18,7 @@ mistakes about four times on Gretel).
 | `knowledgator/gliner-pii-base-v1.0` ("base") | `microsoft/deberta-v3-small` | about 166M | 197 MB (its int8) | Apache-2.0 |
 | `nvidia/gliner-PII` ("large") | `microsoft/deberta-v3-large` | 570M | 1.8 GB (PyTorch) | NVIDIA Open Model Licence |
 | edge, fine-tuned on Gretel (round 1) | edge | about 45M | | |
-| edge, fine-tuned on the mix (round 2) | round 1 | about 45M | 117 MB (8-bit weights, below) | |
+| edge, fine-tuned on the mix (round 2) | round 1 | about 45M | 91 MB (weights stored in 16 bits, below) | |
 
 NVIDIA's model was trained on Nemotron-PII, so its Nemotron figures are in distribution, as are round 2's (trained
 on Nemotron's training split; tested on its test split). Knowledgator doesn't say what its models were trained on.
@@ -117,20 +117,23 @@ lines from outside Europe and North America, usernames and `@Author` tags in pas
 
 ## Running it small
 
-`train_tagger.py export` writes the model as ONNX, which gives the same spans as PyTorch on every text tried. Made
-smaller:
+`train_tagger.py export` writes the model as ONNX, which gives the same spans as PyTorch on every text tried, and
+`model_f16.onnx`, the same with its weights stored in 16 bits and cast back to 32 bits as ONNX Runtime loads it. Made
+smaller, against full precision on 150 texts (Gretel, Nemotron, OntoNotes), and timed on 60 Gretel documents (4
+threads, ONNX Runtime):
 
-| File | Size | Spans as at full precision (150 texts) |
-|---|---|---|
-| full precision | 181 MB | all |
-| weights in 8 bits (`MatMulNBits`, blocks of 32), arithmetic in float | 117 MB | 99.4% |
-| the same, the embedding table in 4 bits | 52 MB | 95.3% |
-| ONNX Runtime's usual int8 (`quantize_dynamic`, activations too) | 46 MB | 67.5% |
+| File | Size | Spans as at full precision | Seconds a page |
+|---|---|---|---|
+| full precision | 181 MB | all | 0.57 |
+| **weights stored in 16 bits** (`model_f16.onnx`) | **91 MB** | **all** | **0.56** |
+| weights in 8 bits (`MatMulNBits`, blocks of 32), arithmetic in float | 117 MB | 99.4% | 0.64 |
+| the same, the embedding table in 4 bits | 52 MB | 95.3% | |
+| ONNX Runtime's usual int8 (`quantize_dynamic`, activations too) | 46 MB | 67.5% | 0.47 |
 
 The usual int8 doesn't suit this model: many of its scores sit just over the threshold, and quantizing the
 activations moves them under it, so the tagger alone found 73.0% on Gretel instead of 95.6%, and 80.3% of TAB's names
-instead of 97.5% (Knowledgator's own models are trained for it). Weights in 8 bits keep the arithmetic, and the
-spans. In one timing on this CPU, with another job running, they ran about a quarter slower than full precision.
+instead of 97.5% (Knowledgator's own models are trained for it). Storing the weights in 16 bits halves the file and
+changes nothing else.
 
 ## Caveats
 

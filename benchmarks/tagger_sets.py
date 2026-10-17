@@ -4,7 +4,7 @@ ai4privacy's short messages in English and five other languages; and text people
 news (CoNLL-2003) and OntoNotes (news, broadcast, phone calls, the web).  Results in benchmarks/model.md.
 
 python tagger_sets.py fetch                        the test sets, to $VEIL_BENCH_DATA (benchmarks/data)
-python tagger_sets.py <model>[@threshold] ...      e.g. knowledgator/gliner-pii-edge-v1.0@0.4 data/mixed::model_w8.onnx
+python tagger_sets.py <model>[@threshold] ...      e.g. knowledgator/gliner-pii-edge-v1.0@0.4 data/mixed::model_f16.onnx
 
 Labels are each dataset's own, mapped onto veil's kinds as external.py does; TAB's are its people's names, CoNLL's and
 OntoNotes' their person names (every other entity is ordinary).  The scanned conditions need Tesseract."""
