@@ -824,7 +824,7 @@ class Redactor(TaxIdRedactor):
                                          rf"{particles}{word(p.last)}(?![^\W\d_])", re.IGNORECASE), None))
             first = p.first.casefold()
             if p.single:
-                alone.append((re.compile(rf"(?<![^\W\d_])(?-i:{word(p.first)})(?![^\W\d_])"), None))
+                alone.append((re.compile(rf"(?<!\w)(?-i:{word(p.first)})(?!\w)"), None))
                 continue
             if p.first and p.bare and len(first) > 3 and first not in _GIVEN | _WORD_SURNAMES | self._v.not_names:
                 # Thandiwe alone: a first name that's no common one or ordinary word
@@ -1015,6 +1015,9 @@ class Redactor(TaxIdRedactor):
                 take(start + lead, start + lead + len(value), "NAME")
                 if len(value.split()) >= 2:
                     self.add_person(value)
+                elif len(value) > 3 and value.casefold() not in _common_words():
+                    # one word, as a table's or a form's field has it: hidden wherever else it's written so
+                    self._remember(_Person(f"NAME:{_fold(value)}", value, first=value, single=True))
 
         for m in _KEYED_VALUE.finditer(fold):
             if m.group("tag") is not None:
@@ -1244,7 +1247,8 @@ class Redactor(TaxIdRedactor):
                     any(toks[k].case == "title" for k in range(a + 1, b + 1)):
                 return False
             # a city before its state or ZIP: "Oakland, CA", "Leeds, LS1 4AP"
-            if re.match(rf"[ \t]*,[ \t]*(?:{_STATE}(?:[ \t]+{_ZIP})?|{_ZIP}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})(?![\w])",
+            if re.match(rf"[ \t]*,[ \t]*(?:{_STATE}(?:[ \t]+{_ZIP}|,[ \t]*(?:USA|US|U\.S\.A?\.?|United States))"
+                        rf"|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})(?![\w])",
                         copy[toks[b].end:toks[b].end + 20]) and \
                     not re.search(r"(?i)name[ \t]*:?[ \t]*\Z", fold[max(0, toks[a].start - 20):toks[a].start]):
                 return False
