@@ -158,7 +158,11 @@ _SUFFIXES = ("Street Avenue Road Boulevard Lane Drive Court Place Way Terrace Ci
              "Flat Flats Garden Gardens Gateway Landing Light Lights Locks Neck Orchard Prairie Rest Spur Throughway "
              "Trace Track Trafficway Turnpike Underpass Burg Burgs Bypass Camp Canyon Cape Causeway Cliff Cliffs Course "
              "Courts Crest Curve Dale Dam Expressway Extension Extensions Ferry Field Fields Freeway Hollow Inlet Key Keys "
-             "Mission Motorway Mountain Mountains Overpass Radial Shoal Shoals Skyway Squares Stravenue Streets Ways").split()
+             "Mission Motorway Mountain Mountains Overpass Radial Shoal Shoals Skyway Squares Stravenue Streets Ways "
+             "Annex Arcade Bayou Beach Bend Bluff Bluffs Bottom Bridge Bridges Brook Brooks Centers Circles Commons "
+             "Concourse Corners Coves Crossroad Crossroads Drives Esplanade Ford Fords Forest Forges Glens Groves "
+             "Junctions Knolls Mall Manors Mews Parks Parkways Passage Pier Ports Promenade Quay Roads Route Spurs "
+             "Valleys Viaduct Walks Wall Wharf Yards").split()
 _STREET_WORDS = re.compile(r"(?<![\w.])(\d{1,6}[ ]+[A-Z][a-z]+[ ]+)([A-Z][a-z]{1,11})(?=[ ]?[,.;:(\n\"]|[ ]+(?:Apt|Suite)\b|$)")
 
 
@@ -219,7 +223,7 @@ def _tidy_names(text: str) -> str:
         w = _ascii(word).casefold()
         return w in _GIVEN or w in _WORD_GIVEN or (w in _given_names() and not _wordlike(w))
 
-    from veil.redactor import _SURNAMES, _common_surnames, _common_words, _surname_list, _top_surnames
+    from veil.redactor import _SURNAMES, _common_surnames, _common_words, _name_listed, _surname_list, _top_surnames
 
     def known(word: str) -> bool:
         w = _ascii(word).casefold()
@@ -265,6 +269,16 @@ def _tidy_names(text: str) -> str:
     text = re.sub(r"(?<=[a-z])-[ ]+-?(?=[A-Z][a-z])|(?<=[a-z])[ ]+-[ ]?-(?=[A-Z][a-z])", "-", text)   # Payne- -Gilbert
     text = re.sub(r"\bj([a-z]{2,})\b(?=[ ,.]+[A-Z]|,)", lambda m: "J" + m.group(1) if given("J" + m.group(1)) else
                   m.group(), text)                                                          # john Doe, Hello john,
+    # Melanie Robin jordan, "Bob","johnson": a surname's J read small, after a first name
+    text = re.sub(r"\b([A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20})?(?: |\",\s?\"))j([a-z]{2,})\b",
+                  lambda m: f"{m.group(1)}J{m.group(2)}" if given(m.group(1).strip(' ",').split()[0]) and
+                  _name_listed(_ascii("j" + m.group(2)), set()) and ("j" + m.group(2)) not in _common_words()
+                  else m.group(), text)
+    # Rahe! for Rahel, No\u00e9! for No\u00ebl, He8 or He& for He\u00df: the last letter of a name misread
+    text = re.sub(r"\b([A-Z][a-z\u00c0-\u024f]{1,15})!(?=[ ,.:;]|$)",
+                  lambda m: m.group(1) + "l" if given(m.group(1) + "l") or known(m.group(1) + "l") else m.group(), text)
+    text = re.sub(r"\b([A-Z][a-z]{1,15} )([A-Z][a-z]{1,15})[8&](?=[ ,.:;\]]|$)",
+                  lambda m: f"{m.group(1)}{m.group(2)}\u00df" if given(m.group(1).strip()) else m.group(), text)
     text = re.sub(r"\b(Dear|Hello|Hi|Thanks|welcome|Name:|you,) j([a-z]{2,})\b",
                   lambda m: f"{m.group(1)} J{m.group(2)}" if given("J" + m.group(2)) else m.group(), text)
     # A period or colon after a first name, before another name: "Melanie. Robin Jordan", "Bas: Timo Evers"
@@ -295,9 +309,10 @@ def _tidy(text: str) -> str:
     # Stra\u00dfe read StraBe, StraRe, Strake: its \u00df
     text = re.sub(r"(?<=[A-Za-z\u00c0-\u024f-])([Ss])tra(?:B|R|k|&|8)e\b", "\\1tra\u00dfe", text)
     # SE1 12Z, RHSW 5RQ: a UK postcode with a 2 for a Z, an S for a 5
+    text = re.sub(r"\b([A-Z]{1,2})l( \d[A-Z\d]{2})\b", r"\g<1>1\2", text)                     # SEl 122
     text = re.sub(r"\b([A-Z]{1,2}\d[A-Z\d]?) (\d)([A-Z2])([A-Z2])\b",
                   lambda m: f"{m.group(1)} {m.group(2)}{m.group(3).replace('2', 'Z')}{m.group(4).replace('2', 'Z')}"
-                  if "2" in m.group(3) + m.group(4) and m.group(3) + m.group(4) != "22" else m.group(), text)
+                  if "2" in m.group(3) + m.group(4) else m.group(), text)
     text = re.sub(r"\b([A-Z]{2})S([A-Z]?) (\d[A-Z]{2})\b", r"\g<1>5\2 \3", text)
     # 67.240. Nolan Junction: a street's number with a dot in it
     text = re.sub(rf"(?<![\w.,$])(\d{{1,3}})\.(\d{{3}})\.?[ ]?(?=(?:[A-Z][\w'-]+[ ]){{1,3}}(?:{'|'.join(_SUFFIXES)})\b)",
@@ -315,6 +330,13 @@ def _tidy(text: str) -> str:
     text = re.sub(r"\b(\d{1,6}[ ]+[A-Z][a-z]{2,})(?:[:.][ ]?)(?=([A-Z][a-z]+)\b)",
                   lambda m: m.group(1) + " " if m.group(2) in _SUFFIXES else m.group(), text)
     text = _STREET_WORDS.sub(_street_word, text)
+    # 456 Oak Street. Anytown, USA: a period read for the comma before the town
+    text = re.sub(rf"(\b\d{{1,6}}[ ]+(?:[A-Z][\w'-]+[ ]+){{1,3}}(?:{'|'.join(_SUFFIXES)}))\.[ ]"
+                  r"(?=[A-Z][\w'-]+(?:[ ][A-Z][\w'-]+)?(?:,|[ ]*\n|[ ]*$))", r"\1, ", text)
+    # a lower case j for the J starting a street's kind or a name after a capitalized word: "Phillip junction"
+    text = re.sub(rf"(\b\d{{1,6}}[ ]+[A-Z][\w'-]+[ ])j(?=(?:{'|'.join(w[1:] for w in _SUFFIXES if w[0] == 'J')})\b)",
+                  r"\1J", text)
+    text = re.sub(r"(?<=\d)\.(?=\d{2}-\d{4}\b)", "-", text)                                 # SSN: 384.35-2296
     text = re.sub(r"(?<=[a-z])\.(?=(?:Apt|Suite|Ste|Unit|Flat)\b)", " ", text)
     text = re.sub(r"(?<!www)(?<=[a-z])\.(?!(?:Com|Org|Net|Edu|Gov|Io|Co|Uk)\b)(?=[A-Z][a-z]{2,}(?![\w-]*\.[A-Za-z]))",
                   " ", text)                                                               # Kelly.Ramp

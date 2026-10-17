@@ -249,6 +249,14 @@ def test_reflow_joins_the_lines_a_page_wrapped_and_keeps_a_forms_lines():
     ("(mailto:mike.johnson@emai l.com)", "(mailto:mike.johnson@email.com)"),
     ("[olivia.davis@email.c om](mailto", "[olivia.davis@email.com](mailto"),
     ("Apt. 92806,lan Pamela Turner,9486", "Apt. 92806,Ian Pamela Turner,9486"),
+    ("Name: Isabelle jourdan\n", "Name: Isabelle Jourdan\n"),
+    ("2. Provided Rahe! with a list", "2. Provided Rahel with a list"),
+    ("Engelbert He8: [name]", "Engelbert He\u00df: [name]"),
+    ("London, UK\n\nSEl 122\n", "London, UK\n\nSE1 1ZZ\n"),
+    ("Address: 456 Oak Street. Anytown, USA\n", "Address: 456 Oak Street, Anytown, USA\n"),
+    ("address of 49249 Phillip junction, Katherineport", "address of 49249 Phillip Junction, Katherineport"),
+    ("SSN: 384.35-2296\n", "SSN: 384-35-2296\n"),
+    ("54652 Monica Mali (the", "54652 Monica Mall (the"),
 ])
 def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
     from veil.files import _tidy
@@ -258,7 +266,7 @@ def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
 @pytest.mark.parametrize("text", [
     "1. Introduction", "We hired John. The team grew.", "Meeting at 10:30 Monday", "See www.Example.com",
     "Total: 1,234.56 at 2021.09.01", "We sold 500 Apple Pies, and", "<phone>819.496.2354</phone>", "Note: Payment due",
-    "Maria lives here", "John loves it", "costs 1.240 Euro", "Big Strake", "Code AB12 322 here",
+    "Maria lives here", "John loves it", "I live at 12 Oak Street. Then we left", "Wow! Great", "costs 1.240 Euro", "Big Strake", "Bob jumped", "Sarah just left",
 ])
 def test_ocr_tidying_leaves_ordinary_text_alone(text):
     from veil.files import _tidy
