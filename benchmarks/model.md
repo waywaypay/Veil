@@ -49,8 +49,9 @@ and amounts taken for account numbers: 7–14% of other words in news and other 
 document the models add little; there the larger model ties the smaller ones, and in people's prose it finds 6–10
 points more names.
 
-What a model returns has to be added after veil, not through `name_finder`: a model that marks a first name and a
-surname apart ("Luigi", "Togliatti") makes veil hide the piece it was given and miss the whole name.
+The tables add what a model returns after veil. Through `name_finder` a model's names are looked for after veil's
+own too, only where nothing else is, so one that marks a first name and a surname apart ("Luigi", "Togliatti") no
+longer makes veil miss the whole name.
 
 ## Trained for veil
 

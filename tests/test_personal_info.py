@@ -683,3 +683,40 @@ def test_a_longer_name_found_over_a_known_one_has_its_own_placeholder():
     assert out == "NAME_001 signed. NAME_002 called."
     assert r.restore_text(out) == "Jane Doe Smith signed. Jane Doe called."
     assert r.redact_text("Jane Doe called again.") == "NAME_002 called again."
+
+
+# -- a name finder's pieces of a name ---------------------------------------------------------------------
+
+@pytest.mark.parametrize("text", ["Luigi Clelia Togliatti signed the agreement.",
+                                  "Full Legal Name: Luigi Clelia Togliatti"])
+@pytest.mark.parametrize("pieces", [
+    ["Luigi"],                          # one piece
+    ["Luigi", "Clelia", "Togliatti"],   # every piece on its own, as some NER models give a name
+    ["Clelia"], ["Togliatti"], ["Luigi Clelia"], ["Clelia Togliatti"],
+])
+def test_a_name_finder_s_piece_of_a_name_hides_no_less_than_no_finder(text, pieces):
+    r = Redactor(FINANCE, name_finder=lambda t: pieces)
+    out = r.redact_text(text)
+    assert out == Redactor(FINANCE).redact_text(text) and "Togliatti" not in out
+    assert r.restore_text(out) == text and r.mapping == {"NAME_001": "Luigi Clelia Togliatti"}
+
+
+@pytest.mark.parametrize("pieces, text", [
+    (["Dr. Luigi"], "Dr. Luigi Clelia Togliatti signed."),   # running past the name found
+    (["Elaine", "Nixon"], "First Name: Elaine\nLast Name: Nixon\n\nSignature: Elaine D. Nixon"),   # a field's name
+    # no surname for the word lists to start a name early on ("I'm Friedrich", "Collins P Zoe")
+    (["Friedrich"], "User: Hi, I'm Friedrich S. Albers from Madrid."),
+    (["Zoe", "Lucas"], "**Collins P Zoe H. Lucas, Treasurer"),
+])
+def test_a_name_finder_s_guess_changes_nothing_the_word_lists_find(pieces, text):
+    r = Redactor(FINANCE, name_finder=lambda t: pieces)
+    out = r.redact_text(text)
+    assert out == Redactor(FINANCE).redact_text(text) and r.restore_text(out) == text
+
+
+def test_a_name_finder_s_pieces_still_hide_a_name_the_word_lists_miss():
+    text = "CEO Zorblax Qwib Vrenquist met the board."
+    assert Redactor(FINANCE).redact_text(text) == text
+    r = Redactor(FINANCE, name_finder=lambda t: ["Zorblax", "Qwib", "Vrenquist"])
+    out = r.redact_text(text)
+    assert out == "CEO NAME_001 met the board." and r.restore_text(out) == text

@@ -734,6 +734,7 @@ class _Person:
     whole: list[str] = field(default_factory=list)   # a business's, trust's or joint account's name, word by word
     bare: bool = False        # hide the surname alone too
     single: bool = False      # a name of one word, found alone: hidden wherever it's written so
+    guess: bool = False       # known from the name finder alone: hidden last, only where nothing else is
 
 
 @dataclass
@@ -782,9 +783,11 @@ class Redactor(TaxIdRedactor):
     ``patterns``: more to look for, as {kind: regex}, e.g. {"MRN": r"\\bMRN[- ]?\\d{6,8}\\b"}.  Each kind gets
     its own placeholders (MRN_001) and is looked for before the built-in ones.
     ``name_finder``: a function from text to the people's names in it, such as a wrapper around an NER model
-    (spaCy, Presidio, a cloud service); each name it returns is added with ``add_person`` before the text is
-    read.  The built-in name finding works from word lists, so it misses names it has no word for in prose
-    that has no label or title before them ("CEO Satya Nadella").
+    (spaCy, Presidio, a cloud service); each name it returns is hidden however it's written, as with
+    ``add_person``, but only where nothing else is, once the rest is found: it can only add to what's hidden.
+    A piece of a name ("Luigi" of "Luigi Clelia Togliatti") leaves the name found around it whole.  The built-in
+    name finding works from word lists, so it misses names it has no word for in prose that has no label or
+    title before them ("CEO Satya Nadella").
     """
 
     def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None):
@@ -799,7 +802,8 @@ class Redactor(TaxIdRedactor):
             self.register_kind(kind)
             self._custom.append((kind, pattern if isinstance(pattern, re.Pattern) else re.compile(pattern)))
         self._people: dict[str, _Person] = {}
-        self._patterns: list[tuple[re.Pattern, _Person | None, str]] | None = None
+        self._patterns: list[tuple[re.Pattern, _Person | None, str, bool]] | None = None
+        self._guessing = False   # what add_person is given comes from the name finder
         self._businesses: set[tuple[str, ...]] = set()   # every run of two to five words of a fund's name
         self._kinds_changed()
 
@@ -881,35 +885,41 @@ class Redactor(TaxIdRedactor):
                 self._remember(_Person(f"NAME:{run[0].casefold()}", run[0], last=run[0], bare=True))
 
     def _remember(self, person: _Person) -> None:
+        person.guess = self._guessing
         known = self._people.get(person.key)
-        if known is not None and (known.bare or not person.bare) and (known.whole or not person.whole):
+        # The name finder's guess changes nothing the app or the word lists know; theirs replaces a guess.
+        if known is not None and known.guess == person.guess:
+            if (known.bare or not person.bare) and (known.whole or not person.whole):
+                return
+            person.display = known.display   # put back as it first was
+        elif known is not None and person.guess:
             return
-        if known is not None:   # put back as it first was
-            person.display = known.display
         self._people[person.key] = person
         self._patterns = None
 
     def _surnames(self) -> set[str]:
         """The surnames of the people known and found so far that are no ordinary word."""
         return {p.last.casefold() for p in self._people.values()
-                if p.last and (p.first or p.bare) and p.last.casefold() not in _WORD_SURNAMES | self._v.not_surnames}
+                if p.last and (p.first or p.bare) and not p.guess and
+                p.last.casefold() not in _WORD_SURNAMES | self._v.not_surnames}
 
-    def _compiled(self) -> list[tuple[re.Pattern, _Person | None, str]]:
-        """Each known person's ways of being written; a None person is put back as written."""
+    def _compiled(self) -> list[tuple[re.Pattern, _Person | None, str, bool]]:
+        """Each known person's ways of being written; a None person is put back as written.  Each says whether
+        it's the name finder's guess."""
         if self._patterns is not None:
             return self._patterns
         gap = r"(?:[ \t_-]+|[ \t]*\n[ \t]*|[ \t]*[.][ \t]*|(?-i:(?<=[a-z])(?=[A-Z])))"
         surnames: dict[str, int] = {}
         for p in self._people.values():
-            if p.last and p.first:
+            if p.last and p.first and not p.guess:
                 surnames[p.last.casefold()] = surnames.get(p.last.casefold(), 0) + 1
 
         def word(w: str) -> str:
             return r"[-\s]?".join(re.escape(part) for part in w.split("-")).replace("'", r"['\s]?")
 
         # each with a word it can't match without, so a long text is searched only for the people it names
-        patterns: list[tuple[re.Pattern, _Person | None, str]] = []
-        alone: list[tuple[re.Pattern, _Person | None, str]] = []
+        patterns: list[tuple[re.Pattern, _Person | None, str, bool]] = []
+        alone: list[tuple[re.Pattern, _Person | None, str, bool]] = []
         for p in sorted(self._people.values(), key=lambda p: -len(p.display)):
             forms = []
             if p.whole:
@@ -928,26 +938,28 @@ class Redactor(TaxIdRedactor):
                                  rf"{last}{suffix}")
             if forms:
                 patterns.append((re.compile(rf"(?<![^\W\d_])(?:{'|'.join(forms)})(?![^\W\d_])", re.IGNORECASE), p,
-                                 p.last or (p.whole[0] if p.whole else "")))
+                                 p.last or (p.whole[0] if p.whole else ""), p.guess))
             if p.last and len(p.last) > 2 and p.last.casefold() not in self._v.stop:
                 # Mr. Mockridge; and Mockridge alone, when that's no ordinary word.  Put back as written.
                 optional = "?" if p.bare and p.last.casefold() not in _GIVEN | _WORD_SURNAMES else ""
                 particles = "".join(rf"(?:{word(x)}[ \t]+)?" for x in p.particles)
                 # not inside a key or a tag's name: "Branch" of Erin Branch isn't in <Branch_Name>
                 alone.append((re.compile(rf"(?<![^\W\d])(?:(?:{'|'.join(_HONORIFICS)})\.?[ \t]+){optional}"
-                                         rf"{particles}{word(p.last)}(?![^\W\d])", re.IGNORECASE), None, p.last))
+                                         rf"{particles}{word(p.last)}(?![^\W\d])", re.IGNORECASE), None, p.last,
+                              p.guess))
             first = p.first.casefold()
             if p.single:
-                alone.append((re.compile(rf"(?<!\w)(?-i:{word(p.first)})(?!\w)"), None, p.first))
+                alone.append((re.compile(rf"(?<!\w)(?-i:{word(p.first)})(?!\w)"), None, p.first, p.guess))
                 continue
             if p.first and p.bare and len(first) > 3 and first not in _GIVEN | _WORD_SURNAMES | self._v.not_names:
                 # Thandiwe alone: a first name that's no common one or ordinary word
-                alone.append((re.compile(rf"(?<![^\W\d_]){word(p.first)}(?![^\W\d_])", re.IGNORECASE), None, p.first))
+                alone.append((re.compile(rf"(?<![^\W\d_]){word(p.first)}(?![^\W\d_])", re.IGNORECASE), None, p.first,
+                              p.guess))
         def probe(word: str) -> str:   # its longest run of letters, as the fold writes it
             runs = re.findall(r"[^\W\d_]+", _ascii(word))
             return max(runs, key=len).casefold() if runs else ""
 
-        self._patterns = [(pattern, person, probe(word)) for pattern, person, word in patterns + alone]
+        self._patterns = [(pattern, person, probe(word), guess) for pattern, person, word, guess in patterns + alone]
         return self._patterns
 
     # -- finding it ------------------------------------------------------------
@@ -957,8 +969,12 @@ class Redactor(TaxIdRedactor):
         two or three capitalized words (that aren't the profile's words, or a business's) are taken for
         a name, and so are a common first name and surname in lower case."""
         if self._name_finder is not None and "NAME" in self._detect and text and not text.isspace():
-            for name in self._name_finder(text) or ():
-                self.add_person(name)
+            self._guessing = True
+            try:
+                for name in self._name_finder(text) or ():
+                    self.add_person(name)
+            finally:
+                self._guessing = False
         text = self._redact_personal(self._prepare(text), typed)
         return self._redact_ids(text) if self._detect & set(TAX_ID_KINDS) else text
 
@@ -1100,13 +1116,29 @@ class Redactor(TaxIdRedactor):
             known[start] = found[-1]
             return True
 
-        people = len(self._people)
+        def sure() -> int:   # the people known but for the name finder's guesses
+            return sum(not p.guess for p in self._people.values())
+
+        people = sure()
         for _ in range(2 if "NAME" in self._detect else 0):   # names found in this text are hidden wherever else it says them
             self._known_names(fold, take_known, typed)
             self._found_names(copy, fold, take, typed)
-            if len(self._people) == people:
+            if sure() == people:
                 break
-            people = len(self._people)
+            people = sure()
+        if "NAME" in self._detect:
+            # The name finder's guesses last, where nothing else is: what it says hides no less than without
+            # it ("Luigi" of "Luigi Clelia Togliatti" leaves the name found whole).  Guesses side by side are
+            # one name: "Zorblax", "Qwib" and "Vrenquist" of "Zorblax Qwib Vrenquist".
+            first = len(found)
+            self._known_names(fold, take, typed, guesses=True)
+            guessed = sorted(found[first:])
+            del found[first:]
+            for start, end, kind, key, real in guessed:
+                if found[first:] and re.fullmatch(r"[ \t]+", copy[found[-1][1]:start]):
+                    start = found.pop()[0]
+                    key, real = f"NAME:{_fold(copy[start:end])}", None
+                found.append((start, end, kind, key, real))
         scan(_LONG_NUMBER, lambda m: not (_TIMESTAMP.fullmatch(m.group()) and
                                           re.search(r":\d{2}[A-Z]?:\Z", copy[max(0, m.start() - 6):m.start()])) and
              take(m.start(), m.end(),
@@ -1330,7 +1362,8 @@ class Redactor(TaxIdRedactor):
             return take(start, start + len(value), kind, f"{kind}:{re.sub(r'[^0-9A-Za-z]', '', value).upper()}")
         return False
 
-    def _known_names(self, fold: str, take, typed: bool) -> None:
+    def _known_names(self, fold: str, take, typed: bool, guesses: bool = False) -> None:
+        """Where the people known are written; ``guesses``: the name finder's guesses, and only them."""
         low = fold.casefold()
 
         def matches(pattern: re.Pattern, word: str):
@@ -1348,8 +1381,8 @@ class Redactor(TaxIdRedactor):
                     start = pos = max(m.end(), m.start() + 1)
                 at = low.find(word, max(at + 1, pos))
 
-        for pattern, person, word in self._compiled():
-            if word and word not in low:
+        for pattern, person, word, guess in self._compiled():
+            if guess != guesses or (word and word not in low):
                 continue
             for m in matches(pattern, word):
                 if person is not None:
@@ -1365,7 +1398,8 @@ class Redactor(TaxIdRedactor):
                     continue
                 if not re.match(r"(?i:" + "|".join(_HONORIFICS) + r")\b", written):
                     before = re.search(r"([^\W\d_]+)[ \t]+\Z", fold[max(0, m.start() - 40):m.start()])
-                    if before and before.group(1)[0].isupper() and before.group(1).casefold() not in self._v.not_names:
+                    if before and before.group(1)[0].isupper() and before.group(1).casefold() not in self._v.not_names \
+                            and not guesses:   # the found names have had their turn
                         continue
                     if not written[0].isupper() and (len(written) < 4 or written.casefold() in _WORD_SURNAMES):
                         continue
