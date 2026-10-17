@@ -649,6 +649,42 @@ def test_a_known_first_name_takes_the_surname_after_it():
     assert r.restore_text(out).startswith("| First Name | Priya |\n\nLetter to Priya Natarajan,")
 
 
+@pytest.mark.parametrize("known, before", [
+    ((), ""),
+    (("Luigi",), ""),
+    (("Clelia Togliatti",), ""),
+    ((), '{"first_name": "Luigi"}\n'),   # known from a form's field
+    (("Togliatti",), "Mr. Togliatti called. "),
+])
+def test_a_longer_name_found_over_a_known_one_is_hidden_whole(known, before):
+    text = before + "Luigi Clelia Togliatti signed the agreement."
+    r = Redactor(FINANCE)
+    for name in known:
+        r.add_person(name)
+    out = r.redact_text(text)
+    assert not {"Luigi", "Clelia", "Togliatti"} & set(out.split()) and out.endswith(" signed the agreement.")
+    assert r._real[out.split()[-4]] == "Luigi Clelia Togliatti"
+    assert r.restore_text(out) == text
+
+
+def test_a_known_title_and_first_name_go_with_the_name_found_after_the_title():
+    r = Redactor(FINANCE)
+    r.add_person("Luc")
+    out = r.redact_text("Signed by Mr. Luc M. Fernandes on the day.")
+    assert out == "Signed by NAME_001 on the day."
+    assert r.restore_text(out) == "Signed by Mr. Luc M. Fernandes on the day."
+
+
+def test_a_longer_name_found_over_a_known_one_has_its_own_placeholder():
+    # one placeholder puts back one name: the known "Jane Doe" keeps hers where she's written alone
+    r = Redactor(FINANCE)
+    r.add_person("Jane Doe")
+    out = r.redact_text("Jane Doe Smith signed. Jane Doe called.")
+    assert out == "NAME_001 signed. NAME_002 called."
+    assert r.restore_text(out) == "Jane Doe Smith signed. Jane Doe called."
+    assert r.redact_text("Jane Doe called again.") == "NAME_002 called again."
+
+
 # -- a name finder's pieces of a name ---------------------------------------------------------------------
 
 @pytest.mark.parametrize("text", ["Luigi Clelia Togliatti signed the agreement.",
