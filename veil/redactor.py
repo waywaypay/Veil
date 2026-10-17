@@ -921,9 +921,14 @@ class Redactor(TaxIdRedactor):
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + re.sub(r"\D", "", m.group())))
         for pattern in _PHONES + (_TYPED_PHONES if typed else []):
             scan(pattern, lambda m: self._phone(m, take))
-        scan(_ADDRESS_LABEL, lambda m: take(m.start("value"), m.start("value") + len(re.sub(
+        # not a sentence that talks of an address ("Address: The updated system will be deployed to ...")
+        scan(_ADDRESS_LABEL, lambda m: len(re.findall(r"(?<![\w'])[a-z]+\b", re.split(r"\d", m.group("value"))[0])) < 4 and
+             take(m.start("value"), m.start("value") + len(re.sub(
             r"(?:,?[ \t]*[\[<][^\]>\n]*[\]>])+[ \t]*$", "", m.group("value"))), "ADDRESS"))
+        # "the 2010 ISDA Credit Support Annex": a year and a title, after "the"
         scan(_STREET, lambda m: not _business_after(fold, m.end(), self._v) and
+             not (re.match(r"(?:19|20)\d{2}\b", m.group()) and
+                  re.search(r"(?i)\bthe[ \t]+\Z", fold[max(0, m.start() - 6):m.start()])) and
              take(m.start(), _address_tail(copy, m.end()), "ADDRESS"))
         scan(_BOXES, lambda m: take(m.start(), m.end(), "ADDRESS"))
         scan(_CITY_STATE_ZIP, lambda m: not set(_fold(m.group("city")).split()) & _NOT_CITY and
