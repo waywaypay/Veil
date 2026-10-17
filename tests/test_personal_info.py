@@ -640,3 +640,10 @@ def test_lower_case_text_comes_back_as_written():
     text = "contact jane smith at 415-555-0134. she lives at 12 main street. the contract was signed on time."
     r = PersonalInfoRedactor()
     assert r.restore_text(r.redact_text(text)) == text
+
+
+def test_a_known_first_name_takes_the_surname_after_it():
+    r = PersonalInfoRedactor()
+    out = r.redact_text("| First Name | Priya |\n\nLetter to Priya Natarajan, and Priya Holdings LLC")
+    assert "Natarajan" not in out and "Holdings LLC" in out
+    assert r.restore_text(out).startswith("| First Name | Priya |\n\nLetter to Priya Natarajan,")

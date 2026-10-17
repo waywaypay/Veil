@@ -298,11 +298,11 @@ _NS = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
        'xmlns:v="urn:schemas-microsoft-com:vml"')
 
 
-def _docx(body, header="", footer="", footnotes="", comments=""):
-    """A .docx of the given WordprocessingML, as Word lays its parts out."""
+def _docx(body, header="", footer="", footnotes="", comments="", more=None):
+    """A .docx of the given WordprocessingML, as Word lays its parts out; ``more``: other parts, by name."""
     import zipfile
 
-    parts = {"word/document.xml": f"<w:document {_NS}><w:body>{body}</w:body></w:document>"}
+    parts = {"word/document.xml": f"<w:document {_NS}><w:body>{body}</w:body></w:document>", **(more or {})}
     if header:
         parts["word/header1.xml"] = f"<w:hdr {_NS}>{header}</w:hdr>"
     if footer:
@@ -390,3 +390,105 @@ def test_a_word_document_is_refused_by_name():
     block = {"type": "document", "source": {"type": "base64", "media_type": DOCX, "data": _b64(b"x")}}
     with pytest.raises(FileError, match="A Word document"):
         client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": [block]}])
+
+
+_CORE = ('<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+         'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Lease for Priya Natarajan</dc:title>'
+         '<dc:creator>Avery Mockridge</dc:creator><cp:lastModifiedBy>jdoe</cp:lastModifiedBy></cp:coreProperties>')
+_RELS = ('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+         '<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" '
+         'Target="mailto:avery.mockridge@example.com" TargetMode="External"/></Relationships>')
+
+
+def _word_letter():
+    box = ("<w:p><w:r><mc:AlternateContent><mc:Choice Requires='wps'><w:drawing><wps:txbx><w:txbxContent>"
+           + _p("Tenant: Wei Tan") + "</w:txbxContent></wps:txbx></w:drawing></mc:Choice><mc:Fallback><w:pict>"
+           "<v:textbox><w:txbxContent>" + _p("Tenant: Wei Tan") + "</w:txbxContent></v:textbox></w:pict>"
+           "</mc:Fallback></mc:AlternateContent></w:r></w:p>")
+    body = ("<w:p><w:r><w:t>Dear Ave</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>ry Mock</w:t></w:r>"
+            "<w:r><w:t>ridge,</w:t></w:r></w:p>"
+            + "<w:p><w:r><w:t>Phone:</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>415-555-0134</w:t></w:r></w:p>"
+            + "<w:p><w:r><w:t xml:space='preserve'>Was </w:t></w:r><w:del w:author='Avery Mockridge'><w:r>"
+              "<w:delText>Jane Roe</w:delText></w:r></w:del><w:ins w:author='Avery Mockridge'><w:r>"
+              "<w:t>the landlord</w:t></w:r></w:ins></w:p>"
+            + "<w:p><w:r><w:fldChar w:fldCharType='begin'/></w:r><w:r><w:instrText xml:space='preserve'> HYPERLINK "
+              "\"mailto:avery.mock</w:instrText></w:r><w:r><w:instrText>ridge@example.com\" </w:instrText></w:r>"
+              "<w:r><w:fldChar w:fldCharType='separate'/>"
+              "</w:r><w:r><w:t>Email me</w:t></w:r><w:r><w:fldChar w:fldCharType='end'/></w:r></w:p>"
+            + "<w:tbl><w:tr><w:tc>" + _p("SSN") + "</w:tc><w:tc>" + _p("123-45-6789") + "</w:tc></w:tr></w:tbl>"
+            + box)
+    return _docx(body, header=_p("Avery Mockridge, 1234 Main Street, Anytown, DE 12345"),
+                 comments="<w:comment w:id='0' w:author='Avery Mockridge' w:initials='AM'>"
+                          + _p("Ask Priya to sign") + "</w:comment>",
+                 more={"docProps/core.xml": _CORE, "word/_rels/document.xml.rels": _RELS,
+                       "word/_rels/settings.xml.rels": _RELS.replace("mailto:avery.mockridge@example.com",
+                                                                     "file:///C:\\Users\\jdoe\\Normal.dotm"),
+                       "word/media/image1.png": _png_bytes()})
+
+
+def _png_bytes():
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 20), "black").save(buf, "PNG")
+    return buf.getvalue()
+
+
+def _package(data):
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        return {n: z.read(n) for n in z.namelist()}
+
+
+def test_a_redacted_word_document_says_nothing_personal_anywhere_in_it():
+    from veil.files import redact_docx
+
+    parts = _package(redact_docx(_word_letter(), Redactor(FINANCE)))
+    everything = b"".join(parts.values())
+    for secret in (b"Mockridge", b"Avery", b"415-555", b"6789", b"avery.mock", b"Main Street", b"Priya",
+                   b"Natarajan", b"Wei Tan", b"Jane Roe", b"jdoe", b"w:initials"):
+        assert secret not in everything, secret
+    assert parts["word/media/image1.png"] != _png_bytes()   # a white picture in its place
+
+
+def test_a_redacted_word_document_keeps_its_runs_and_reads_as_the_redacted_text():
+    from veil.files import read_text, redact_docx
+
+    redactor = Redactor(FINANCE)
+    out = redact_docx(_word_letter(), redactor)
+    text = read_text(out, DOCX)
+    assert "Dear NAME_001," in text and "Phone:\tPHONE_001" in text and "| SSN | SSN_001 |" in text
+    assert "Was the landlord" in text and "Email me" in text and text.count("Tenant: NAME_") == 1
+    body = _package(out)["word/document.xml"].decode()
+    assert "<w:t xml:space=\"preserve\">Dear NAME_001</w:t>" in body   # in the first run, as it was
+    assert body.count("<w:b/>") == 1 and "mailto:EMAIL_001" in body
+    assert 'w:author="NAME_001"' in _package(out)["word/comments.xml"].decode()
+
+
+def test_a_redacted_word_document_comes_back_with_restore_docx():
+    from veil.files import read_text, redact_docx, restore_docx
+
+    redactor = Redactor(FINANCE)
+    original = _word_letter()
+    back = restore_docx(redact_docx(original, redactor), redactor)
+    assert read_text(back, DOCX) == read_text(original, DOCX)
+    parts = _package(back)
+    assert b"<dc:creator>Avery Mockridge</dc:creator>" in parts["docProps/core.xml"]
+    assert b"mailto:avery.mockridge@example.com" in parts["word/_rels/document.xml.rels"]
+
+
+def test_a_word_document_keeps_its_pictures_when_asked():
+    from veil.files import redact_docx
+
+    assert _package(redact_docx(_word_letter(), pictures="keep"))["word/media/image1.png"] == _png_bytes()
+    with pytest.raises(ValueError, match="pictures"):
+        redact_docx(_word_letter(), pictures="hide")
+
+
+def test_a_file_embedded_in_a_word_document_is_refused():
+    from veil.files import redact_docx
+
+    data = _docx(_p("Name: Avery Mockridge"), more={"word/embeddings/oleObject1.bin": b"\xd0\xcf\x11\xe0"})
+    with pytest.raises(ValueError, match="oleObject1.bin"):
+        redact_docx(data)

@@ -76,11 +76,19 @@ def header_footer(text, seed):
 
 _BOX = """<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
   xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
-  xmlns:v="urn:schemas-microsoft-com:vml"><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wps:txbx>
-  <w:txbxContent><w:p><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:p></w:txbxContent></wps:txbx></w:drawing>
-  </mc:Choice><mc:Fallback><w:pict><v:textbox><w:txbxContent><w:p><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:p>
-  </w:txbxContent></v:textbox></w:pict></mc:Fallback></mc:AlternateContent></w:r>"""
+  xmlns:v="urn:schemas-microsoft-com:vml"><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>
+  <wp:inline><wp:extent cx="5486400" cy="914400"/><wp:docPr id="{id}" name="Text Box {id}"/><a:graphic>
+  <a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp>
+  <wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="914400"/></a:xfrm>
+  <a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r>
+  <w:t xml:space="preserve">{text}</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr><a:spAutoFit/></wps:bodyPr>
+  </wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing></mc:Choice><mc:Fallback><w:pict>
+  <v:shape style="width:432pt;height:72pt"><v:textbox style="mso-fit-shape-to-text:t"><w:txbxContent><w:p><w:r>
+  <w:t xml:space="preserve">{text}</w:t></w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback>
+  </mc:AlternateContent></w:r>"""
 
 
 def text_boxes(text, seed):
@@ -92,7 +100,7 @@ def text_boxes(text, seed):
     for n, line in enumerate(text.split("\n")):
         p = doc.add_paragraph()
         if n % 3 == 1 and line.strip():
-            p._p.append(etree.fromstring(_BOX.format(escape(line), escape(line))))
+            p._p.append(etree.fromstring(_BOX.format(id=n + 1, text=escape(line))))
         else:
             _runs(p, line, rnd)
     return _save(doc)

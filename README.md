@@ -118,6 +118,39 @@ Only `files="send"` lets such a file through.
 Outside the wrapper, `veil.files.read_text(data, media_type)` gives you the
 text to pass to `redact_text` yourself.
 
+### A redacted Word document
+
+`veil.files.redact_docx` writes the Word document itself back with its
+personal details replaced, so it can be shared or sent where only a file
+will do. The formatting, tables, headers, comments and layout stay as they
+were:
+
+```python
+from veil.files import redact_docx, restore_docx
+
+r = Redactor()
+safe = redact_docx(open("lease.docx", "rb").read(), r)   # bytes of a .docx: "Dear NAME_001," ...
+back = restore_docx(edited, r)                            # an edited copy, with the real names again
+```
+
+The text is redacted as `read_text` reads it, all at once, so a name a form
+gives is hidden everywhere the document says it. Each placeholder goes where
+the text it hides was, in that text's first run, so it keeps the formatting.
+Also hidden:
+
+* who wrote the document, its comments and tracked changes, and the
+  initials Word keeps for them;
+* field codes (`HYPERLINK "mailto:..."`) and link addresses;
+* a picture's alt text;
+* the document's title, subject and keywords.
+
+Tracked deletions are accepted. Each picture (a signature, a pasted scan,
+the thumbnail) becomes a blank white one, since veil can't read what a
+picture shows; pass `pictures="keep"` to leave them as they are. A file
+embedded in the document, such as a spreadsheet or a PDF, makes
+`redact_docx` raise `ValueError`, since veil can't redact inside it. The one
+exception is a chart's own data: that is left out, and the chart stays.
+
 ## Use it with anything else
 
 ```python

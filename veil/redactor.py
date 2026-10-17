@@ -1342,6 +1342,12 @@ class Redactor(TaxIdRedactor):
                         continue
                     if not written[0].isupper() and (len(written) < 4 or written.casefold() in _WORD_SURNAMES):
                         continue
+                # "Priya" known, then "Priya Natarajan": the surname after it goes with it
+                after = re.match(r"[ \t]+([A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?![\w'-])", fold[m.end():m.end() + 40])
+                if after and written[0].isupper() and after.group(1).casefold() not in self._v.not_names and \
+                        not _business_after(fold, m.end() + after.end(), self._v, typed) and \
+                        take(m.start(), m.end() + after.end(), "NAME"):
+                    continue
                 take(m.start(), m.end(), "NAME")
 
     # -- names it finds --------------------------------------------------------
