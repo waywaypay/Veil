@@ -96,6 +96,9 @@ def reflow(data: dict) -> str:
     # the text's right margin: most lines that run full end there (one overlong line doesn't move it)
     ends = sorted(max(left + width for left, _, width, _, _ in words) for words in ordered)
     right = ends[int(0.95 * (len(ends) - 1))] if len(ends) >= 5 else ends[-1]
+    # and in letters, for a page wrapped by its letters' count rather than their width
+    counts = sorted(len(" ".join(w for *_, w in words)) for words in ordered)
+    longest = counts[int(0.95 * (len(counts) - 1))] if len(counts) >= 5 else counts[-1]
     out, prev = [], None
     for key, words in zip(sorted(lines), ordered):
         text = " ".join(w for *_, w in words)
@@ -106,7 +109,10 @@ def reflow(data: dict) -> str:
             prev_bottom = max(y + h for _, y, _, h, _ in prev_words)
             char = sum(w for _, _, w, _, _ in prev_words) / max(1, sum(len(t) for *_, t in prev_words))
             line_height = max(h for _, _, _, h, _ in prev_words)
-            wrapped = right - prev_right < width + 2.5 * char and top - prev_bottom < 1.8 * line_height and \
+            prev_text = " ".join(w for *_, w in prev_words)
+            full = right - prev_right < width + 2.5 * char or \
+                (len(prev_text) >= 0.8 * longest and len(prev_text) + 1 + len(words[0][4]) > longest)
+            wrapped = full and top - prev_bottom < 1.8 * line_height and \
                 abs(left - min(x for x, *_ in prev_words)) < 4 * char and \
                 not re.match(r"[-*\u2022]|\d{1,2}[.)]|[A-Z][\w ]{0,30}:", text) and not prev_words[-1][4].endswith(":")
             if wrapped:
@@ -248,6 +254,11 @@ def _tidy_names(text: str) -> str:
                   lambda m: m.group(1) + " " if given(m.group(1)) and (known(m.group(2)) or m.group(2).casefold() in
                                                                         _common_surnames()) else m.group(), text)
     text = re.sub(r"(?<=\b(?:Mr|Ms|Dr))\.?:[ ]?(?=[A-Z])|(?<=\bMrs)\.?:[ ]?(?=[A-Z])", ". ", text)  # Mr.:Smith
+    # Tiziano Paolo loppi: an I read as an l, starting the surname after a first name
+    text = re.sub(r"\b([A-Z][a-z]{2,}[ ](?:[A-Z][a-z]{2,}[ ])?)l([a-z]{3,})\b",
+                  lambda m: m.group(1) + "I" + m.group(2) if given(m.group(1).split()[0]) and
+                  ("l" + m.group(2)) not in _common_words() else m.group(), text)
+    text = re.sub(r"\b([A-Z][a-z]{2,} )\|\.(?= [A-Z][a-z])", r"\1I.", text)                 # Insa |. Salz
     text = re.sub(r"(?<=[a-z])[\u2018\u2019'](?=[ ]?[A-Z](?:[a-z]|\.))", "", text)            # Emil' Winkler
     text = re.sub(r"(?<=[a-z])-[ ]+-?(?=[A-Z][a-z])|(?<=[a-z])[ ]+-[ ]?-(?=[A-Z][a-z])", "-", text)   # Payne- -Gilbert
     text = re.sub(r"\bj([a-z]{2,})\b(?=[ ,.]+[A-Z]|,)", lambda m: "J" + m.group(1) if given("J" + m.group(1)) else
@@ -273,8 +284,16 @@ def _tidy(text: str) -> str:
         domain = re.sub(r"\.c(?:orn|orm|om[nr])$", ".com", re.sub(_DOTS, ".", m.group(2)))   # .corn: rn for m
         return _unaccent(f"{re.sub(_DOTS, '.', m.group(1))}@{domain}")
 
+    text = text.replace("\u201c", '"').replace("\u201d", '"')   # curly quotes, as OCR reads a JSON's or a CSV's
     text = _tidy_labels(text)
     text = _BROKEN_EMAIL.sub(email, text)
+    # Stra\u00dfe read StraBe, StraRe, Strake: its \u00df
+    text = re.sub(r"(?<=[A-Za-z\u00c0-\u024f-])([Ss])tra(?:B|R|k|&|8)e\b", "\\1tra\u00dfe", text)
+    # SE1 12Z, RHSW 5RQ: a UK postcode with a 2 for a Z, an S for a 5
+    text = re.sub(r"\b([A-Z]{1,2}\d[A-Z\d]?) (\d)([A-Z2])([A-Z2])\b",
+                  lambda m: f"{m.group(1)} {m.group(2)}{m.group(3).replace('2', 'Z')}{m.group(4).replace('2', 'Z')}"
+                  if "2" in m.group(3) + m.group(4) and m.group(3) + m.group(4) != "22" else m.group(), text)
+    text = re.sub(r"\b([A-Z]{2})S([A-Z]?) (\d[A-Z]{2})\b", r"\g<1>5\2 \3", text)
     # 67.240. Nolan Junction: a street's number with a dot in it
     text = re.sub(rf"(?<![\w.,$])(\d{{1,3}})\.(\d{{3}})\.?[ ]?(?=(?:[A-Z][\w'-]+[ ]){{1,3}}(?:{'|'.join(_SUFFIXES)})\b)",
                   r"\1\2 ", text)

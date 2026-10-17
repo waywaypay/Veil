@@ -236,6 +236,16 @@ def test_reflow_joins_the_lines_a_page_wrapped_and_keeps_a_forms_lines():
     ("Dear josephine M, Miller,", "Dear Josephine M. Miller,"),
     ("appointed Leoriard Leigh Rowe as", "appointed Leonard Leigh Rowe as"),
     ("Vancouver, BC, V6B.1C3", "Vancouver, BC, V6B 1C3"),
+    ("at [support@mobilem\u00e9ney,.com](mailto", "at [support@mobilemeney.com](mailto"),
+    ("mike.johnson@email.corn here", "mike.johnson@email.com here"),
+    ('"Robinson-Patel","67.240. Nolan Junction, Suite 509"', '"Robinson-Patel","67240 Nolan Junction, Suite 509"'),
+    ("Suite 300; Anytown,:AB T1Y 2B3", "Suite 300; Anytown, AB T1Y 2B3"),
+    ("at Eleonore-Krebs-StraBe 6, Munich", "at Eleonore-Krebs-Stra\u00dfe 6, Munich"),
+    ("London, UK\n\nSE1 12Z\n", "London, UK\n\nSE1 1ZZ\n"),
+    ("Landing, RHSW 5RQ, South", "Landing, RH5W 5RQ, South"),
+    ("Dear Mr. Tiziano Paolo loppi,", "Dear Mr. Tiziano Paolo Ioppi,"),
+    ("Dear Insa |. Salz,", "Dear Insa I. Salz,"),
+    ("\u201clast_name\u201d: \u201cSmith\u201d", '"last_name": "Smith"'),
 ])
 def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
     from veil.files import _tidy
@@ -245,6 +255,7 @@ def test_ocr_misreadings_around_personal_details_are_mended(ocr, tidy):
 @pytest.mark.parametrize("text", [
     "1. Introduction", "We hired John. The team grew.", "Meeting at 10:30 Monday", "See www.Example.com",
     "Total: 1,234.56 at 2021.09.01", "We sold 500 Apple Pies, and", "<phone>819.496.2354</phone>", "Note: Payment due",
+    "Maria lives here", "John loves it", "costs 1.240 Euro", "Big Strake", "Code AB12 322 here",
 ])
 def test_ocr_tidying_leaves_ordinary_text_alone(text):
     from veil.files import _tidy
