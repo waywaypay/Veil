@@ -259,7 +259,9 @@ has no title or label before it. Pass a `name_finder` (any function from text
 to a list of names) to close that gap. Each name it returns gets every variant spelling covered,
 like names given to `add_person`, and is hidden wherever nothing else already is, so a finder can
 only add to what's hidden: one that returns a name in pieces ("Luigi", then "Togliatti") leaves
-"Luigi Clelia Togliatti" whole.
+"Luigi Clelia Togliatti" whole. `benchmarks/model.md` tests small span taggers (GLiNER models,
+45M to 570M parameters, on a CPU) beside veil, off the shelf and trained for it, on 20 test sets
+and on real AI chats.
 
 ## A second check: a guardrail
 
