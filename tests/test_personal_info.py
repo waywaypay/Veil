@@ -599,6 +599,18 @@ def test_a_name_stops_at_the_period_ending_its_sentence():
     assert hidden("Thank you, Mar\u00eda \u00c1ngeles. I've verified your account.") == ["Mar\u00eda \u00c1ngeles"]
 
 
+def test_a_contraction_is_no_part_of_a_name():
+    # a support chat in Gretel's English test split: "Camille, I've" read as a name turned round, put back as
+    # "I've Camille"; then, with that surname known, "I'm" hidden as a later "Camille Adam"'s first name
+    text = ("Customer: Hello, I'm Camille Adam.\nSupport Agent: Camille, I've reviewed the website.\n"
+            "Customer: Hi, I'm Camille Adam, customer")
+    r = PersonalInfoRedactor()
+    out = r.redact_text(text)
+    assert out == ("Customer: Hello, I'm NAME_001.\nSupport Agent: NAME_002, I've reviewed the website.\n"
+                   "Customer: Hi, I'm NAME_001, customer")
+    assert r.restore_text(out) == text
+
+
 def test_a_surname_isnt_hidden_inside_a_tag_s_name():
     out = PersonalInfoRedactor().redact_text("<Branch_Name>New Erin Branch</Branch_Name>")
     assert out.startswith("<Branch_Name>") and out.endswith("</Branch_Name>")
