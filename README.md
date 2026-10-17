@@ -257,7 +257,9 @@ ENABLE word list decides). That works well on forms, statements, messages and st
 data. In free-flowing prose, though, it misses a name that's on no list and
 has no title or label before it. Pass a `name_finder` (any function from text
 to a list of names) to close that gap. Each name it returns gets every variant spelling covered,
-like names given to `add_person`.
+like names given to `add_person`, and is hidden wherever nothing else already is, so a finder can
+only add to what's hidden: one that returns a name in pieces ("Luigi", then "Togliatti") leaves
+"Luigi Clelia Togliatti" whole.
 
 ## A second check: a guardrail
 
