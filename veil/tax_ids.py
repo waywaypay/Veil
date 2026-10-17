@@ -184,6 +184,8 @@ def _joins(gap: str) -> bool:
     if not gap or len(gap) > 10 or gap.count("\n") > 2 or any(c in _MONEY for c in gap):
         return False
     marks = gap.replace(" ", "").replace("\n", "")
+    if ":" in marks:
+        return False   # a field's tag between them, as SWIFT writes ":64:/130929"
     return len(marks) <= 6 and len(gap.replace("\n", "")) <= 8 and not any(c.isalnum() for c in marks)
 
 

@@ -508,6 +508,8 @@ _IBAN = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?:[ ]?[A-Za-z0-9]{4}){2,7}
                    r"(?![A-Za-z0-9])")
 _CARD = re.compile(r"(?<![\d.,$])(?:\d{4}([ -])\d{4}\1\d{4}\1\d{3,4}(?:\1\d{1,3})?|\d{4}([ -])\d{6}\2\d{5})"
                    rf"{_END}")
+# A date and a time written as one number, as a SWIFT field has it (":32A:20210311120000"): no ID
+_TIMESTAMP = re.compile(r"(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:[01]\d|2[0-3])[0-5]\d(?:[0-5]\d(?:\d{1,6})?)?")
 _LONG_NUMBER = re.compile(rf"(?<![\d.,$])\d{{11,24}}{_END}")
 
 _APOSTROPHES = "\u2019\u2018\u02bc`\u00b4\u2032"
@@ -833,8 +835,9 @@ class Redactor(TaxIdRedactor):
                 # Mr. Mockridge; and Mockridge alone, when that's no ordinary word.  Put back as written.
                 optional = "?" if p.bare and p.last.casefold() not in _GIVEN | _WORD_SURNAMES else ""
                 particles = "".join(rf"(?:{word(x)}[ \t]+)?" for x in p.particles)
-                alone.append((re.compile(rf"(?<![^\W\d_])(?:(?:{'|'.join(_HONORIFICS)})\.?[ \t]+){optional}"
-                                         rf"{particles}{word(p.last)}(?![^\W\d_])", re.IGNORECASE), None))
+                # not inside a key or a tag's name: "Branch" of Erin Branch isn't in <Branch_Name>
+                alone.append((re.compile(rf"(?<![^\W\d])(?:(?:{'|'.join(_HONORIFICS)})\.?[ \t]+){optional}"
+                                         rf"{particles}{word(p.last)}(?![^\W\d])", re.IGNORECASE), None))
             first = p.first.casefold()
             if p.single:
                 alone.append((re.compile(rf"(?<!\w)(?-i:{word(p.first)})(?!\w)"), None))
@@ -949,7 +952,9 @@ class Redactor(TaxIdRedactor):
             if len(self._people) == known:
                 break
             known = len(self._people)
-        scan(_LONG_NUMBER, lambda m: take(m.start(), m.end(),
+        scan(_LONG_NUMBER, lambda m: not (_TIMESTAMP.fullmatch(m.group()) and
+                                          re.search(r":\d{2}[A-Z]?:\Z", copy[max(0, m.start() - 6):m.start()])) and
+             take(m.start(), m.end(),
                                           *(("ACCOUNT", f"ACCOUNT:{m.group()}") if len(m.group()) >= 13 and
                                             _luhn(m.group()) else ("ID", f"ID:{m.group()}"))))
         if not found:
