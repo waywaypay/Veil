@@ -267,6 +267,8 @@ _DOB_NEAR = re.compile(rf"(?<![^\W\d_])(?i:{_DOB_LABEL})(?P<gap>(?:(?!\.\s|\d)[^
 # A UK National Insurance number: two letters, three pairs of digits, a letter.
 _NI_NUMBER = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2}[ ]?\d{2}[ ]?\d{2}[ ]?\d{2}[ ]?[A-Z](?![A-Za-z0-9])")
 # An SSN with all but its last four digits masked: ***-**-1234
+# A Swedish or Danish personal number: the birth date, a dash or a plus, four digits (811217-8701)
+_PERSONNUMMER = re.compile(r"(?<![\w-])(?:19|20)?\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-+]\d{4}(?![\w-])")
 _MASKED_SSN = re.compile(r"(?<![\w*])(?:\*{3,4}|X{3}|x{3})-(?:\*{2}|X{2}|x{2})-\d{4}(?!\d)")
 # A card or account number a few words after its label: "the credit card number on file is 3495-4026-3400-406"
 _ACCOUNT_NEAR = re.compile(
@@ -904,6 +906,11 @@ class Redactor(TaxIdRedactor):
         if "ID" in self._detect:
             scan(_NI_NUMBER, lambda m: take(m.start(), m.end(), "ID", "ID:" + m.group().replace(" ", "")))
         scan(_MASKED_SSN, lambda m: take(m.start(), m.end(), "SSN", "SSN:" + m.group()))
+        if "ID" in self._detect:
+            scan(_PERSONNUMMER, lambda m: not re.search(
+                r"(?i)(?:invoice|order|ref(?:erence)?|po|batch|lot|ticket|case|no|number|\#)\W{0,3}\Z",
+                fold[max(0, m.start() - 14):m.start()]) and
+                take(m.start(), m.end(), "ID", "ID:" + re.sub(r"\D", "", m.group())))
         scan(_LABELLED, lambda m: self._labelled(m, take, fold))
         scan(_DOB_NEAR, lambda m: take(m.start("value"), m.end("value"), "DOB"))
         if "ID" in self._detect:
