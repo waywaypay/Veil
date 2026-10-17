@@ -684,3 +684,48 @@ def test_a_name_finder_s_pieces_still_hide_a_name_the_word_lists_miss():
     r = Redactor(FINANCE, name_finder=lambda t: ["Zorblax", "Qwib", "Vrenquist"])
     out = r.redact_text(text)
     assert out == "CEO NAME_001 met the board." and r.restore_text(out) == text
+
+
+# -- a name known as one word ------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("known, text, name", [
+    ("Rubén", "Dear Consuelo Rubén R. Camacho,\n\nWe hope", "Consuelo Rubén R. Camacho"),
+    ("Camille", "Customer: Hello, I'm Camille Adam, customer ID 4.", "Camille Adam"),
+    ("Flavia", "The insured person under this Policy is Virginie Flavia Elvira Zacco, with a mailing address",
+     "Virginie Flavia Elvira Zacco"),
+    ("Götz", "for the tax year 2022 for Alwin Götz G. Wohlgemut, the proprietor", "Alwin Götz G. Wohlgemut"),
+    ("Baptist", "Full Legal Name: Uwe Baptist H. Trüb\nDate: March 15, 2023", "Uwe Baptist H. Trüb"),
+    ("Napoleone", "is entered into between Roy Napoleone Lucrezia Terragni, a natural person",
+     "Roy Napoleone Lucrezia Terragni"),
+    ("William", "How can I assist you today? | Hello, I'm William Matthews. I'm interested", "William Matthews"),
+    ("Adamo", "the folder related to Project XY Adamo Rosario Giannelli.\n\n**Project:** Project XYZ",
+     "Adamo Rosario Giannelli"),
+])
+def test_a_name_known_as_one_word_doesnt_cut_short_the_name_it_starts_or_is_in(known, text, name):
+    # a one-word name is a known surname, but may be a first or a middle name: the name goes on past it
+    r = Redactor(FINANCE)
+    r.add_person(known)
+    out = r.redact_text(text)
+    assert out == Redactor(FINANCE).redact_text(text) == text.replace(name, "NAME_001")
+    assert r.mapping == {"NAME_001": name} and r.restore_text(out) == text
+
+
+def test_a_one_word_field_s_name_doesnt_cut_short_the_name_it_starts():
+    text = '{"first_name": "Camille"}\nCustomer: Hello, I\'m Camille Adam, customer ID 4.'
+    r = Redactor(FINANCE)
+    out = r.redact_text(text)
+    assert out == '{"first_name": "NAME_001"}\nCustomer: Hello, I\'m NAME_002, customer ID 4.'
+    assert r.mapping == {"NAME_001": "Camille", "NAME_002": "Camille Adam"} and r.restore_text(out) == text
+
+
+@pytest.mark.parametrize("text, name", [
+    ("Signed by Qwib Okonkwo today.", "Qwib Okonkwo"),   # found only once Okonkwo is known
+    ("Signed by Thandiwe Okonkwo today.", "Thandiwe Okonkwo"),
+    ("Thandiwe Okonkwo Adeyemi signed the form.", "Thandiwe Okonkwo Adeyemi"),
+    ("Best regards,\nThandiwe Okonkwo\nChief Financial Officer", "Thandiwe Okonkwo"),
+])
+def test_a_surname_known_as_one_word_still_ends_the_name_before_it(text, name):
+    r = Redactor(FINANCE)
+    r.add_person("Okonkwo")
+    out = r.redact_text(text)
+    assert out == text.replace(name, "NAME_001") and r.restore_text(out) == text
