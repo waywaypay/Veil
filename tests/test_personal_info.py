@@ -579,9 +579,14 @@ def test_a_name_found_alone_is_hidden_wherever_else_it_is_written():
     "BAI2\n:9\n:100\n:1\n:1\n:1\n:2\n:2\n:1\n:1\n:1\n:2\n:1", ":64:/130929USD0.00\n:65:/130929USD0.00",
     ":32A:20210311120000\n:33B", "in the 2010 ISDA Credit Support Annex (the \"CSA\")",
     "Proof of Address: A recent utility bill or bank statement showing your name and the street address",
+    "BAISET,001,20220222,000001,C,000000001,Checking,Active,123456.78,0,0,0,0,0,0,0,0,0,0,0,0,0",
 ])
 def test_what_the_third_gretel_round_hid_by_mistake(text):
     assert hidden(text) == []
+
+
+def test_a_name_stops_at_the_period_ending_its_sentence():
+    assert hidden("Thank you, Mar\u00eda \u00c1ngeles. I've verified your account.") == ["Mar\u00eda \u00c1ngeles"]
 
 
 def test_a_surname_isnt_hidden_inside_a_tag_s_name():

@@ -359,6 +359,8 @@ class TaxIdRedactor:
         if any(g.money for g in run):   # an amount or a date, even one whose digits match a number caught
             return None
         known = self._known(digits)
+        if known and digits not in self._by_digits and len(set(digits)) == 1:
+            known = False   # 000000000 is one digit off 000000001, but no number
         lookalikes = sum(g.lookalikes for g in run)
         # A comma is a weak separator, like a space: in a CSV row "20,1250000" is a box and an amount.
         punct = all(j.strip(" \n,") for j in joins)
@@ -385,6 +387,8 @@ class TaxIdRedactor:
         if len(digits) == 9:
             if digits.endswith("0000") and sizes != (3, 2, 4) and sizes != (2, 7):
                 return None   # no SSN ends in 0000: a round amount such as 125000000
+            if digits.startswith("00") and not near(_LABEL_BEFORE, _LABEL_AFTER):
+                return None   # no SSN, EIN or ITIN starts 00: a counter such as 000000001
             if sizes in ((9,), (3, 2, 4)):
                 return ("SSN" if sizes == (3, 2, 4) else "TIN"), 80, dashed and sizes == (3, 2, 4)
             if sizes == (2, 7):

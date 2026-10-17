@@ -929,9 +929,11 @@ class Redactor(TaxIdRedactor):
         for pattern in _PHONES + (_TYPED_PHONES if typed else []):
             scan(pattern, lambda m: self._phone(m, take))
         # not a sentence that talks of an address ("Address: The updated system will be deployed to ...")
+        # and up to a comma before words in lower case ("..., Apt. 42875, was also verified")
         scan(_ADDRESS_LABEL, lambda m: len(re.findall(r"(?<![\w'])[a-z]+\b", re.split(r"\d", m.group("value"))[0])) < 4 and
              take(m.start("value"), m.start("value") + len(re.sub(
-            r"(?:,?[ \t]*[\[<][^\]>\n]*[\]>])+[ \t]*$", "", m.group("value"))), "ADDRESS"))
+                 r"(?:,?[ \t]*[\[<][^\]>\n]*[\]>])+[ \t]*$", "",
+                 re.split(r"(?<=\d),[ \t]+(?=[a-z]{2,}[ \t]+[a-z])", m.group("value"))[0])), "ADDRESS"))
         # "the 2010 ISDA Credit Support Annex": a year and a title, after "the"
         scan(_STREET, lambda m: not _business_after(fold, m.end(), self._v) and
              not (re.match(r"(?:19|20)\d{2}\b", m.group()) and
@@ -1263,8 +1265,9 @@ class Redactor(TaxIdRedactor):
                 # a surname may end a sentence ("Dr. Ahmed Khan."); an initial with a period is a middle
                 if fits(k) and (not toks[k].dot or (toks[k].case != "initial" and len(toks[k].word) > 2)):
                     ends.append(k)
-                if not (toks[k].case == "initial" or name_word(k, None if mixed else case)) or not near(k):
-                    break
+                if not (toks[k].case == "initial" or name_word(k, None if mixed else case)) or not near(k) or \
+                        (toks[k].dot and toks[k].case != "initial" and len(toks[k].word) > 2):
+                    break   # no name goes on past a period ending a sentence ("María Ángeles. I've")
                 k += 1
             if not ends:
                 return None
@@ -1439,7 +1442,7 @@ class Redactor(TaxIdRedactor):
                     f not in _PLACES and (f in _GIVEN or (f in _given_names() and not _wordlike(f) and
                                                           f not in _common_words()))
             if first_name(i) and i + 2 < len(toks) and first_name(i + 1) and near(i + 1) and \
-                    toks[i + 2].case == "title" and len(toks[i + 2].word) > 2 and \
+                    toks[i + 2].case == "title" and len(toks[i + 2].word) > 2 and "'" not in toks[i + 2].word and \
                     toks[i + 2].fold not in self._v.not_surnames and toks[i + 2].fold not in _PLACES and \
                     not (i + 3 < len(toks) and near(i + 2) and toks[i + 3].case in ("title", "caps")) and ok(i, i + 2):
                 return found(i, i + 2, t.word, [toks[i + 1].word], toks[i + 2].word, True)
