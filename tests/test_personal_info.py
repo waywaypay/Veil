@@ -534,3 +534,56 @@ def test_what_the_second_gretel_round_found(text, expected):
 ])
 def test_what_the_second_gretel_round_hid_by_mistake(text):
     assert hidden(text) == []
+
+
+@pytest.mark.parametrize("text, expected", [
+    # the third round on Gretel's synthetic financial documents
+    ("(hereinafter \"Lender\"), and Leone Toselli, an individual", ["Leone Toselli"]),
+    ("Beneficiary: Jane Doe (Spouse)\nPolicy", ["Jane Doe"]),
+    ("Shipper:\nCharlie G. Pearce\n", ["Charlie G. Pearce"]),
+    ("Report Prepared by:\nCalixta Valls\nCompliance Officer", ["Calixta Valls"]),
+    ("Of course, my last name is Verdú, and my", ["Verdú"]),
+    ("Customer: Hello, I'm Jesús. I'm interested", ["Jesús"]),
+    ("we project that Gustavo G. Cases' business will", ["Gustavo G. Cases"]),
+    ("such as that of Julius Rosalinde Killer residing at", ["Julius Rosalinde Killer"]),
+    ("5. **Update Margaret:** Notify Margaret about it", ["Margaret"]),
+    ("Last Name: Begum\n", ["Begum"]),
+    ("Engelbert Heß is here", ["Engelbert Heß"]),
+    ('{"name_first": "MARTINE", "name_last": "MARQUES"}', ["MARTINE", "MARQUES"]),
+    ("Name: Gonzalo T\n", ["Gonzalo T"]),
+    ("who resides at 548 Gerald Gateway, Suite 816. The credit card", ["548 Gerald Gateway, Suite 816"]),
+    ("reached at [2265 Carrie Pines, Port Justin] for", ["2265 Carrie Pines, Port Justin"]),
+    (":86:Rambla de Nilo Casas 355\n", ["Rambla de Nilo Casas 355"]),
+    ("registered address at rue de Bonnet.\n", ["rue de Bonnet"]),
+    ("Reimar Manuel Gude\n887 Simon Cliff, 28346\nClineville\n\nThank you", ["Reimar Manuel Gude", "887 Simon Cliff, 28346\nClineville"]),
+    ("| 93 Incrocio Cecilia, Apt. 80 |", ["93 Incrocio Cecilia, Apt. 80"]),
+    ("- Phone: (+1) 555-123-4567\n", ["(+1) 555-123-4567"]),
+    ("Contact Number: 0712345678\n", ["0712345678"]),
+    ("Emergency contact: +1 800 111 2222\n", ["+1 800 111 2222"]),
+    ("Tel: (+44) 151-123-4567\n", ["(+44) 151-123-4567"]),
+    ("whose phone number is 0682580174 and", ["0682580174"]),
+    ("by credit card (3786-7537-5271-590) or", ["3786-7537-5271-590"]),
+])
+def test_what_the_third_gretel_round_found(text, expected):
+    assert hidden(text) == expected
+
+
+def test_a_name_found_alone_is_hidden_wherever_else_it_is_written():
+    out = PersonalInfoRedactor().redact_text("5. **Update Margaret:** Notify Margaret about it")
+    assert "Margaret" not in out
+
+
+@pytest.mark.parametrize("text", [
+    "The API Key is", "Port of Discharge: Oakland, CA, USA", "visited John F. Kennedy Airport",
+    "I rue the day", "Covid19 Green Way", "Checking,Active,123456.78,0,0,0,0,0,0,0,0,0,0,0,0",
+    "BAI2\n:9\n:100\n:1\n:1\n:1\n:2\n:2\n:1\n:1\n:1\n:2\n:1", ":64:/130929USD0.00\n:65:/130929USD0.00",
+    ":32A:20210311120000\n:33B", "in the 2010 ISDA Credit Support Annex (the \"CSA\")",
+    "Proof of Address: A recent utility bill or bank statement showing your name and the street address",
+])
+def test_what_the_third_gretel_round_hid_by_mistake(text):
+    assert hidden(text) == []
+
+
+def test_a_surname_isnt_hidden_inside_a_tag_s_name():
+    out = PersonalInfoRedactor().redact_text("<Branch_Name>New Erin Branch</Branch_Name>")
+    assert out.startswith("<Branch_Name>") and out.endswith("</Branch_Name>")
