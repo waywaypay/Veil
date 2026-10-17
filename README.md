@@ -216,7 +216,9 @@ ENABLE word list decides). That works well on forms, statements, messages and st
 data. In free-flowing prose, though, it misses a name that's on no list and
 has no title or label before it. Pass a `name_finder` (any function from text
 to a list of names) to close that gap. Each name it returns gets every variant spelling covered,
-like names given to `add_person`.
+like names given to `add_person`. `benchmarks/model.md` tests small span taggers (GLiNER models,
+45M to 570M parameters, on a CPU) beside veil, off the shelf and trained for it, on 20 test sets
+and on real AI chats.
 
 ## A second check: a guardrail
 
