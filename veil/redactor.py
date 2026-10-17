@@ -202,6 +202,8 @@ _AFTER_CUES = (r",?[ \t]+(?i:ttee|trustee|custodian|cust|executor|executrix)\b",
 
 # A word: letters, with apostrophes (O'Brien, but not a possessive 's) and hyphens inside.
 _TOKEN = re.compile(r"[^\W\d_]+(?:'(?![sS](?![^\W\d_]))[^\W\d_]+)*(?:-[^\W\d_]+)*")
+# A contraction, no name: You're, I've, I'm, don't.
+_CONTRACTION = re.compile(r"'(?:re|ve|m|d|ll|t)$")
 _NAME_GAP = re.compile(r"[ \t_]{1,3}")
 _COMMA_GAP = re.compile(r",[ \t]{1,2}")
 _LIST_GAP = re.compile(r"(?:[ \t]*\([^()\n]{1,12}\))?(?:,[ \t]{1,2}(?:(?:and|&)[ \t]+)?|[ \t]+(?:and|&)[ \t]+)",
@@ -1485,9 +1487,9 @@ class Redactor(TaxIdRedactor):
             return _NAME_GAP.fullmatch(gap) is not None or (gap == "" and toks[a].case == "initial" and toks[a].dot)
 
         def name_word(j: int, case: str | None = None) -> bool:
-            s = toks[j]
+            s = toks[j]   # no contraction: "Camille, I've reviewed", "Agent Smith. I'm here"
             return (s.case == case if case else s.case in ("title", "caps")) and len(s.word) > 1 and \
-                s.fold not in self._v.not_surnames
+                s.fold not in self._v.not_surnames and not _CONTRACTION.search(s.fold)
 
         def rest(j: int, case: str, mixed: bool, test, longer: bool):
             """After a first name at token j - 1: middles (initials or names) and particles, then a surname
@@ -1542,6 +1544,8 @@ class Redactor(TaxIdRedactor):
             return _Found(a, b, key, display,
                           _Person(key, display, first, middles, last, bare=True) if remember else None)
 
+        if _CONTRACTION.search(t.fold):
+            return None   # a contraction starts no name: "I'm Camille Adam" once an Adam is known
         # Dr. Avery Mockridge: the name, the title left as it is.  Mr. Mockridge: both.
         if t.fold in _HONORIFICS and t.case in ("title", "caps") and near(i):
             j = i + 1
@@ -1594,10 +1598,9 @@ class Redactor(TaxIdRedactor):
             capitalized words (a heading), and not the start of a business's name."""
             if t.case not in ("title", "caps") or len(t.word) < 2 or t.fold in self._v.not_names or \
                     t.fold in _PLACES or (t.case == "caps" and not cued) or \
-                    re.search(r"'(?:re|ve|m|d|ll|t)$", t.fold) or \
                     (len(t.word) < 3 and t.fold not in _GIVEN) or \
                     (re.match(r"[^\W_]", fold[t.end:t.end + 1]) and t.start and re.match(r"[^\W_]", fold[t.start - 1])):
-                return None   # a contraction (You're), a fragment of a code (5Au4), a place
+                return None   # a fragment of a code (5Au4), a place
             # "Last Name: Hill", "the last name is Tan": after a label that says it's a person's name, any
             # capitalized word ending the field or the sentence but a stop word
             strong = cued and t.case in ("title", "caps") and t.fold not in self._v.stop and \
