@@ -609,6 +609,13 @@ def test_a_contraction_is_no_part_of_a_name():
     assert out == ("Customer: Hello, I'm NAME_001.\nSupport Agent: NAME_002, I've reviewed the website.\n"
                    "Customer: Hi, I'm NAME_001, customer")
     assert r.restore_text(out) == text
+    # another: "Smith. I'm" read as a first name and surname after a title, and that surname put before the next name
+    text = ("[Agent Smith] Hello, this is Agent Smith. I'm here to help you.\n"
+            "[Vittorio A. Sbarbaro] Hi, I'm Vittorio A. Sbarbaro.")
+    r = PersonalInfoRedactor()
+    out = r.redact_text(text)
+    assert out == "[NAME_001] Hello, this is NAME_001. I'm here to help you.\n[NAME_002] Hi, I'm NAME_002."
+    assert r.restore_text(out) == text
 
 
 def test_a_surname_isnt_hidden_inside_a_tag_s_name():

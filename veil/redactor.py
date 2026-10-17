@@ -1482,9 +1482,9 @@ class Redactor(TaxIdRedactor):
             return _NAME_GAP.fullmatch(gap) is not None or (gap == "" and toks[a].case == "initial" and toks[a].dot)
 
         def name_word(j: int, case: str | None = None) -> bool:
-            s = toks[j]
+            s = toks[j]   # no contraction: "Camille, I've reviewed", "Agent Smith. I'm here"
             return (s.case == case if case else s.case in ("title", "caps")) and len(s.word) > 1 and \
-                s.fold not in self._v.not_surnames
+                s.fold not in self._v.not_surnames and not _CONTRACTION.search(s.fold)
 
         def rest(j: int, case: str, mixed: bool, test, longer: bool):
             """After a first name at token j - 1: middles (initials or names) and particles, then a surname
@@ -1781,11 +1781,9 @@ class Redactor(TaxIdRedactor):
                 return _Found(i, j, None, None, None)
         # Mockridge, Avery K.
         # Not a greeting or an everyday word before the comma ("Congratulations, Cory"), not a place either
-        # side ("Ain, France", "Jones, NASDAQ" isn't a name turned round), not a contraction after the comma
-        # ("Camille, I've reviewed"), and both written alike
+        # side ("Ain, France", "Jones, NASDAQ" isn't a name turned round), and both written alike
         if i + 1 < len(toks) and _COMMA_GAP.fullmatch(_gap(fold, toks, i)) and name_word(i) and \
                 t.fold not in _GREETINGS and t.fold not in _PLACES and toks[i + 1].fold not in _PLACES and \
-                not _CONTRACTION.search(toks[i + 1].fold) and \
                 toks[i + 1].fold not in _COUNTRY_WORDS and toks[i + 1].case == t.case and \
                 toks[i + 1].word not in _STATE_NAMES and \
                 not re.match(r"[ \t]+(?i:county|parish|borough|province|state|region|district)\b",
