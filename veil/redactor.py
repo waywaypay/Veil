@@ -138,7 +138,7 @@ _WORD_GIVEN = _words("mark will grant june may rose faith hope joy dawn april su
                      "valentine grace robin hazel olive heather violet ginger sandy gene guy art lee don glen angel penny "
                      "brandy max faye flora wade homer rex earnest jewel laurel aurora candy merle clay toby charity "
                      "heath sterling rocky gale dolly dee chuck chase august rod eve rusty cliff ward reed cole basil "
-                     "mack saul ed al geneva devon marshall burton maxwell coral nova pier")
+                     "mack saul ed al geneva devon marshall burton maxwell coral nova pier luna")
 # Words a first name alone may follow: "Hello Sarah", "Thanks Kai".
 _GREETINGS = _words("hello hi hey dear thanks thank welcome congratulations congrats goodbye bye morning afternoon "
                     "evening sorry yes no ok okay great cheers")
@@ -1323,7 +1323,7 @@ class Redactor(TaxIdRedactor):
                     not (t.fold in _GIVEN or (t.fold in _given_names() and not _wordlike(t.fold))):
                 return None
             if re.match(r"[ \t]*(?:&|and[ \t])", fold[t.end:t.end + 5]) and \
-                    not (t.fold in _GIVEN and re.match(r"[ \t]+and[ \t]+[a-z]", copy[t.end:t.end + 12])):
+                    not ((t.fold in _GIVEN or cued) and re.match(r"[ \t]+and[ \t]+[a-z]", copy[t.end:t.end + 12])):
                 return None
             if i > 0 and toks[i - 1].case in ("title", "caps") and near(i - 1) and not cued and \
                     toks[i - 1].fold not in _GREETINGS and not (toks[i - 1].dot and toks[i - 1].case != "initial"):
