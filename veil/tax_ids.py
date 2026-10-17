@@ -377,6 +377,9 @@ class TaxIdRedactor:
             return any(0 <= start - label_end <= before or 0 <= label_start - end <= after
                        for label_start, label_end in labels)
 
+        if len(set(digits)) == 1 and not near(_LABEL_BEFORE, _LABEL_AFTER):
+            return None   # 0,0,0,0,0,0,0,0,0: a row of empty fields, no number
+
         if len(digits) == 9:
             if digits.endswith("0000") and sizes != (3, 2, 4) and sizes != (2, 7):
                 return None   # no SSN ends in 0000: a round amount such as 125000000
@@ -389,8 +392,8 @@ class TaxIdRedactor:
                         or int(run[0].digits) > box_max:
                     return "EIN", 80, dashed
                 return None
-            if all(s == 1 for s in sizes) and all(len(j) <= 3 and "," not in j for j in joins):
-                return "TIN", 75, False   # one digit per box (a list "1,2,3,...,9" isn't)
+            if all(s == 1 for s in sizes) and all(len(j) <= 3 and "," not in j and "\n" not in j for j in joins):
+                return "TIN", 75, False   # one digit per box on a line (a list "1,2,3,...,9" isn't)
             # "518 206 194" typed with single spaces; a table's column of small amounts is spaced wider.
             if sizes == (3, 3, 3) and all(j == " " for j in joins):
                 return "TIN", 70, False
