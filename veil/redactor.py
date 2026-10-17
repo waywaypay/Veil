@@ -174,14 +174,14 @@ _CUE_PATTERN = (
     r"|beneficiary|trustee|custodian|grantor|spouse|client|contact(?:\s+person)?|attn|attention|dear|fbo|c/o"
     r"|for\s+the\s+benefit\s+of|(?:prepared|issued|mailed|sent|registered)\s+(?:for|to)|prepared\s+by"
     r"|registration|signed|i'm|i[ \t]+am|this[ \t]+is{extra})"
-    r"(?:'s)?[ \t]*(?:[:.,-][ \t]*)?(?:/s/[ \t]*)?(?:(?<=:)\n[ \t]*)?"
+    r"(?:'s)?[ \t]*(?:[:.,-][ \t]*)?(?:/s/[ \t]*)?(?:(?<=:)(?:\n[ \t]*){1,2})?"
     r"|(?:by|to|from|re|cc|bcc)[ \t]*:[ \t]*(?:/s/[ \t]*)?(?:\n[ \t]*)?"
     # a party's role, then a colon: "Shipper: Tassilo M. Hess", "Borrower: Pedro"
     r"|(?:shipper|consignee|notify\s+party|payer|payee|remitter|applicant|co-?applicant|borrower|co-?borrower"
     r"|guarantor|insured|policy\s*holder|patient|purchaser|buyer|seller|vendor|lessee|lessor|tenant|landlord"
     r"|employee|customer|claimant|sender|recipient|debtor|creditor|witness|physician|doctor|assigned\s+to"
     r"|created\s+by|modified\s+by|reported\s+by|approved\s+by|reviewed\s+by|requested\s+by|user|agent)"
-    r"(?:'s)?[ \t]*:[ \t]*(?:\*\*[ \t]*)?(?:\n[ \t]*)?)\Z")
+    r"(?:'s)?[ \t]*:[ \t]*(?:\*\*[ \t]*)?(?:\n[ \t]*){0,2})\Z")
 # The last word of each of those: the label is looked for only after one of them.
 _CUE_ENDS = _words("""
 name is i'm am code signatory signature regards sincerely cordially respectfully owner holder executor executrix administrator
@@ -453,7 +453,8 @@ _PERSON_ROLES = ("payer|payee|shipper|consignee|applicant|co-?applicant|borrower
 _NAME_KEY = re.compile(rf"(?i)(?:(?:first|last|full|middle|given|family|sur|maiden|nick|legal|display|contact|customer"
                        rf"|client|employee|patient|holder|account|beneficiary|applicant|insured|payer|payee|sender"
                        rf"|recipient|person|party|member|owner|signer|driver|agent|cardholder|card)[ _-]?)?name"
-                       rf"|(?:{_PERSON_ROLES})(?:[ _-]?(?:name|full[ _-]?name))?|first|last|surname|forename|given")
+                       rf"|(?:{_PERSON_ROLES})(?:[ _-]?(?:name|full[ _-]?name))?|first|last|surname|forename|given"
+                       rf"|name[ _-]?(?:first|last|full|given|middle|family)")
 # Keys with "name" in them that name no person.
 _NOT_PERSON_KEY = re.compile(r"(?i)user[ _-]?name|login|company|business|bank|product|file|instrument|org|firm|fund"
                              r"|entity|brand|item|project|event|venue|vessel|ship(?!per)|plan\b|program|course|trade"
@@ -578,15 +579,18 @@ class _Tok:
     dot: bool        # a period right after it
 
 
-def _tokens(fold: str) -> list[_Tok]:
+def _tokens(fold: str, copy: str = "") -> list[_Tok]:
     toks = []
     for m in _TOKEN.finditer(fold):
         w = m.group()
+        # Heß is looked up as Hess: the fold keeps one letter for each, so its ß is an s
+        folded = _ascii(copy[m.start():m.end()].replace("\u00df", "ss")).casefold() if "\u00df" in copy[m.start():m.end()] \
+            else w.casefold()
         if len(w) == 1:
             case = "initial" if w.isupper() else "lower"
         else:
             case = "caps" if w.isupper() else "title" if w[0].isupper() else "lower"
-        toks.append(_Tok(m.start(), m.end(), w, w.casefold(), case, fold[m.end():m.end() + 1] == "."))
+        toks.append(_Tok(m.start(), m.end(), w, folded, case, fold[m.end():m.end() + 1] == "."))
     return toks
 
 
@@ -1156,7 +1160,7 @@ class Redactor(TaxIdRedactor):
     # -- names it finds --------------------------------------------------------
 
     def _found_names(self, copy: str, fold: str, take, typed: bool) -> None:
-        toks = _tokens(fold)
+        toks = _tokens(fold, copy)
         surnames = self._surnames()
         # listed: the token after a name and ", " or " and ", where another may start; it counts as after a
         # label when the name before it was found by one.
