@@ -94,9 +94,13 @@ redaction: commas, colons and spaces for an email's dots, a period or hyphen
 for the space in an address ("5678. Elm Street"), a misread street kind
 ("Kristi Hil"), an initial's period read as a colon ("Claire Z: Thibault"),
 lookalike letters in a name ("Tarnmy"), and misread labels ("Phorie",
-"Employee 1D"). On Gretel's financial documents rendered as images, veil
-finds 94% of the personal details in clean OCR text and 90% in degraded
-scans, against 95% in the plain text (`benchmarks/`).
+"Employee 1D"). A scan's speckle is taken out before it's read, and a page
+with small letters is read again at twice the size. On Gretel's financial
+documents held out from tuning, veil finds 96% of the labelled personal
+details in plain text, 94% in clean OCR text and 93% in degraded scans,
+hiding about 1% of other words; judged by hand, as the synthetic labels are
+noisy both ways, that is 98%, 97% and 95% found and about 0.3% of ordinary
+words hidden (`benchmarks/audit.md`).
 
 A file sent as a URL or a Files API ID can't be read first (Anthropic fetches
 those, or already has them), so with `"read"` or `"refuse"` the request

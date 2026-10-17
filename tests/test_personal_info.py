@@ -602,3 +602,41 @@ def test_a_name_stops_at_the_period_ending_its_sentence():
 def test_a_surname_isnt_hidden_inside_a_tag_s_name():
     out = PersonalInfoRedactor().redact_text("<Branch_Name>New Erin Branch</Branch_Name>")
     assert out.startswith("<Branch_Name>") and out.endswith("</Branch_Name>")
+
+
+@pytest.mark.parametrize("text, expected", [
+    # what other makers' datasets (Nemotron-PII's training split) showed
+    ("- **Last Name:** Hill\n- **Email:**", ["Hill"]),
+    ("the first name is Wei, and the last name is Tan. The", ["Wei", "Tan"]),
+    ("| Field | Value |\n|-------|-------|\n| First Name | Fazila |\n", ["Fazila"]),
+    ("Your user name is melissamahler and your password", ["melissamahler"]),
+    ("an employee with the ID **M7231P**.", ["M7231P"]),
+    ("the swift bic ABZYUS4L91 was used", ["ABZYUS4L91"]),
+    ("The account number, 47213985, has been", ["47213985"]),
+    ("- **Tax ID**: NPWP: 14.745.321.8-921.010\n", ["14.745.321.8-921.010"]),
+    ("or call us at 9843057113. The", ["9843057113"]),
+    ("- **Phone Number**: 8277-3622\n", ["8277-3622"]),
+    ("- **City**: Indore\n", ["Indore"]),
+    ("located at Rua das Flores, 88. The room", ["Rua das Flores, 88"]),
+    ("The firm is located at Herzl Street 42, Israel. Please", ["Herzl Street 42, Israel"]),
+    ("to depart from 75 Yulgok-ro. The", ["75 Yulgok-ro"]),
+    ("contact jane smith at the office. she lives at 12 main street, springfield, il 62701. the contract was "
+     "signed by both parties", ["jane smith", "12 main street, springfield, il 62701"]),
+])
+def test_what_other_datasets_found(text, expected):
+    assert hidden(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "| City | Population |\n|---|---|\n| Boston | 600000 |", "Agent: Thank you for calling. I have it.",
+    "Main Street 5 Year Plan", "on Wall Street 2023 was good", "Last Name: Total",
+    "hey can you send the invoice to mark? thanks, will do it tomorrow morning for the team and the client.",
+])
+def test_what_other_datasets_hid_by_mistake(text):
+    assert hidden(text) == []
+
+
+def test_lower_case_text_comes_back_as_written():
+    text = "contact jane smith at 415-555-0134. she lives at 12 main street. the contract was signed on time."
+    r = PersonalInfoRedactor()
+    assert r.restore_text(r.redact_text(text)) == text
