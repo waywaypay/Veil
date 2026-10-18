@@ -27,6 +27,7 @@ python train_wider.py stress <model>[@threshold] ..."""
 import ast
 import hashlib
 import json
+import os
 import random
 import re
 import sys
@@ -383,16 +384,27 @@ def judged(key):
     return out
 
 
+def judged_items(key, texts):
+    """(text, [(start, end, verdict)]) each judged item of a training or dev split, in order: a text the corpus holds
+    more than once was judged as many times as it was drawn, and its other copies are left out."""
+    items = {}
+    for h, spans, verdicts in manifest()[key]:
+        items.setdefault(h, []).append([(s, e, v) for (s, e), v in zip(spans, verdicts)])
+    out = []
+    for text in texts:
+        if items.get(sha(text)):
+            out.append((text, items[sha(text)].pop(0)))
+    return out
+
+
 def tweets(split):
     """(text, details, public names) the judged tweets and posts of the training or dev split: their private
     people's details labelled, public figures and everything else left.  A post with an unsure verdict is left out."""
-    v = judged(f"tweets_{split}")
     out = []
-    for text in social(split):
-        h = sha(text)
-        if h not in v or any(x == "unsure" for *_, x in v[h]):
+    for text, v in judged_items(f"tweets_{split}", social(split)):
+        if any(x == "unsure" for *_, x in v):
             continue
-        spans = sorted((s, e, x.split(":", 1)[1].strip()) for s, e, x in v[h]
+        spans = sorted((s, e, x.split(":", 1)[1].strip()) for s, e, x in v
                        if x.startswith("personal:") and x.split(":", 1)[1].strip() in GROUP)
         kept = []
         for s, e, lab in spans:   # overlapping spans of one detail: the longest
@@ -401,7 +413,7 @@ def tweets(split):
                     kept[-1] = (s, e, lab)
                 continue
             kept.append((s, e, lab))
-        out.append((text, kept, [(s, e) for s, e, x in v[h] if x == "public"]))
+        out.append((text, kept, [(s, e) for s, e, x in v if x == "public"]))
     return out
 
 
@@ -591,6 +603,8 @@ def stress(models):
 
 
 if __name__ == "__main__":
+    if os.environ.get("PYTHONHASHSEED") != "0":   # formgen's draws go through Faker data kept in sets
+        os.execve(sys.executable, [sys.executable, *sys.argv], {**os.environ, "PYTHONHASHSEED": "0"})
     cmd, *a = sys.argv[1:]
     {"fetch": fetch, "build": lambda: build(int(a[0])), "train": lambda: train(int(a[0]), *a[1:]),
      "dev": lambda: dev(a), "test": lambda: test(a), "stress": lambda: stress(a)}[cmd]()

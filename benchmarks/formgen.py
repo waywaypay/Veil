@@ -4,7 +4,8 @@ exports (CSV, JSON, XML, YAML, SQL), logs and file paths, bank and pay statement
 with their MRZ, chat transcripts, shipping labels.  Among them the things that must stay: amounts, dates that aren't
 a birth date, order, invoice, tracking and case numbers, IPs, versions, companies, places alone, public figures and
 fictional characters.  Labels are (start, end, label) in the tagger's label names; a street address is one span with
-the town, region and postcode written with it.  Every person is made up (Faker)."""
+the town, region and postcode written with it.  Every person is made up (Faker).  A draw is repeatable with
+PYTHONHASHSEED=0, as some of Faker's locales keep their data in sets (train_wider.py sets it)."""
 import contextlib
 import io
 import random
@@ -151,9 +152,15 @@ class Person:
                 "initial": f"{first[0]}. {last}", "nick": f"{first} \"{r.choice(NICK)}\" {last}", "first": first,
                 "last": last}[style]
 
+    def ascii_first(self):
+        """An English first name for a person whose own isn't written in ASCII, to build an email from."""
+        en = Faker("en_US")
+        en.seed_instance(self.r.randrange(10 ** 9))
+        return en.first_name()
+
     def email(self):
         r, f = self.r, self.f
-        base = "".join(c for c in Faker("en_US").first_name().lower() if c.isalpha()) if not self.first.isascii() \
+        base = "".join(c for c in self.ascii_first().lower() if c.isalpha()) if not self.first.isascii() \
             else "".join(c for c in self.first.lower() if c.isalnum())
         lastb = "".join(c for c in self.last.lower() if c.isalnum() and c.isascii()) or "x"
         user = r.choice([f"{base}.{lastb}", f"{base[0]}{lastb}", f"{base}{r.randint(1, 99)}", f"{lastb}.{base}",
@@ -731,6 +738,7 @@ def doc(r):
 
 
 def docs(n, seed):
+    random.seed(seed)   # some of Faker's providers draw from the module's generator, not their own
     r = random.Random(seed)
     return [doc(r) for _ in range(n)]
 
