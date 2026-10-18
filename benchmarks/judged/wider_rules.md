@@ -56,3 +56,19 @@ the same verdicts with one more:
 * `unsure`: you can't tell.
 
 Write verdicts the same way, one list per item, one verdict per span, in order.
+
+
+## Chats (`locked_chats_b*.json`)
+
+Messages people sent to an AI assistant (WildChat). The spans are words a redaction system hid; details the dataset
+already knows about (made-up names, emails and phones written in where its de-identifier took something out) are not
+among them. Same verdicts as tweets and posts: `personal:<label>` for a private person's detail (the user, their
+family, friends, colleagues, a landlord, a teacher; their contact details and numbers; a username in a pasted path),
+`public` for a public figure, an author cited in a reference list or a fictional character (including characters in
+a story or role-play the user is writing), `ordinary` for anything else (words, places, companies, products, code
+identifiers, placeholder names like John Doe), `business` for an organisation's own contact details, `unsure` when you
+can't tell.
+
+## Locked sets
+
+Files named `locked_*` are the final test. Judge every span on its own merits; you are not told which system hid it.
