@@ -260,6 +260,7 @@ def score(specs):
         systems[model.rstrip("/").split("/")[-1]] = (model, float(th or T.THRESHOLD))
     found = {k: T.spans(m, texts) for k, (m, _) in ((k, v) for k, v in systems.items() if v)}
 
+    cover = {k: verdicts(n) for k, n in (("tweets and posts", "tweets"), ("Enron emails", "enron"))}
     per, unjudged = {}, {}
     for setname, rs in ss.items():
         per[setname] = {}
@@ -269,10 +270,10 @@ def score(specs):
                 f"veil + {name}": [T.with_veil(t, found[name][T.key(t)], T.checked, v[1]) for _, t, _ in rs]}
             for sysname, o in outs.items():
                 per[setname][sysname] = [counts(t, sp, out) for (_, t, sp), out in zip(rs, o)]
-                if setname in ("tweets and posts", "Enron emails"):
+                if setname in cover:   # runs no verdict of any kind covers: counted as other words hidden
                     unjudged.setdefault(setname, {})[sysname] = sum(
-                        1 for (_, t, sp), out in zip(rs, o) for a, b in runs(t, out)
-                        if not any(s < b and e > a for s, e, _ in sp))
+                        1 for (k, t, _), out in zip(rs, o) for a, b in runs(t, out)
+                        if not any(s < b and e > a for s, e, _ in cover[setname].get(k, [])))
     per["chats"] = {}
     for name, v in systems.items():
         if v is None:
