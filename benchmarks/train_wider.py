@@ -499,9 +499,19 @@ def build(n):
     print(f"{len(data)} chunks in all")
 
 
+def examples(n):
+    """A round's mix.  From round 6 on, an example over 2,048 tokens (as far as GLiNER reads) is cut to its first
+    1,024: one 7,897-token bank file padded its batch to 2,048 and ran round 6's second segment out of memory."""
+    ex = json.load(open(T.DATA / f"round{n}_examples.json"))
+    for x in ex if n >= 6 else []:
+        if len(x["tokenized_text"]) > 2048:
+            x["tokenized_text"] = x["tokenized_text"][:1024]
+            x["ner"] = [s for s in x["ner"] if s[1] < 1024]
+    return ex
+
+
 def train(n, base, out, offset):
-    TT.train(base, out, lambda splitter: (json.load(open(T.DATA / f"round{n}_examples.json")) * 2)[int(offset):int(offset) + 4000],
-             500)
+    TT.train(base, out, lambda splitter: (examples(n) * 2)[int(offset):int(offset) + 4000], 500)
 
 
 # -- choosing -------------------------------------------------------------------------------------------------------
