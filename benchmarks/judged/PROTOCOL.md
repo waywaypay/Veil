@@ -94,7 +94,8 @@ Written on 18 October 2026, after round 6's locked test was scored and before an
 * **The first locked test is development data now.** Its sets, and every earlier test, may be studied to decide what
   data to make. New model spans in its judged sets are judged before they're counted.
 * **A second locked test**, made before round 7's training data and kept from everyone who makes that data: 150
-  documents by ten new agents, forms from `formgen.py` seed 95, 200 Enron emails from the corpus's third file in
+  documents by ten new agents and 15 forms of many kinds (school, government, insurance, housing, tax outside the US,
+  web submissions) by an eleventh, added before any round 7 model existed, forms from `formgen.py` seed 95, 200 Enron emails from the corpus's third file in
   mailboxes neither earlier sample used, tweets and posts 1,400 to 2,099 of the test splits' shuffle, and 720 chats
   from WildChat shards 8 and 9 (WildChat-1M has 14 shards; 0 to 7 and 10 to 13 are taken, 8 and 9 never used). It is judged blind and scored once, at the end, as the first was.
 * **Choosing**: the rule above, on dev only. Dev is the earlier dev slices, the first locked test's five sets and a
