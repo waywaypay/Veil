@@ -193,7 +193,7 @@ def counts(text, spans, out):
     return [hit, tot, sum(not kept[j] for j in other), len(other)]
 
 
-def chat_counts(conv, outs, here):
+def chat_counts(conv, outs, here, small=False):
     """[found, details, ordinary words hidden, public words hidden, other words] for one conversation; ``here`` is
     {turn: [(start, end, verdict)]}."""
     hit = tot = ordinary = public = words = 0
@@ -202,8 +202,13 @@ def chat_counts(conv, outs, here):
         ws = T.bench.words(text)
         _, kept = T.bench.redacted_mask(text, out)
         personal = set()
-        for s, e in [(s, e) for s, e, g in t["spans"] if g != "outside"] + \
-                    [(s, e) for s, e, x in v if x.startswith("personal:")]:
+        known = [(s, e) for s, e, g in t["spans"] if g != "outside"]
+        judged_ = [(s, e) for s, e, x in v if x.startswith("personal:")]
+        if small:   # a judged span holding a smaller private detail is set aside; the details inside it are scored
+            held = {(s, e) for s, e in judged_ if any((a, b) != (s, e) and s <= a and b <= e for a, b in known + judged_)}
+            judged_ = [x for x in judged_ if x not in held]
+            v = [x for x in v if x[:2] not in held] + [(s, e, "unsure") for s, e in held]
+        for s, e in known + judged_:
             idx = {j for j, (w, a, b) in enumerate(ws) if a < e and b > s and w.lower() not in T.bench.TITLES}
             personal |= idx
             if idx:
@@ -279,7 +284,10 @@ def score(specs):
                        T.with_veil(t["text"], found[s][T.key(t["text"])], T.checked, th, redactor=r)
                        for t in c["turns"]])(Redactor(GENERIC))}
         for sysname, fn in fns.items():
-            per["chats"][sysname] = [chat_counts(c, fn(c), chat_v.get(k, {})) for c, k in zip(convs, keys)]
+            outs = [fn(c) for c in convs]
+            per["chats"][sysname] = [chat_counts(c, o, chat_v.get(k, {})) for c, o, k in zip(convs, outs, keys)]
+            per.setdefault("chats (smallest spans)", {})[sysname] = [chat_counts(c, o, chat_v.get(k, {}), True)
+                                                                   for c, o, k in zip(convs, outs, keys)]
 
     last = list(systems)[-1]
     pairs = [(f"{last} alone", "veil"), (f"veil + {last}", "veil")] + \
@@ -288,11 +296,12 @@ def score(specs):
     for setname, p in per.items():
         sums = {k: [sum(c) for c in zip(*rows)] for k, rows in p.items()}
         results[setname] = {"units": len(next(iter(p.values()))), "sums": sums, **boot(p, pairs)}
-        print(f"\n{setname} ({results[setname]['units']} {'conversations' if setname == 'chats' else 'texts'})")
+        print(f"\n{setname} ({results[setname]['units']} {'conversations' if setname.startswith('chats') else 'texts'})")
         for k, s in sums.items():
             ci = results[setname]["systems"][k]
-            over = (s[2] + s[3]) / s[4] if setname == "chats" else s[2] / s[3]
-            extra = f"  (ordinary {s[2] / s[4]:.2%}, public {s[3] / s[4]:.2%})" if setname == "chats" else \
+            chat = setname.startswith("chats")
+            over = (s[2] + s[3]) / s[4] if chat else s[2] / s[3]
+            extra = f"  (ordinary {s[2] / s[4]:.2%}, public {s[3] / s[4]:.2%})" if chat else \
                 f", {unjudged[setname][k]} hidden runs no verdict covers" if unjudged.get(setname, {}).get(k) else ""
             print(f"  {k:30} found {s[0] / s[1]:6.1%} [{ci['found'][0]:.1%}, {ci['found'][1]:.1%}]   other words "
                   f"hidden {over:5.2%} [{ci['over'][0]:.2%}, {ci['over'][1]:.2%}]   {s[1]} details{extra}")
