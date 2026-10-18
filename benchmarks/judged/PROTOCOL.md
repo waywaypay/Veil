@@ -84,3 +84,25 @@ Means over the 13 dev slices, found / other words hidden, each step's bound the 
 Segment 2's first run ran out of memory at step 387 on one 7,897-token bank file; that example was cut to 1,024
 tokens and the segment run again from segment 1 (`train_wider.py`'s `examples`). The three planned segments take
 the mix once; no fourth was trained.
+
+## Round 7 on: towards 99% found and under 1% other words hidden
+
+Written on 18 October 2026, after round 6's locked test was scored and before any round 7 data existed.
+
+* **Target**: the model alone, at one threshold chosen on dev, finding at least 99.0% of private people's details
+  while hiding at most 1.00% of other words, on each of a second locked test's five sets.
+* **The first locked test is development data now.** Its sets, and every earlier test, may be studied to decide what
+  data to make. New model spans in its judged sets are judged before they're counted.
+* **A second locked test**, made before round 7's training data and kept from everyone who makes that data: 150
+  documents by ten new agents and 15 forms of many kinds (school, government, insurance, housing, tax outside the US,
+  web submissions) by an eleventh, added before any round 7 model existed, forms from `formgen.py` seed 95, 200 Enron emails from the corpus's third file in
+  mailboxes neither earlier sample used, tweets and posts 1,400 to 2,099 of the test splits' shuffle, and 720 chats
+  from WildChat shards 8 and 9 (WildChat-1M has 14 shards; 0 to 7 and 10 to 13 are taken, 8 and 9 never used). It is judged blind and scored once, at the end, as the first was.
+* **Choosing**: the rule above, on dev only. Dev is the earlier dev slices, the first locked test's five sets and a
+  held-out fifth of each new source.
+* **Stopping**: when the dev means reach the target, or when two rounds in a row add less than 0.3 points of mean
+  dev found at no more other words hidden; then the second locked test is scored once either way, and the result
+  reported as it falls.
+* **Measurement ceiling**: on the first locked test, a second reviewer agreed on whether a span is a private
+  person's detail 97.8% (Enron) to 98.8% (tweets) of the time, so a 99% found on the judged sets is near what the
+  judging itself can tell apart. This is reported beside the result.
