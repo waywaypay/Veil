@@ -1,4 +1,4 @@
-"""Rounds 3 to 5 of the tagger's training (benchmarks/model.md), each from the last round's model, in 500-step segments
+"""Rounds 3 to 6 of the tagger's training (benchmarks/model.md), each from the last round's model, in 500-step segments
 as train_tagger.py trains, every choice made on dev sets and each test set scored once.
 
   round 3   Gretel finance's other languages, Gretel pii-masking-en-v1's training split (chunks with its loosely
@@ -11,6 +11,12 @@ as train_tagger.py trains, every choice made on dev sets and each test set score
             personal in it, and round 3's mix replayed
   round 5   half of round 4's mix, more of round 3's, round 2's judged chats at full weight, fresh tax-form snippets
             and the judged tweets again
+  round 6   from round 5's first segment, aimed at what round 4 missed on dev: 320 documents by eight more agents
+            (judged/docgen/round6: health and insurance numbers, bank lines and payment files, staff and customer
+            numbers, German, Dutch, Nordic, French, Spanish, Italian and Portuguese prose, Asian, African and Middle
+            Eastern names, taxpayer IDs in markup, chats with nothing personal in them; a fifth held out for dev),
+            round 4's agent documents again, round 5's mix replayed, fresh forms and tax-form snippets, the judged
+            tweets
 
 The tests: 150 documents written by other agents who never saw the training ones (judged/docgen/test), 300 fresh
 forms, 700 tweets and posts from the two corpora's test splits, and 231 of Enron's emails, every span a system hid
@@ -18,7 +24,7 @@ in them judged (judged/wider.json; the rules are judged/wider_rules.md); and vei
 Needs faker, besides train_tagger.py's needs.
 
 python train_wider.py fetch
-python train_wider.py build <round>                        3, 4 or 5
+python train_wider.py build <round>                        3, 4, 5 or 6
 python train_wider.py train <round> <base> <out dir> <offset>
 python train_wider.py dev <model>[@threshold] ...
 python train_wider.py test <model>[@threshold] ...
@@ -87,8 +93,10 @@ SIZES = {3: {"Gretel, other languages": 2500, "Gretel en-v1": 2500, "TAB": 1500,
          4: {"documents (agents)": 1800, "forms (synthetic)": 3200, "tweets and posts": 2200, "receipts": 400,
              "résumés": 1400, "press releases": 800, "EU court texts": 700, "round 3, replayed": 3500},
          5: {"round 4, replayed": 6000, "round 3, replayed": 2500, "chats (round 2's, judged)": 1800,
-             "tax forms (synthetic, fresh)": 1500, "tweets and posts (judged)": 1000}}
-SEEDS = {3: 7, 4: 17, 5: 23}
+             "tax forms (synthetic, fresh)": 1500, "tweets and posts (judged)": 1000},
+         6: {"documents (round 6 agents)": 4200, "documents (round 4 agents)": 1200, "round 5, replayed": 5500,
+             "forms (synthetic, fresh)": 1500, "tax forms (synthetic, fresh)": 800, "tweets and posts (judged)": 800}}
+SEEDS = {3: 7, 4: 17, 5: 23, 6: 29}
 
 
 def fetch():
@@ -357,10 +365,12 @@ def resumes(seed, n=None):
 
 SOCIAL = {"train": ["btc_a.conll", "btc_b.conll", "btc_e.conll", "btc_g.conll", "wnut_wnut17train.conll"],
           "dev": ["btc_h.conll", "wnut_emerging.dev.conll"], "test": ["btc_f.conll", "wnut_emerging.test.annotated"]}
+SOCIAL["locked"] = SOCIAL["test"]   # locked.py's: the next 700 of the test splits' shuffle
 
 
 def social(split):
-    """The tweets and posts of a split, shuffled as they were judged."""
+    """The tweets and posts of a split, shuffled as they were judged: the test, the first 700 of its two test
+    splits'; the locked test, the next 700."""
     out = []
     for name in SOCIAL[split]:
         doc = []
@@ -372,8 +382,8 @@ def social(split):
                 doc = []
                 continue
             doc.append((line.split("\t") if "\t" in line else line.split())[0])
-    random.Random(5 if split != "test" else 9).shuffle(out)
-    return out[:700] if split == "test" else out
+    random.Random(9 if split in ("test", "locked") else 5).shuffle(out)
+    return out[:700] if split == "test" else out[700:1400] if split == "locked" else out
 
 
 def judged(key):
@@ -454,11 +464,31 @@ def round5_parts(split, rng):
             "tweets and posts (judged)": TT.examples([(t, s) for t, s, _ in tweets("train")], split)}
 
 
+def round6_docs():
+    """{"train": [...], "dev": [...]}: round 6's agent documents, a fifth held out for dev by a hash of the text."""
+    out = {"train": [], "dev": []}
+    for path in sorted((DOCGEN / "round6").glob("g*.jsonl")):
+        for line in open(path):
+            if line.strip():
+                text, spans = unmark(json.loads(line)["text"])
+                out["dev" if int(sha(text)[:8], 16) % 5 == 0 else "train"].append((text, spans))
+    return out
+
+
+def round6_parts(split, rng):
+    return {"documents (round 6 agents)": TT.examples(round6_docs()["train"], split) * 3,
+            "documents (round 4 agents)": TT.examples(docgen()["train"], split) * 2,
+            "round 5, replayed": json.load(open(T.DATA / "round5_examples.json")),
+            "forms (synthetic, fresh)": TT.examples(formgen.docs(1500, 22), split),
+            "tax forms (synthetic, fresh)": TT.examples(taxgen.docs(800, 13), split),
+            "tweets and posts (judged)": TT.examples([(t, s) for t, s, _ in tweets("train")], split)}
+
+
 def build(n):
     from gliner import GLiNER
     split = GLiNER.from_pretrained("knowledgator/gliner-pii-edge-v1.0").data_processor.words_splitter
     rng = random.Random(SEEDS[n])
-    parts = {3: round3_parts, 4: round4_parts, 5: round5_parts}[n](split, rng)
+    parts = {3: round3_parts, 4: round4_parts, 5: round5_parts, 6: round6_parts}[n](split, rng)
     data = []
     for k, ex in parts.items():
         rng.shuffle(ex)
@@ -517,7 +547,8 @@ def dev_sets():
             "documents (agents)": rows(docgen()["dev"]), "forms (synthetic)": rows(formgen.docs(300, 98)),
             "tweets and posts": [(t, [(s, e, GROUP[lab]) for s, e, lab in sp] + [(s, e, "ordinary") for s, e in pub])
                                  for t, sp, pub in tweets("dev")],
-            "receipts": rows(cord("dev")), "résumés": rows(resumes(2, 100))}
+            "receipts": rows(cord("dev")), "résumés": rows(resumes(2, 100)),
+            "documents (round 6 agents)": rows(round6_docs()["dev"])}
 
 
 def dev(models):
