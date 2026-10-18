@@ -20,7 +20,7 @@ Gretel), except where a section says its spans were judged.
 | `nvidia/gliner-PII` ("large") | `microsoft/deberta-v3-large` | 570M | 1.8 GB (PyTorch) | NVIDIA Open Model Licence |
 | edge, fine-tuned on Gretel (round 1) | edge | about 45M | | |
 | edge, fine-tuned on the mix (round 2) | round 1 | about 45M | 91 MB (weights stored in 16 bits, below) | |
-| edge, rounds 3 to 6 (below) | the round before | about 45M | 91 MB (16 bits) | |
+| edge, rounds 3 to 6 (below) | the round before | about 45M | 91 MB (16 bits; round 6 gives PyTorch's spans on 498 of 500 texts, two names scored at the threshold falling the other way) | |
 
 NVIDIA's model was trained on Nemotron-PII, so its Nemotron figures are in distribution, as are round 2's (trained
 on Nemotron's training split; tested on its test split). Knowledgator doesn't say what its models were trained on.
@@ -222,6 +222,36 @@ Checks:
 * What happened along the way is in `judged/INTEGRITY.md` (who opened what, conflicting verdicts, a scorer fix made
   before scoring) and `judged/PROTOCOL.md` (each choice, and a training segment that ran out of memory and was run
   again).
+
+### Earlier tests, now development data
+
+Round 4's test sets, the 20 sets, the chat test and veil's taxpayer-ID stress cases were looked at while rounds 5
+and 6 were designed, so they are development results here, not a test. Round 5's and round 6's spans in round 4's
+tweets and emails weren't judged; each such run counts as a mistake. The tagger alone:
+
+| Set | veil | round 2 | round 4 | round 5 | round 6 |
+|---|---|---|---|---|---|
+| 150 held-out agent documents | 65.4 / 3.96 | 78.4 / 4.45 | 87.6 / 4.40 | 88.3 / 4.46 | 91.1 / 3.86 |
+| 300 held-out forms (seed 97) | 75.0 / 2.33 | 81.1 / 5.11 | 97.6 / 2.13 | 97.1 / 2.30 | 98.0 / 1.54 |
+| 700 tweets and posts | 90.5 / 3.55 | 88.5 / 7.30 | 86.2 / 6.54 | 90.0 / 6.83 | 91.6 / 4.95 |
+| 231 Enron emails | 87.2 / 0.86 | 90.1 / 0.91 | 92.7 / 0.88 | 93.3 / 1.01 | 94.7 / 0.86 |
+| Gretel finance (veil's held-out) | 95.8 / 1.09 | 95.6 / 0.78 | 94.7 / 1.05 | 94.7 / 1.03 | 94.7 / 0.98 |
+| Nemotron, plain | 92.8 / 0.07 | 96.3 / 0.30 | 97.0 / 0.14 | 97.0 / 0.16 | 97.0 / 0.11 |
+| Nemotron, lower case | 77.3 / 0.21 | 93.8 / 0.24 | 95.0 / 0.22 | 95.5 / 0.20 | 95.0 / 0.21 |
+| Nemotron, UPPER CASE | 86.8 / 0.40 | 86.0 / 0.47 | 93.0 / 0.51 | 91.8 / 0.41 | 89.0 / 0.30 |
+| Nemotron, fax | 81.3 / 0.26 | 93.5 / 0.54 | 95.3 / 0.52 | 94.3 / 0.46 | 95.8 / 0.43 |
+| Gretel en-v1 | 82.8 / 1.10 | 96.9 / 2.29 | 95.5 / 1.60 | 95.8 / 1.62 | 94.2 / 1.30 |
+| ai4privacy, English | 49.8 / 2.11 | 85.7 / 4.46 | 78.4 / 3.31 | 80.8 / 3.65 | 78.0 / 2.94 |
+| TAB court judgments (real) | 84.7 / 0.43 | 97.5 / 0.57 | 97.8 / 0.28 | 97.8 / 0.28 | 97.5 / 0.30 |
+| CoNLL-2003 news (real) | 78.1 / 1.23 | 90.5 / 6.01 | 90.0 / 5.68 | 90.3 / 6.99 | 91.1 / 4.18 |
+| OntoNotes (real) | 76.9 / 0.67 | 91.6 / 0.86 | 86.1 / 0.45 | 85.3 / 0.46 | 84.1 / 0.32 |
+| chats (found; ordinary words hidden, with details / without; public names) | 84.5; 0.46 / 0.32; 1.94 | 93.6; 0.90 / 0.63; 2.56 | 93.7; 0.87 / 1.16; 2.60 | 93.2; 0.79 / 1.07; 2.65 | 93.3; 0.84 / 0.92; 2.43 |
+
+Of veil's 74 taxpayer-ID formats that once leaked, round 6 alone still leaks 5 (round 2: 17, round 4: 11, round 5:
+6); of 20 K-1 specimens, 1. The losses since round 2 are in news prose and labels it never trained on: OntoNotes
+(91.6 to 84.1, though with fewer other words hidden), ai4privacy's fragments (85.7 to 78.0) and Gretel en-v1 (96.9
+to 94.2), and against round 4, UPPER CASE text (93.0 to 89.0). The forms here differ slightly from round 4's report,
+which drew them before `formgen.py` was made repeatable.
 
 ## Running it small
 
