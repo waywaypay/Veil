@@ -96,7 +96,7 @@ Written on 18 October 2026, after round 6's locked test was scored and before an
 * **A second locked test**, made before round 7's training data and kept from everyone who makes that data: 150
   documents by ten new agents, forms from `formgen.py` seed 95, 200 Enron emails from the corpus's third file in
   mailboxes neither earlier sample used, tweets and posts 1,400 to 2,099 of the test splits' shuffle, and 720 chats
-  from WildChat shards 14 to 17. It is judged blind and scored once, at the end, as the first was.
+  from WildChat shards 8 and 9 (WildChat-1M has 14 shards; 0 to 7 and 10 to 13 are taken, 8 and 9 never used). It is judged blind and scored once, at the end, as the first was.
 * **Choosing**: the rule above, on dev only. Dev is the earlier dev slices, the first locked test's five sets and a
   held-out fifth of each new source.
 * **Stopping**: when the dev means reach the target, or when two rounds in a row add less than 0.3 points of mean
