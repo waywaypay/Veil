@@ -20,6 +20,7 @@ python train_tagger.py export <model dir> <out dir>      model.onnx and model_f1
 import ast
 import json
 import os
+import pathlib
 import random
 import re
 import sys
@@ -164,10 +165,21 @@ def train(base, out, data, steps):
     torch.set_num_threads(os.cpu_count())
     model = GLiNER.from_pretrained(base)
     data = data(model.data_processor.words_splitter)
+    # A checkpoint every ``save_every`` steps (a container restart then costs at most that many); a run restarted
+    # with the same ``out`` picks up from the newest one.
+    save_every = int(os.environ.get("TRAIN_SAVE_EVERY", 100))
     args = model.create_training_args(output_dir=out, learning_rate=1e-5, others_lr=2e-5, weight_decay=0.01,
                                       focal_loss_alpha=0.75, focal_loss_gamma=2, per_device_train_batch_size=8,
-                                      max_steps=steps, save_steps=10 ** 9, logging_steps=25, use_cpu=True,
-                                      dataloader_num_workers=0, warmup_ratio=0.1, bf16=True)
+                                      max_steps=steps, save_steps=save_every, save_total_limit=1, logging_steps=25,
+                                      use_cpu=True, dataloader_num_workers=0, warmup_ratio=0.1, bf16=True)
+    ckpts = sorted((q for q in pathlib.Path(out).glob("checkpoint-*") if int(q.name.split("-")[1]) < steps),
+                   key=lambda q: int(q.name.split("-")[1])) if os.path.isdir(out) else []   # a finished run starts over
+    if ckpts:
+        import transformers
+        resume, original = str(ckpts[-1]), transformers.Trainer.train
+        print(f"resuming from {resume}", file=sys.stderr)
+        transformers.Trainer.train = lambda self, resume_from_checkpoint=None, **kw: original(
+            self, resume_from_checkpoint=resume, **kw)
     t0 = time.perf_counter()
     model.train_model(train_dataset=data, eval_dataset=None, training_args=args)
     model.save_pretrained(out)
