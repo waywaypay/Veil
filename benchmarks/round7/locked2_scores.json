@@ -1,0 +1,3187 @@
+{
+ "overall": {
+  "model alone": {
+   "found": 0.94,
+   "lo": 0.9268162393162394,
+   "hi": 0.951025641025641,
+   "over": 0.041734194292173205,
+   "details": 3850
+  },
+  "veil alone": {
+   "found": 0.6283116883116883,
+   "lo": 0.592797118847539,
+   "hi": 0.6633165829145728,
+   "over": 0.037426113920946844,
+   "details": 3850
+  },
+  "veil + model": {
+   "found": 0.8693506493506493,
+   "lo": 0.8479413993432685,
+   "hi": 0.8865707434052758,
+   "over": 0.06948939989338467,
+   "details": 3850
+  }
+ },
+ "by_type": {
+  "1099-NEC e-delivery email + 1099-MISC": {
+   "model alone": {
+    "found": 0.9583333333333334,
+    "over": 0.014,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9166666666666666,
+    "over": 0.09,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.104,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "CI output": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.03171247357293869,
+    "details": 41,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9024390243902439,
+    "over": 0.010570824524312896,
+    "details": 41,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.975609756097561,
+    "over": 0.04439746300211417,
+    "details": 41,
+    "docs": 1
+   }
+  },
+  "CSV export": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.16923076923076924,
+    "details": 63,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5873015873015873,
+    "over": 0.07692307692307693,
+    "details": 63,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9523809523809523,
+    "over": 0.18846153846153846,
+    "details": 63,
+    "docs": 1
+   }
+  },
+  "IRS notice CP2000 (scanned, annotated)": {
+   "model alone": {
+    "found": 0.9583333333333334,
+    "over": 0.01348314606741573,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7916666666666666,
+    "over": 0.05393258426966292,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9583333333333334,
+    "over": 0.05393258426966292,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "JSON API payload": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.061281337047353765,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7083333333333334,
+    "over": 0.002785515320334262,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9583333333333334,
+    "over": 0.13649025069637882,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "KYC form": {
+   "model alone": {
+    "found": 0.9655172413793104,
+    "over": 0.029143897996357013,
+    "details": 29,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6896551724137931,
+    "over": 0.01639344262295082,
+    "details": 29,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8620689655172413,
+    "over": 0.051001821493624776,
+    "details": 29,
+    "docs": 1
+   }
+  },
+  "SEPA transfer form (OCR scan)": {
+   "model alone": {
+    "found": 0.7142857142857143,
+    "over": 0.08333333333333333,
+    "details": 14,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.2857142857142857,
+    "over": 0.03571428571428571,
+    "details": 14,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.5714285714285714,
+    "over": 0.10714285714285714,
+    "details": 14,
+    "docs": 1
+   }
+  },
+  "SMS export": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.052138504519993335,
+    "details": 58,
+    "docs": 2
+   },
+   "veil alone": {
+    "found": 0.7758620689655172,
+    "over": 0.011774715536206164,
+    "details": 58,
+    "docs": 2
+   },
+   "veil + model": {
+    "found": 0.9310344827586207,
+    "over": 0.04283118310132549,
+    "details": 58,
+    "docs": 2
+   }
+  },
+  "SQL dump": {
+   "model alone": {
+    "found": 0.9577464788732394,
+    "over": 0.06368330464716007,
+    "details": 71,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4225352112676056,
+    "over": 0.024096385542168676,
+    "details": 71,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9436619718309859,
+    "over": 0.08950086058519793,
+    "details": 71,
+    "docs": 1
+   }
+  },
+  "Schedule K-1 (Form 1065) with cover letter": {
+   "model alone": {
+    "found": 0.9375,
+    "over": 0.01140684410646388,
+    "details": 16,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9375,
+    "over": 0.060836501901140684,
+    "details": 16,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9375,
+    "over": 0.062103929024081114,
+    "details": 16,
+    "docs": 1
+   }
+  },
+  "Slack export": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.029411764705882353,
+    "details": 29,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6551724137931034,
+    "over": 0.004524886877828055,
+    "details": 29,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7241379310344828,
+    "over": 0.038461538461538464,
+    "details": 29,
+    "docs": 1
+   }
+  },
+  "Teams chat export": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.02631578947368421,
+    "details": 42,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8095238095238095,
+    "over": 0.010526315789473684,
+    "details": 42,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.03684210526315789,
+    "details": 42,
+    "docs": 1
+   }
+  },
+  "W-2 (OCR scan)": {
+   "model alone": {
+    "found": 0.8,
+    "over": 0.015355086372360844,
+    "details": 10,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4,
+    "over": 0.019193857965451054,
+    "details": 10,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8,
+    "over": 0.028790786948176585,
+    "details": 10,
+    "docs": 1
+   }
+  },
+  "W-2PR / 499R-2 with cover letter (Puerto Rico)": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.05811138014527845,
+    "details": 16,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.625,
+    "over": 0.09200968523002422,
+    "details": 16,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9375,
+    "over": 0.11864406779661017,
+    "details": 16,
+    "docs": 1
+   }
+  },
+  "W-4 with HR intake notes": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.033707865168539325,
+    "details": 13,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9230769230769231,
+    "over": 0.02247191011235955,
+    "details": 13,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.031835205992509365,
+    "details": 13,
+    "docs": 1
+   }
+  },
+  "W-8BEN with vendor payment setup": {
+   "model alone": {
+    "found": 0.9333333333333333,
+    "over": 0.005535055350553505,
+    "details": 30,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.01107011070110701,
+    "details": 30,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8333333333333334,
+    "over": 0.016605166051660517,
+    "details": 30,
+    "docs": 1
+   }
+  },
+  "W-9 with cover email and ACH form": {
+   "model alone": {
+    "found": 0.8846153846153846,
+    "over": 0.01001669449081803,
+    "details": 26,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8461538461538461,
+    "over": 0.011686143572621035,
+    "details": 26,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9230769230769231,
+    "over": 0.02003338898163606,
+    "details": 26,
+    "docs": 1
+   }
+  },
+  "WhatsApp export": {
+   "model alone": {
+    "found": 0.9444444444444444,
+    "over": 0.027450980392156862,
+    "details": 54,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8703703703703703,
+    "over": 0.0196078431372549,
+    "details": 54,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9629629629629629,
+    "over": 0.045098039215686274,
+    "details": 54,
+    "docs": 1
+   }
+  },
+  "air waybill": {
+   "model alone": {
+    "found": 0.0,
+    "over": 0.08333333333333333,
+    "details": 0,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.0,
+    "over": 0.06910569105691057,
+    "details": 0,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.0,
+    "over": 0.12804878048780488,
+    "details": 0,
+    "docs": 1
+   }
+  },
+  "analytics events": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.15913200723327306,
+    "details": 26,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8461538461538461,
+    "over": 0.04701627486437613,
+    "details": 26,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9615384615384616,
+    "over": 0.16998191681735986,
+    "details": 26,
+    "docs": 1
+   }
+  },
+  "application log": {
+   "model alone": {
+    "found": 0.9642857142857143,
+    "over": 0.04043545878693624,
+    "details": 28,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6785714285714286,
+    "over": 0.0077760497667185065,
+    "details": 28,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9285714285714286,
+    "over": 0.05287713841368585,
+    "details": 28,
+    "docs": 1
+   }
+  },
+  "appointment reminder": {
+   "model alone": {
+    "found": 0.9090909090909091,
+    "over": 0.02349869451697128,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7727272727272727,
+    "over": 0.08877284595300261,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7727272727272727,
+    "over": 0.08877284595300261,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "assistant_chat_code": {
+   "model alone": {
+    "found": 0.9836065573770492,
+    "over": 0.007173601147776184,
+    "details": 61,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6065573770491803,
+    "over": 0.0028694404591104736,
+    "details": 61,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8688524590163934,
+    "over": 0.010043041606886656,
+    "details": 61,
+    "docs": 1
+   }
+  },
+  "assistant_chat_form": {
+   "model alone": {
+    "found": 0.875,
+    "over": 0.0019646365422396855,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7083333333333334,
+    "over": 0.015717092337917484,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9583333333333334,
+    "over": 0.019646365422396856,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "assistant_chat_homework": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.01176470588235294,
+    "details": 3,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 1.0,
+    "over": 0.01176470588235294,
+    "details": 3,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.01411764705882353,
+    "details": 3,
+    "docs": 1
+   }
+  },
+  "assistant_chat_letter": {
+   "model alone": {
+    "found": 0.96,
+    "over": 0.018518518518518517,
+    "details": 25,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.76,
+    "over": 0.0,
+    "details": 25,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.92,
+    "over": 0.018518518518518517,
+    "details": 25,
+    "docs": 1
+   }
+  },
+  "assistant_chat_story": {
+   "model alone": {
+    "found": 0.9166666666666666,
+    "over": 0.030144167758846662,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.75,
+    "over": 0.007863695937090432,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9166666666666666,
+    "over": 0.03800786369593709,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "background check": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.008174386920980926,
+    "details": 20,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8,
+    "over": 0.04632152588555858,
+    "details": 20,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.95,
+    "over": 0.051771117166212535,
+    "details": 20,
+    "docs": 1
+   }
+  },
+  "bank chat transcript": {
+   "model alone": {
+    "found": 0.9302325581395349,
+    "over": 0.029220779220779217,
+    "details": 43,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.46511627906976744,
+    "over": 0.0016233766233766233,
+    "details": 43,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9302325581395349,
+    "over": 0.032467532467532464,
+    "details": 43,
+    "docs": 1
+   }
+  },
+  "bank statement": {
+   "model alone": {
+    "found": 0.9615384615384616,
+    "over": 0.09826589595375723,
+    "details": 26,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6538461538461539,
+    "over": 0.04238921001926782,
+    "details": 26,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9615384615384616,
+    "over": 0.14450867052023122,
+    "details": 26,
+    "docs": 1
+   }
+  },
+  "benefits_application": {
+   "model alone": {
+    "found": 0.9642857142857143,
+    "over": 0.05142857142857143,
+    "details": 28,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.42857142857142855,
+    "over": 0.02666666666666667,
+    "details": 28,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8928571428571429,
+    "over": 0.07238095238095238,
+    "details": 28,
+    "docs": 1
+   }
+  },
+  "brokerage statement": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.0110803324099723,
+    "details": 13,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8461538461538461,
+    "over": 0.04155124653739612,
+    "details": 13,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8461538461538461,
+    "over": 0.04709141274238227,
+    "details": 13,
+    "docs": 1
+   }
+  },
+  "calendar invite": {
+   "model alone": {
+    "found": 0.8571428571428571,
+    "over": 0.06053268765133172,
+    "details": 14,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5714285714285714,
+    "over": 0.04116222760290557,
+    "details": 14,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.6428571428571429,
+    "over": 0.07263922518159806,
+    "details": 14,
+    "docs": 1
+   }
+  },
+  "camp_registration_form_ocr": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.030364372469635623,
+    "details": 30,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.05465587044534413,
+    "details": 30,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8333333333333334,
+    "over": 0.06680161943319839,
+    "details": 30,
+    "docs": 1
+   }
+  },
+  "card dispute form": {
+   "model alone": {
+    "found": 0.9444444444444444,
+    "over": 0.036734693877551024,
+    "details": 18,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.07959183673469387,
+    "details": 18,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9444444444444444,
+    "over": 0.08979591836734693,
+    "details": 18,
+    "docs": 1
+   }
+  },
+  "chat log": {
+   "model alone": {
+    "found": 0.9787234042553191,
+    "over": 0.06913183279742766,
+    "details": 47,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7872340425531915,
+    "over": 0.03376205787781351,
+    "details": 47,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9787234042553191,
+    "over": 0.08038585209003216,
+    "details": 47,
+    "docs": 1
+   }
+  },
+  "childcare_registration_form_ocr": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.08896797153024912,
+    "details": 28,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.2857142857142857,
+    "over": 0.042704626334519574,
+    "details": 28,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.75,
+    "over": 0.1387900355871886,
+    "details": 28,
+    "docs": 1
+   }
+  },
+  "club_membership_form_pdf_extract": {
+   "model alone": {
+    "found": 0.75,
+    "over": 0.14615384615384616,
+    "details": 16,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.0625,
+    "over": 0.0,
+    "details": 16,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.625,
+    "over": 0.12307692307692307,
+    "details": 16,
+    "docs": 1
+   }
+  },
+  "club_membership_webform_notification_email": {
+   "model alone": {
+    "found": 0.9545454545454546,
+    "over": 0.020100502512562818,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8636363636363636,
+    "over": 0.09547738693467336,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9545454545454546,
+    "over": 0.11557788944723618,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "code with fixtures": {
+   "model alone": {
+    "found": 0.9545454545454546,
+    "over": 0.10914454277286137,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5909090909090909,
+    "over": 0.035398230088495575,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8636363636363636,
+    "over": 0.1710914454277286,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "collections letter": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.027881040892193308,
+    "details": 15,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7333333333333333,
+    "over": 0.03717472118959108,
+    "details": 15,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9333333333333333,
+    "over": 0.046468401486988845,
+    "details": 15,
+    "docs": 1
+   }
+  },
+  "config file": {
+   "model alone": {
+    "found": 0.8421052631578947,
+    "over": 0.11728395061728396,
+    "details": 19,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8421052631578947,
+    "over": 0.11419753086419752,
+    "details": 19,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9473684210526315,
+    "over": 0.14814814814814814,
+    "details": 19,
+    "docs": 1
+   }
+  },
+  "consent form": {
+   "model alone": {
+    "found": 0.9166666666666666,
+    "over": 0.03260869565217391,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.09239130434782608,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7916666666666666,
+    "over": 0.10869565217391304,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "consolidated 1099 (OCR scan)": {
+   "model alone": {
+    "found": 0.9,
+    "over": 0.025695931477516056,
+    "details": 10,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.04925053533190578,
+    "details": 10,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.6,
+    "over": 0.06852248394004283,
+    "details": 10,
+    "docs": 1
+   }
+  },
+  "contract": {
+   "model alone": {
+    "found": 0.9047619047619048,
+    "over": 0.10126582278481013,
+    "details": 21,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6190476190476191,
+    "over": 0.004219409282700422,
+    "details": 21,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9047619047619048,
+    "over": 0.1160337552742616,
+    "details": 21,
+    "docs": 1
+   }
+  },
+  "court_filing": {
+   "model alone": {
+    "found": 0.9795918367346939,
+    "over": 0.014191770417516065,
+    "details": 49,
+    "docs": 2
+   },
+   "veil alone": {
+    "found": 0.8571428571428571,
+    "over": 0.025292305378789466,
+    "details": 49,
+    "docs": 2
+   },
+   "veil + model": {
+    "found": 0.9387755102040817,
+    "over": 0.02949002283740059,
+    "details": 49,
+    "docs": 2
+   }
+  },
+  "crash report": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.02190721649484536,
+    "details": 12,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.75,
+    "over": 0.054123711340206195,
+    "details": 12,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.07860824742268041,
+    "details": 12,
+    "docs": 1
+   }
+  },
+  "credit report": {
+   "model alone": {
+    "found": 0.9047619047619048,
+    "over": 0.046296296296296294,
+    "details": 21,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5238095238095238,
+    "over": 0.08101851851851852,
+    "details": 21,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7142857142857143,
+    "over": 0.09490740740740741,
+    "details": 21,
+    "docs": 1
+   }
+  },
+  "customs declaration (CN 23)": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.06779661016949153,
+    "details": 9,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.2222222222222222,
+    "over": 0.012106537530266344,
+    "details": 9,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.4444444444444444,
+    "over": 0.06295399515738499,
+    "details": 9,
+    "docs": 1
+   }
+  },
+  "cv": {
+   "model alone": {
+    "found": 0.9166666666666666,
+    "over": 0.02709665956774851,
+    "details": 36,
+    "docs": 3
+   },
+   "veil alone": {
+    "found": 0.6388888888888888,
+    "over": 0.03131329949656719,
+    "details": 36,
+    "docs": 3
+   },
+   "veil + model": {
+    "found": 0.8888888888888888,
+    "over": 0.047599140066789135,
+    "details": 36,
+    "docs": 3
+   }
+  },
+  "database dump": {
+   "model alone": {
+    "found": 0.9538461538461539,
+    "over": 0.08,
+    "details": 65,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4461538461538462,
+    "over": 0.014666666666666666,
+    "details": 65,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8153846153846154,
+    "over": 0.1533333333333333,
+    "details": 65,
+    "docs": 1
+   }
+  },
+  "dating_profile": {
+   "model alone": {
+    "found": 0.875,
+    "over": 0.07804878048780488,
+    "details": 8,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.625,
+    "over": 0.0975609756097561,
+    "details": 8,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.875,
+    "over": 0.13170731707317074,
+    "details": 8,
+    "docs": 1
+   }
+  },
+  "dental record": {
+   "model alone": {
+    "found": 0.8333333333333334,
+    "over": 0.037940379403794036,
+    "details": 18,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.3888888888888889,
+    "over": 0.016260162601626018,
+    "details": 18,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7222222222222222,
+    "over": 0.056910569105691054,
+    "details": 18,
+    "docs": 1
+   }
+  },
+  "discharge summary": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.03932584269662921,
+    "details": 20,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9,
+    "over": 0.04307116104868914,
+    "details": 20,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.06554307116104868,
+    "details": 20,
+    "docs": 1
+   }
+  },
+  "e-ticket receipt and boarding pass": {
+   "model alone": {
+    "found": 0.8823529411764706,
+    "over": 0.06769230769230769,
+    "details": 17,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.17647058823529413,
+    "over": 0.052307692307692305,
+    "details": 17,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8823529411764706,
+    "over": 0.12615384615384614,
+    "details": 17,
+    "docs": 1
+   }
+  },
+  "electricity bill": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.05527638190954774,
+    "details": 13,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8461538461538461,
+    "over": 0.06030150753768844,
+    "details": 13,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9230769230769231,
+    "over": 0.07537688442211055,
+    "details": 13,
+    "docs": 1
+   }
+  },
+  "email": {
+   "model alone": {
+    "found": 0.963855421686747,
+    "over": 0.0358773843439751,
+    "details": 83,
+    "docs": 2
+   },
+   "veil alone": {
+    "found": 0.7590361445783133,
+    "over": 0.05996485782612103,
+    "details": 83,
+    "docs": 2
+   },
+   "veil + model": {
+    "found": 0.9518072289156626,
+    "over": 0.08709549700135744,
+    "details": 83,
+    "docs": 2
+   }
+  },
+  "email thread": {
+   "model alone": {
+    "found": 0.9850746268656716,
+    "over": 0.07046761564642959,
+    "details": 67,
+    "docs": 2
+   },
+   "veil alone": {
+    "found": 0.7910447761194029,
+    "over": 0.05330005197592341,
+    "details": 67,
+    "docs": 2
+   },
+   "veil + model": {
+    "found": 0.9402985074626866,
+    "over": 0.08561775899937964,
+    "details": 67,
+    "docs": 2
+   }
+  },
+  "employment_onboarding_spreadsheet_export": {
+   "model alone": {
+    "found": 0.8431372549019608,
+    "over": 0.029239766081871343,
+    "details": 51,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4117647058823529,
+    "over": 0.029239766081871343,
+    "details": 51,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7647058823529411,
+    "over": 0.06432748538011696,
+    "details": 51,
+    "docs": 1
+   }
+  },
+  "explanation of benefits": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.016355140186915886,
+    "details": 15,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 1.0,
+    "over": 0.049065420560747655,
+    "details": 15,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.05607476635514018,
+    "details": 15,
+    "docs": 1
+   }
+  },
+  "facebook_group_post": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.04153354632587859,
+    "details": 16,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.875,
+    "over": 0.019169329073482427,
+    "details": 16,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.04472843450479233,
+    "details": 16,
+    "docs": 1
+   }
+  },
+  "fan_fiction": {
+   "model alone": {
+    "found": 0.8333333333333334,
+    "over": 0.06902985074626866,
+    "details": 6,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.0708955223880597,
+    "details": 6,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.08395522388059702,
+    "details": 6,
+    "docs": 1
+   }
+  },
+  "foi_response": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.04820936639118457,
+    "details": 5,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 1.0,
+    "over": 0.03994490358126722,
+    "details": 5,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.07300275482093664,
+    "details": 5,
+    "docs": 1
+   }
+  },
+  "form": {
+   "model alone": {
+    "found": 0.9148936170212766,
+    "over": 0.06556915935715932,
+    "details": 141,
+    "docs": 5
+   },
+   "veil alone": {
+    "found": 0.41134751773049644,
+    "over": 0.04422113983661194,
+    "details": 141,
+    "docs": 5
+   },
+   "veil + model": {
+    "found": 0.8723404255319149,
+    "over": 0.09192069952925264,
+    "details": 141,
+    "docs": 5
+   }
+  },
+  "forum_thread": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.02806122448979592,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.00510204081632653,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9166666666666666,
+    "over": 0.038265306122448974,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "forwarded email chain": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.03183023872679045,
+    "details": 38,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8421052631578947,
+    "over": 0.0583554376657825,
+    "details": 38,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.07161803713527852,
+    "details": 38,
+    "docs": 1
+   }
+  },
+  "fraud alert ops report": {
+   "model alone": {
+    "found": 0.9,
+    "over": 0.06643356643356643,
+    "details": 10,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4,
+    "over": 0.04895104895104895,
+    "details": 10,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9,
+    "over": 0.09965034965034965,
+    "details": 10,
+    "docs": 1
+   }
+  },
+  "fraud case note": {
+   "model alone": {
+    "found": 0.9333333333333333,
+    "over": 0.03874538745387454,
+    "details": 30,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6333333333333333,
+    "over": 0.014760147601476014,
+    "details": 30,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9,
+    "over": 0.046125461254612546,
+    "details": 30,
+    "docs": 1
+   }
+  },
+  "git log": {
+   "model alone": {
+    "found": 0.9428571428571428,
+    "over": 0.02941176470588235,
+    "details": 35,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4857142857142857,
+    "over": 0.04751131221719456,
+    "details": 35,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8285714285714286,
+    "over": 0.07918552036199095,
+    "details": 35,
+    "docs": 1
+   }
+  },
+  "government_benefit_claim_form_boxes": {
+   "model alone": {
+    "found": 0.75,
+    "over": 0.08061420345489444,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.20833333333333334,
+    "over": 0.023032629558541268,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.5416666666666666,
+    "over": 0.10940499040307101,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "group_chat_export": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.08836206896551724,
+    "details": 47,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6595744680851063,
+    "over": 0.040948275862068964,
+    "details": 47,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9574468085106383,
+    "over": 0.09482758620689655,
+    "details": 47,
+    "docs": 1
+   }
+  },
+  "handover notes": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.0868421052631579,
+    "details": 33,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7575757575757576,
+    "over": 0.018421052631578946,
+    "details": 33,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9090909090909091,
+    "over": 0.09736842105263158,
+    "details": 33,
+    "docs": 1
+   }
+  },
+  "healthcare_intake_form_pdf_extract": {
+   "model alone": {
+    "found": 0.9583333333333334,
+    "over": 0.015283842794759825,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.75,
+    "over": 0.03056768558951965,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.875,
+    "over": 0.03275109170305677,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "hotel folio": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.04821802935010482,
+    "details": 14,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7142857142857143,
+    "over": 0.0649895178197065,
+    "details": 14,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9285714285714286,
+    "over": 0.09224318658280922,
+    "details": 14,
+    "docs": 1
+   }
+  },
+  "hotel_review": {
+   "model alone": {
+    "found": 0.9166666666666666,
+    "over": 0.023195876288659795,
+    "details": 12,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.005154639175257733,
+    "details": 12,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9166666666666666,
+    "over": 0.028350515463917526,
+    "details": 12,
+    "docs": 1
+   }
+  },
+  "household goods customs and biosecurity declaration": {
+   "model alone": {
+    "found": 0.9629629629629629,
+    "over": 0.02846299810246679,
+    "details": 27,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8148148148148148,
+    "over": 0.03225806451612903,
+    "details": 27,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8518518518518519,
+    "over": 0.0777988614800759,
+    "details": 27,
+    "docs": 1
+   }
+  },
+  "housing_application_webform_html": {
+   "model alone": {
+    "found": 0.85,
+    "over": 0.03536585365853658,
+    "details": 20,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.45,
+    "over": 0.03536585365853658,
+    "details": 20,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.75,
+    "over": 0.06341463414634146,
+    "details": 20,
+    "docs": 1
+   }
+  },
+  "immigration_correspondence": {
+   "model alone": {
+    "found": 0.9772727272727273,
+    "over": 0.02152317880794702,
+    "details": 44,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8636363636363636,
+    "over": 0.026490066225165563,
+    "details": 44,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9090909090909091,
+    "over": 0.04470198675496689,
+    "details": 44,
+    "docs": 1
+   }
+  },
+  "insurance claim form": {
+   "model alone": {
+    "found": 0.9523809523809523,
+    "over": 0.03225806451612903,
+    "details": 21,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8095238095238095,
+    "over": 0.05161290322580645,
+    "details": 21,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8571428571428571,
+    "over": 0.07419354838709677,
+    "details": 21,
+    "docs": 1
+   }
+  },
+  "insurance claim statement": {
+   "model alone": {
+    "found": 0.9333333333333333,
+    "over": 0.061371841155234655,
+    "details": 15,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4666666666666667,
+    "over": 0.04693140794223827,
+    "details": 15,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7333333333333333,
+    "over": 0.10830324909747292,
+    "details": 15,
+    "docs": 1
+   }
+  },
+  "insurance_claim_form_pdf_extract": {
+   "model alone": {
+    "found": 0.9090909090909091,
+    "over": 0.0631163708086785,
+    "details": 33,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6060606060606061,
+    "over": 0.0670611439842209,
+    "details": 33,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9393939393939394,
+    "over": 0.1222879684418146,
+    "details": 33,
+    "docs": 1
+   }
+  },
+  "international wire transfer request": {
+   "model alone": {
+    "found": 0.8275862068965517,
+    "over": 0.013698630136986302,
+    "details": 29,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6551724137931034,
+    "over": 0.027397260273972605,
+    "details": 29,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7241379310344828,
+    "over": 0.043835616438356165,
+    "details": 29,
+    "docs": 1
+   }
+  },
+  "job application": {
+   "model alone": {
+    "found": 0.9333333333333333,
+    "over": 0.022388059701492536,
+    "details": 15,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5333333333333333,
+    "over": 0.11442786069651742,
+    "details": 15,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8666666666666667,
+    "over": 0.1318407960199005,
+    "details": 15,
+    "docs": 1
+   }
+  },
+  "job posting": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.04430379746835443,
+    "details": 3,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.029535864978902957,
+    "details": 3,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.04430379746835443,
+    "details": 3,
+    "docs": 1
+   }
+  },
+  "lab report": {
+   "model alone": {
+    "found": 0.8571428571428571,
+    "over": 0.03931203931203931,
+    "details": 14,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.2857142857142857,
+    "over": 0.0171990171990172,
+    "details": 14,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.6428571428571429,
+    "over": 0.03194103194103194,
+    "details": 14,
+    "docs": 1
+   }
+  },
+  "leave request": {
+   "model alone": {
+    "found": 0.95,
+    "over": 0.015527950310559008,
+    "details": 20,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.65,
+    "over": 0.018633540372670808,
+    "details": 20,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.85,
+    "over": 0.034161490683229816,
+    "details": 20,
+    "docs": 1
+   }
+  },
+  "letter": {
+   "model alone": {
+    "found": 0.918918918918919,
+    "over": 0.04507222889967485,
+    "details": 74,
+    "docs": 3
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.062123419353077136,
+    "details": 74,
+    "docs": 3
+   },
+   "veil + model": {
+    "found": 0.7297297297297297,
+    "over": 0.08806054109923768,
+    "details": 74,
+    "docs": 3
+   }
+  },
+  "licence_renewal": {
+   "model alone": {
+    "found": 0.9333333333333333,
+    "over": 0.008982035928143712,
+    "details": 15,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.011976047904191617,
+    "details": 15,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8666666666666667,
+    "over": 0.02095808383233533,
+    "details": 15,
+    "docs": 1
+   }
+  },
+  "mail server log": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.055089820359281436,
+    "details": 24,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.875,
+    "over": 0.05269461077844311,
+    "details": 24,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.11736526946107785,
+    "details": 24,
+    "docs": 1
+   }
+  },
+  "marketplace messages": {
+   "model alone": {
+    "found": 0.8648648648648649,
+    "over": 0.005025125628140704,
+    "details": 37,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.24324324324324326,
+    "over": 0.01256281407035176,
+    "details": 37,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8648648648648649,
+    "over": 0.017587939698492462,
+    "details": 37,
+    "docs": 1
+   }
+  },
+  "meeting notes": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.03676470588235294,
+    "details": 25,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.84,
+    "over": 0.05392156862745098,
+    "details": 25,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.92,
+    "over": 0.07107843137254902,
+    "details": 25,
+    "docs": 1
+   }
+  },
+  "mobile phone bill": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.04081632653061224,
+    "details": 21,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5714285714285714,
+    "over": 0.06802721088435375,
+    "details": 21,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9523809523809523,
+    "over": 0.10884353741496598,
+    "details": 21,
+    "docs": 1
+   }
+  },
+  "mortgage application": {
+   "model alone": {
+    "found": 0.9512195121951219,
+    "over": 0.02832512315270936,
+    "details": 41,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6585365853658537,
+    "over": 0.0332512315270936,
+    "details": 41,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8292682926829268,
+    "over": 0.04556650246305419,
+    "details": 41,
+    "docs": 1
+   }
+  },
+  "notary_acknowledgement": {
+   "model alone": {
+    "found": 0.967741935483871,
+    "over": 0.040632054176072234,
+    "details": 31,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9354838709677419,
+    "over": 0.0654627539503386,
+    "details": 31,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9354838709677419,
+    "over": 0.08803611738148984,
+    "details": 31,
+    "docs": 1
+   }
+  },
+  "notice": {
+   "model alone": {
+    "found": 0.7,
+    "over": 0.13584905660377358,
+    "details": 10,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.3,
+    "over": 0.033962264150943396,
+    "details": 10,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.4,
+    "over": 0.1018867924528302,
+    "details": 10,
+    "docs": 1
+   }
+  },
+  "offer letter": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.006802721088435375,
+    "details": 14,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8571428571428571,
+    "over": 0.01870748299319728,
+    "details": 14,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9285714285714286,
+    "over": 0.025510204081632654,
+    "details": 14,
+    "docs": 1
+   }
+  },
+  "onboarding form": {
+   "model alone": {
+    "found": 0.9130434782608695,
+    "over": 0.029566684561699516,
+    "details": 46,
+    "docs": 2
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.020820615077843392,
+    "details": 46,
+    "docs": 2
+   },
+   "veil + model": {
+    "found": 0.8260869565217391,
+    "over": 0.043754889178617994,
+    "details": 46,
+    "docs": 2
+   }
+  },
+  "order confirmation email": {
+   "model alone": {
+    "found": 0.7333333333333333,
+    "over": 0.048859934853420196,
+    "details": 15,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6,
+    "over": 0.06514657980456026,
+    "details": 15,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8666666666666667,
+    "over": 0.11400651465798045,
+    "details": 15,
+    "docs": 1
+   }
+  },
+  "org chart": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.03278688524590164,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9090909090909091,
+    "over": 0.04918032786885246,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9545454545454546,
+    "over": 0.06147540983606557,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "out-of-office reply": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.05511811023622047,
+    "details": 12,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9166666666666666,
+    "over": 0.08661417322834646,
+    "details": 12,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.1062992125984252,
+    "details": 12,
+    "docs": 1
+   }
+  },
+  "parcel shipping label": {
+   "model alone": {
+    "found": 0.8,
+    "over": 0.20512820512820512,
+    "details": 10,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.2,
+    "over": 0.02564102564102564,
+    "details": 10,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.6,
+    "over": 0.18803418803418803,
+    "details": 10,
+    "docs": 1
+   }
+  },
+  "patient portal message": {
+   "model alone": {
+    "found": 0.96,
+    "over": 0.021634615384615384,
+    "details": 25,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.68,
+    "over": 0.016826923076923076,
+    "details": 25,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.76,
+    "over": 0.028846153846153848,
+    "details": 25,
+    "docs": 1
+   }
+  },
+  "payment file (pain.001 XML)": {
+   "model alone": {
+    "found": 0.6333333333333333,
+    "over": 0.007633587786259542,
+    "details": 30,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4,
+    "over": 0.015267175572519083,
+    "details": 30,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.6666666666666666,
+    "over": 0.030534351145038167,
+    "details": 30,
+    "docs": 1
+   }
+  },
+  "payroll change": {
+   "model alone": {
+    "found": 0.9545454545454546,
+    "over": 0.0,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6818181818181818,
+    "over": 0.023333333333333334,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.023333333333333334,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "payroll register": {
+   "model alone": {
+    "found": 0.6808510638297872,
+    "over": 0.018018018018018018,
+    "details": 47,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.40425531914893614,
+    "over": 0.025225225225225224,
+    "details": 47,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7021276595744681,
+    "over": 0.043243243243243246,
+    "details": 47,
+    "docs": 1
+   }
+  },
+  "payslip": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.03934911889457344,
+    "details": 16,
+    "docs": 2
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.052271698036448606,
+    "details": 16,
+    "docs": 2
+   },
+   "veil + model": {
+    "found": 0.9375,
+    "over": 0.06938001059930662,
+    "details": 16,
+    "docs": 2
+   }
+  },
+  "pension statement": {
+   "model alone": {
+    "found": 0.9230769230769231,
+    "over": 0.038202247191011236,
+    "details": 13,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.3076923076923077,
+    "over": 0.056179775280898875,
+    "details": 13,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.6923076923076923,
+    "over": 0.09662921348314607,
+    "details": 13,
+    "docs": 1
+   }
+  },
+  "performance review": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.01674641148325359,
+    "details": 12,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8333333333333334,
+    "over": 0.009569377990430622,
+    "details": 12,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.01674641148325359,
+    "details": 12,
+    "docs": 1
+   }
+  },
+  "personal loan application": {
+   "model alone": {
+    "found": 0.8846153846153846,
+    "over": 0.035629453681710214,
+    "details": 26,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5769230769230769,
+    "over": 0.06175771971496437,
+    "details": 26,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8076923076923077,
+    "over": 0.1021377672209026,
+    "details": 26,
+    "docs": 1
+   }
+  },
+  "pharmacy label": {
+   "model alone": {
+    "found": 0.8571428571428571,
+    "over": 0.23134328358208953,
+    "details": 7,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.42857142857142855,
+    "over": 0.06716417910447761,
+    "details": 7,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8571428571428571,
+    "over": 0.19402985074626866,
+    "details": 7,
+    "docs": 1
+   }
+  },
+  "pipeline log": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.0493046776232617,
+    "details": 1,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.0,
+    "over": 0.018963337547408345,
+    "details": 1,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.05941845764854614,
+    "details": 1,
+    "docs": 1
+   }
+  },
+  "planning_objection": {
+   "model alone": {
+    "found": 0.75,
+    "over": 0.014900662251655629,
+    "details": 16,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8125,
+    "over": 0.014900662251655629,
+    "details": 16,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8125,
+    "over": 0.028145695364238412,
+    "details": 16,
+    "docs": 1
+   }
+  },
+  "police_report": {
+   "model alone": {
+    "found": 0.7666666666666667,
+    "over": 0.0738255033557047,
+    "details": 30,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4,
+    "over": 0.04530201342281879,
+    "details": 30,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8,
+    "over": 0.11744966442953021,
+    "details": 30,
+    "docs": 1
+   }
+  },
+  "power_of_attorney": {
+   "model alone": {
+    "found": 0.9714285714285714,
+    "over": 0.0340599455040872,
+    "details": 35,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5428571428571428,
+    "over": 0.01634877384196185,
+    "details": 35,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8,
+    "over": 0.035422343324250684,
+    "details": 35,
+    "docs": 1
+   }
+  },
+  "preparer client newsletter email": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.05235602094240838,
+    "details": 5,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8,
+    "over": 0.055846422338568937,
+    "details": 5,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.08726003490401396,
+    "details": 5,
+    "docs": 1
+   }
+  },
+  "preparer email thread": {
+   "model alone": {
+    "found": 0.9736842105263158,
+    "over": 0.0407725321888412,
+    "details": 38,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7894736842105263,
+    "over": 0.034334763948497854,
+    "details": 38,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9210526315789473,
+    "over": 0.06866952789699571,
+    "details": 38,
+    "docs": 1
+   }
+  },
+  "prescription": {
+   "model alone": {
+    "found": 0.8888888888888888,
+    "over": 0.02390438247011952,
+    "details": 9,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4444444444444444,
+    "over": 0.08366533864541832,
+    "details": 9,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 1.0,
+    "over": 0.08366533864541832,
+    "details": 9,
+    "docs": 1
+   }
+  },
+  "product_review": {
+   "model alone": {
+    "found": 0.0,
+    "over": 0.043209876543209874,
+    "details": 0,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.0,
+    "over": 0.01646090534979424,
+    "details": 0,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.0,
+    "over": 0.047325102880658436,
+    "details": 0,
+    "docs": 1
+   }
+  },
+  "recruiter email": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.025641025641025644,
+    "details": 28,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8571428571428571,
+    "over": 0.014245014245014245,
+    "details": 28,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9642857142857143,
+    "over": 0.03133903133903134,
+    "details": 28,
+    "docs": 1
+   }
+  },
+  "reddit_post": {
+   "model alone": {
+    "found": 0.9655172413793104,
+    "over": 0.02263251800298584,
+    "details": 58,
+    "docs": 2
+   },
+   "veil alone": {
+    "found": 0.2413793103448276,
+    "over": 0.016022682352414417,
+    "details": 58,
+    "docs": 2
+   },
+   "veil + model": {
+    "found": 0.5517241379310345,
+    "over": 0.03960216946902492,
+    "details": 58,
+    "docs": 2
+   }
+  },
+  "reference letter": {
+   "model alone": {
+    "found": 0.9230769230769231,
+    "over": 0.011848341232227487,
+    "details": 13,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6923076923076923,
+    "over": 0.03317535545023697,
+    "details": 13,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.7692307692307693,
+    "over": 0.037914691943127965,
+    "details": 13,
+    "docs": 1
+   }
+  },
+  "referral letter": {
+   "model alone": {
+    "found": 0.9333333333333333,
+    "over": 0.029478458049886618,
+    "details": 15,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7333333333333333,
+    "over": 0.06349206349206349,
+    "details": 15,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9333333333333333,
+    "over": 0.108843537414966,
+    "details": 15,
+    "docs": 1
+   }
+  },
+  "rental_application_form_ocr": {
+   "model alone": {
+    "found": 0.9545454545454546,
+    "over": 0.07042253521126761,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.04225352112676056,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8181818181818182,
+    "over": 0.11549295774647887,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "residence_permit_application": {
+   "model alone": {
+    "found": 0.9545454545454546,
+    "over": 0.046620046620046623,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.06060606060606061,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8636363636363636,
+    "over": 0.0979020979020979,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "residential lease agreement": {
+   "model alone": {
+    "found": 0.9642857142857143,
+    "over": 0.05509181969949916,
+    "details": 28,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5714285714285714,
+    "over": 0.03171953255425709,
+    "details": 28,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8571428571428571,
+    "over": 0.08681135225375626,
+    "details": 28,
+    "docs": 1
+   }
+  },
+  "residential_lease": {
+   "model alone": {
+    "found": 0.9615384615384616,
+    "over": 0.022326674500587545,
+    "details": 26,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8461538461538461,
+    "over": 0.038777908343125736,
+    "details": 26,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8846153846153846,
+    "over": 0.04465334900117509,
+    "details": 26,
+    "docs": 1
+   }
+  },
+  "return authorisation email thread": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.08278867102396514,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8636363636363636,
+    "over": 0.0718954248366013,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9090909090909091,
+    "over": 0.12636165577342048,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "scanned document (OCR)": {
+   "model alone": {
+    "found": 0.90625,
+    "over": 0.023565942656900284,
+    "details": 64,
+    "docs": 3
+   },
+   "veil alone": {
+    "found": 0.46875,
+    "over": 0.027380704077463465,
+    "details": 64,
+    "docs": 3
+   },
+   "veil + model": {
+    "found": 0.796875,
+    "over": 0.042405815467682656,
+    "details": 64,
+    "docs": 3
+   }
+  },
+  "school_admission_form_pdf_extract": {
+   "model alone": {
+    "found": 0.9545454545454546,
+    "over": 0.019313304721030045,
+    "details": 22,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.36363636363636365,
+    "over": 0.030042918454935622,
+    "details": 22,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8636363636363636,
+    "over": 0.03862660944206009,
+    "details": 22,
+    "docs": 1
+   }
+  },
+  "screening reminder": {
+   "model alone": {
+    "found": 0.0,
+    "over": 0.02925531914893617,
+    "details": 0,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.0,
+    "over": 0.015957446808510637,
+    "details": 0,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.0,
+    "over": 0.031914893617021274,
+    "details": 0,
+    "docs": 1
+   }
+  },
+  "stack trace": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.005312084993359893,
+    "details": 25,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4,
+    "over": 0.0,
+    "details": 25,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.84,
+    "over": 0.005312084993359893,
+    "details": 25,
+    "docs": 1
+   }
+  },
+  "state tax letter (NY DTF) with response": {
+   "model alone": {
+    "found": 0.875,
+    "over": 0.028350515463917526,
+    "details": 16,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9375,
+    "over": 0.04639175257731959,
+    "details": 16,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9375,
+    "over": 0.05154639175257732,
+    "details": 16,
+    "docs": 1
+   }
+  },
+  "supermarket receipt (scanned)": {
+   "model alone": {
+    "found": 0.5,
+    "over": 0.15246636771300448,
+    "details": 4,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.0,
+    "over": 0.09865470852017937,
+    "details": 4,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.5,
+    "over": 0.2017937219730942,
+    "details": 4,
+    "docs": 1
+   }
+  },
+  "support ticket": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.04205607476635514,
+    "details": 27,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.8148148148148148,
+    "over": 0.02102803738317757,
+    "details": 27,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9259259259259259,
+    "over": 0.0794392523364486,
+    "details": 27,
+    "docs": 1
+   }
+  },
+  "support ticket export": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.05436893203883495,
+    "details": 27,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7407407407407407,
+    "over": 0.0854368932038835,
+    "details": 27,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9259259259259259,
+    "over": 0.1029126213592233,
+    "details": 27,
+    "docs": 1
+   }
+  },
+  "tax organizer": {
+   "model alone": {
+    "found": 0.9555555555555556,
+    "over": 0.006493506493506494,
+    "details": 45,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7111111111111111,
+    "over": 0.015151515151515152,
+    "details": 45,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8888888888888888,
+    "over": 0.03463203463203463,
+    "details": 45,
+    "docs": 1
+   }
+  },
+  "tax_declaration_form_boxes": {
+   "model alone": {
+    "found": 0.875,
+    "over": 0.0933786078098472,
+    "details": 16,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5,
+    "over": 0.042444821731748725,
+    "details": 16,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8125,
+    "over": 0.10696095076400679,
+    "details": 16,
+    "docs": 1
+   }
+  },
+  "travel agency invoice": {
+   "model alone": {
+    "found": 0.9523809523809523,
+    "over": 0.14173228346456693,
+    "details": 21,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.42857142857142855,
+    "over": 0.09973753280839895,
+    "details": 21,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8571428571428571,
+    "over": 0.2020997375328084,
+    "details": 21,
+    "docs": 1
+   }
+  },
+  "tweet_thread": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.010040160642570281,
+    "details": 41,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.9512195121951219,
+    "over": 0.004016064257028112,
+    "details": 41,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.975609756097561,
+    "over": 0.010040160642570281,
+    "details": 41,
+    "docs": 1
+   }
+  },
+  "university_enrollment_form_blanks": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.18088737201365188,
+    "details": 21,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.2857142857142857,
+    "over": 0.027303754266211604,
+    "details": 21,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.6666666666666666,
+    "over": 0.18771331058020477,
+    "details": 21,
+    "docs": 1
+   }
+  },
+  "utility_signup_webform_json": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.07407407407407407,
+    "details": 18,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.3333333333333333,
+    "over": 0.018518518518518517,
+    "details": 18,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8333333333333334,
+    "over": 0.07407407407407407,
+    "details": 18,
+    "docs": 1
+   }
+  },
+  "vehicle rental agreement": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.01834862385321101,
+    "details": 21,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.5714285714285714,
+    "over": 0.02981651376146789,
+    "details": 21,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9047619047619048,
+    "over": 0.0389908256880734,
+    "details": 21,
+    "docs": 1
+   }
+  },
+  "veterinary record": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.053125,
+    "details": 14,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7857142857142857,
+    "over": 0.090625,
+    "details": 14,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9285714285714286,
+    "over": 0.109375,
+    "details": 14,
+    "docs": 1
+   }
+  },
+  "visa_invitation": {
+   "model alone": {
+    "found": 0.9666666666666667,
+    "over": 0.03917910447761194,
+    "details": 30,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.6666666666666666,
+    "over": 0.03544776119402985,
+    "details": 30,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8666666666666667,
+    "over": 0.061567164179104475,
+    "details": 30,
+    "docs": 1
+   }
+  },
+  "voicemail transcript": {
+   "model alone": {
+    "found": 0.85,
+    "over": 0.05362776025236592,
+    "details": 20,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.55,
+    "over": 0.08517350157728706,
+    "details": 20,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.85,
+    "over": 0.10410094637223975,
+    "details": 20,
+    "docs": 1
+   }
+  },
+  "warranty_claim_form_business_pdf_extract": {
+   "model alone": {
+    "found": 0.0,
+    "over": 0.05581395348837209,
+    "details": 0,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.0,
+    "over": 0.05581395348837209,
+    "details": 0,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.0,
+    "over": 0.09069767441860464,
+    "details": 0,
+    "docs": 1
+   }
+  },
+  "will": {
+   "model alone": {
+    "found": 0.9428571428571428,
+    "over": 0.012671594508975714,
+    "details": 35,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.7714285714285715,
+    "over": 0.023231256599788808,
+    "details": 35,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.8,
+    "over": 0.0337909186906019,
+    "details": 35,
+    "docs": 1
+   }
+  },
+  "witness_statement": {
+   "model alone": {
+    "found": 1.0,
+    "over": 0.014157014157014158,
+    "details": 23,
+    "docs": 1
+   },
+   "veil alone": {
+    "found": 0.4782608695652174,
+    "over": 0.015444015444015444,
+    "details": 23,
+    "docs": 1
+   },
+   "veil + model": {
+    "found": 0.9565217391304348,
+    "over": 0.021879021879021878,
+    "details": 23,
+    "docs": 1
+   }
+  }
+ },
+ "by_data": {
+  "model alone": {
+   "username": [
+    162,
+    172
+   ],
+   "SSN": [
+    37,
+    37
+   ],
+   "tax / national ID": [
+    158,
+    163
+   ],
+   "name": [
+    1670,
+    1781
+   ],
+   "address": [
+    214,
+    243
+   ],
+   "phone": [
+    429,
+    436
+   ],
+   "email": [
+    256,
+    260
+   ],
+   "customer ID": [
+    155,
+    166
+   ],
+   "employee ID": [
+    78,
+    102
+   ],
+   "passport": [
+    40,
+    40
+   ],
+   "account number": [
+    107,
+    121
+   ],
+   "driver licence": [
+    28,
+    28
+   ],
+   "date of birth": [
+    178,
+    184
+   ],
+   "credit card": [
+    42,
+    47
+   ],
+   "IBAN": [
+    47,
+    50
+   ],
+   "SWIFT": [
+    18,
+    20
+   ]
+  },
+  "veil alone": {
+   "username": [
+    51,
+    172
+   ],
+   "SSN": [
+    32,
+    37
+   ],
+   "tax / national ID": [
+    94,
+    163
+   ],
+   "name": [
+    1304,
+    1781
+   ],
+   "address": [
+    71,
+    243
+   ],
+   "phone": [
+    302,
+    436
+   ],
+   "email": [
+    238,
+    260
+   ],
+   "customer ID": [
+    74,
+    166
+   ],
+   "employee ID": [
+    20,
+    102
+   ],
+   "passport": [
+    35,
+    40
+   ],
+   "account number": [
+    56,
+    121
+   ],
+   "driver licence": [
+    19,
+    28
+   ],
+   "date of birth": [
+    54,
+    184
+   ],
+   "credit card": [
+    10,
+    47
+   ],
+   "IBAN": [
+    45,
+    50
+   ],
+   "SWIFT": [
+    14,
+    20
+   ]
+  },
+  "veil + model": {
+   "username": [
+    169,
+    172
+   ],
+   "SSN": [
+    37,
+    37
+   ],
+   "tax / national ID": [
+    151,
+    163
+   ],
+   "name": [
+    1529,
+    1781
+   ],
+   "address": [
+    110,
+    243
+   ],
+   "phone": [
+    423,
+    436
+   ],
+   "email": [
+    239,
+    260
+   ],
+   "customer ID": [
+    154,
+    166
+   ],
+   "employee ID": [
+    82,
+    102
+   ],
+   "passport": [
+    40,
+    40
+   ],
+   "account number": [
+    103,
+    121
+   ],
+   "driver licence": [
+    27,
+    28
+   ],
+   "date of birth": [
+    174,
+    184
+   ],
+   "credit card": [
+    42,
+    47
+   ],
+   "IBAN": [
+    48,
+    50
+   ],
+   "SWIFT": [
+    19,
+    20
+   ]
+  }
+ }
+}
