@@ -263,6 +263,37 @@ only add to what's hidden: one that returns a name in pieces ("Luigi", then "Tog
 45M to 570M parameters, on a CPU) beside veil, off the shelf and trained for it, on 20 test sets
 and on real AI chats.
 
+## With the span tagger
+
+`veil.tagged` runs veil's rules and a fine-tuned GLiNER tagger
+([Deerpark/veil-tagger-edge](https://huggingface.co/Deerpark/veil-tagger-edge), 45M parameters, CPU) on the
+original text and hides every word either one marks:
+
+```python
+pip install -e ".[tagger]"
+
+from veil.tagged import TaggedRedactor
+r = TaggedRedactor()                          # system="union"; "model" or "veil" for one layer alone
+text, spans = r.redact("Call Maria Lopez on 0412 555 019.")
+```
+
+`threshold` (0.35 by default) trades what the tagger finds against the other words it hides.
+
+### Benchmarking it
+
+```
+pip install -e ".[bench]" && python -m spacy download en_core_web_lg
+python benchmarks/veilbench.py systems                  # veil, the tagger, Presidio, scrubadub, spaCy, 12 PII models
+python benchmarks/veilbench.py score my_docs.jsonl --systems union,model,veil,presidio --out report/
+python benchmarks/veilbench.py redact contract.pdf notes.txt --out redacted.html
+```
+
+`score` reads JSONL lines of `{"text": ..., "spans": [[start, end, "name"], ...], "group": "..."}` (or documents in
+the `⟦label|text⟧` markup of `benchmarks/judged/docgen`) and writes `report.json` and `report.md`: the share of
+labelled details hidden in full, with a 95% interval, the share of other words hidden, both per type of detail and
+per group, and every miss with its context. `redact` shows what would be hidden in your own files, without labels.
+Set `VEIL_TAGGER` to use a local copy of the tagger.
+
 ## A second check: a guardrail
 
 ```python

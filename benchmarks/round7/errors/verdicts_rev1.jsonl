@@ -1,0 +1,255 @@
+{"id": 0, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Payer name hidden; only bank UPI suffix okhdfc visible"}
+{"id": 1, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only licence prefix letters EF visible"}
+{"id": 2, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only a lone letter fragment visible"}
+{"id": 3, "category": "true_miss", "cue": "context_sentence", "reason": "SSN area and group digits 266-40 visible"}
+{"id": 4, "category": "label_error", "cue": "none", "reason": "Peso Bruto is a field caption, not a name"}
+{"id": 5, "category": "true_miss", "cue": "name_knowledge", "reason": "User's given name visible in device name"}
+{"id": 6, "category": "true_miss", "cue": "label_or_field", "reason": "Full loan number visible"}
+{"id": 7, "category": "true_miss", "cue": "label_or_field", "reason": "Full username visible after IDENTIFIANT caption"}
+{"id": 8, "category": "true_miss", "cue": "label_or_field", "reason": "Full date of birth of insured visible"}
+{"id": 9, "category": "label_error", "cue": "none", "reason": "'via email' is ordinary phrase, not an email"}
+{"id": 10, "category": "true_miss", "cue": "name_knowledge", "reason": "Student's name fully visible in Korean"}
+{"id": 11, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only city, state and country visible; street hidden"}
+{"id": 12, "category": "true_miss", "cue": "label_or_field", "reason": "Full SSN visible"}
+{"id": 13, "category": "true_miss", "cue": "format_only", "reason": "Full employee number visible in payroll register"}
+{"id": 14, "category": "harmless_leftover", "cue": "format_only", "reason": "Only github.com domain visible"}
+{"id": 15, "category": "label_error", "cue": "none", "reason": "Detta is a Swedish pronoun"}
+{"id": 16, "category": "true_miss", "cue": "label_or_field", "reason": "Employer state ID number fully visible on W-2"}
+{"id": 17, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only honorific 'sig' visible"}
+{"id": 18, "category": "label_error", "cue": "context_sentence", "reason": "Business franchise address, not a private home"}
+{"id": 19, "category": "label_error", "cue": "none", "reason": "Company name (GmbH), not a person"}
+{"id": 20, "category": "true_miss", "cue": "label_or_field", "reason": "Child's first name Ana visible"}
+{"id": 21, "category": "true_miss", "cue": "label_or_field", "reason": "Signatory name fully visible"}
+{"id": 22, "category": "label_error", "cue": "none", "reason": "Form text 'Ja/Nej Om Ja', not a name"}
+{"id": 23, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only word BORGO visible; number and town hidden"}
+{"id": 24, "category": "true_miss", "cue": "label_or_field", "reason": "Furigana reading of applicant's name fully visible"}
+{"id": 25, "category": "true_miss", "cue": "label_or_field", "reason": "Mother's first name visible"}
+{"id": 26, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Only initial S visible"}
+{"id": 27, "category": "true_miss", "cue": "label_or_field", "reason": "House number and street name visible"}
+{"id": 28, "category": "harmless_leftover", "cue": "format_only", "reason": "Only TLD edu visible"}
+{"id": 29, "category": "ambiguous", "cue": "label_or_field", "reason": "Already-masked SSN; last four digits only"}
+{"id": 30, "category": "true_miss", "cue": "context_sentence", "reason": "Home street number in directions to house visible"}
+{"id": 31, "category": "true_miss", "cue": "label_or_field", "reason": "Most driver number digits visible"}
+{"id": 32, "category": "label_error", "cue": "none", "reason": "Vastgoed is a balance-sheet term"}
+{"id": 33, "category": "true_miss", "cue": "label_or_field", "reason": "Health fund member number fully visible"}
+{"id": 34, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only title Mme visible"}
+{"id": 35, "category": "harmless_leftover", "cue": "format_only", "reason": "Only house number visible; street hidden"}
+{"id": 36, "category": "true_miss", "cue": "context_sentence", "reason": "Recipient surname visible in salutation"}
+{"id": 37, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only house number visible"}
+{"id": 38, "category": "label_error", "cue": "none", "reason": "Umsatz is an accounting term"}
+{"id": 39, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only initial Ö visible"}
+{"id": 40, "category": "true_miss", "cue": "label_or_field", "reason": "Full UAN visible"}
+{"id": 41, "category": "true_miss", "cue": "name_knowledge", "reason": "Employee first name visible"}
+{"id": 42, "category": "true_miss", "cue": "format_only", "reason": "Full membership card number visible"}
+{"id": 43, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Street hidden; postcode and province only"}
+{"id": 44, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only title Mme visible"}
+{"id": 45, "category": "true_miss", "cue": "format_only", "reason": "Street, suburb and state visible"}
+{"id": 46, "category": "true_miss", "cue": "label_or_field", "reason": "Child's full date of birth visible"}
+{"id": 47, "category": "ambiguous", "cue": "context_sentence", "reason": "Truncated work extension fragment; marginal contact detail"}
+{"id": 48, "category": "true_miss", "cue": "label_or_field", "reason": "Full Medicare MBI visible"}
+{"id": 49, "category": "harmless_leftover", "cue": "format_only", "reason": "Only 'C' street abbreviation visible"}
+{"id": 50, "category": "true_miss", "cue": "label_or_field", "reason": "Dependent surname fully visible"}
+{"id": 51, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Truncated email fragment 'cas' reveals nothing"}
+{"id": 52, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Street hidden; only XML tag text visible"}
+{"id": 53, "category": "label_error", "cue": "none", "reason": "Sitz means seat/headquarters, not a name"}
+{"id": 54, "category": "label_error", "cue": "none", "reason": "Importe is a table header"}
+{"id": 55, "category": "label_error", "cue": "none", "reason": "Closing greeting, not a name"}
+{"id": 56, "category": "true_miss", "cue": "label_or_field", "reason": "Employer state ID number fully visible"}
+{"id": 57, "category": "harmless_leftover", "cue": "format_only", "reason": "Only TLD edu visible"}
+{"id": 58, "category": "label_error", "cue": "none", "reason": "Passiva is a balance-sheet term"}
+{"id": 59, "category": "true_miss", "cue": "label_or_field", "reason": "Employee first name (OCR-garbled) visible"}
+{"id": 60, "category": "true_miss", "cue": "context_sentence", "reason": "Staff username visible in file path"}
+{"id": 61, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only ID suffix letters visible"}
+{"id": 62, "category": "true_miss", "cue": "name_knowledge", "reason": "Nurse surname fully visible"}
+{"id": 63, "category": "true_miss", "cue": "format_only", "reason": "Full employee ID visible in timesheet"}
+{"id": 64, "category": "harmless_leftover", "cue": "format_only", "reason": "Only bank sort code visible; account number hidden"}
+{"id": 65, "category": "true_miss", "cue": "context_sentence", "reason": "Phone number spelled out fully visible"}
+{"id": 66, "category": "ambiguous", "cue": "context_sentence", "reason": "Initials of a resident; weakly identifying"}
+{"id": 67, "category": "true_miss", "cue": "name_knowledge", "reason": "Most of employee's Thai name visible"}
+{"id": 68, "category": "label_error", "cue": "none", "reason": "Logga is a verb, not a name"}
+{"id": 69, "category": "true_miss", "cue": "name_knowledge", "reason": "Landlord's name fully visible"}
+{"id": 70, "category": "label_error", "cue": "none", "reason": "Certificate file ID, not personal"}
+{"id": 71, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only 'ST' prefix visible"}
+{"id": 72, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only suffix 000 visible"}
+{"id": 73, "category": "true_miss", "cue": "context_sentence", "reason": "Staff username fully visible"}
+{"id": 74, "category": "true_miss", "cue": "label_or_field", "reason": "All SSN digits visible"}
+{"id": 75, "category": "label_error", "cue": "none", "reason": "Scott stamp catalogue reference, not a person"}
+{"id": 76, "category": "label_error", "cue": "context_sentence", "reason": "Example address in a policy text"}
+{"id": 77, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only ID suffix letters visible"}
+{"id": 78, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only ID suffix letters visible"}
+{"id": 79, "category": "true_miss", "cue": "label_or_field", "reason": "First five ITIN digits visible"}
+{"id": 80, "category": "label_error", "cue": "none", "reason": "Einnahmen is an accounting term"}
+{"id": 81, "category": "label_error", "cue": "none", "reason": "Uitgegeven means 'issued', not a name"}
+{"id": 82, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only ID suffix letters visible"}
+{"id": 83, "category": "true_miss", "cue": "context_sentence", "reason": "Patient surname TAN visible"}
+{"id": 84, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only suffix JR visible"}
+{"id": 85, "category": "label_error", "cue": "none", "reason": "Betrag is a table header"}
+{"id": 86, "category": "true_miss", "cue": "label_or_field", "reason": "Street name and number visible"}
+{"id": 87, "category": "label_error", "cue": "none", "reason": "Abschreibungen is an accounting term"}
+{"id": 88, "category": "label_error", "cue": "none", "reason": "Du is a pronoun"}
+{"id": 89, "category": "ambiguous", "cue": "name_knowledge", "reason": "Unclear if CSV value is person or company"}
+{"id": 90, "category": "label_error", "cue": "none", "reason": "Ik is a pronoun"}
+{"id": 91, "category": "label_error", "cue": "none", "reason": "'goda betyg' means good grades"}
+{"id": 92, "category": "label_error", "cue": "none", "reason": "Verstehe is a verb"}
+{"id": 93, "category": "true_miss", "cue": "context_sentence", "reason": "Gaming handle fully visible"}
+{"id": 94, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only initial visible; surname hidden"}
+{"id": 95, "category": "true_miss", "cue": "format_only", "reason": "Most of Thai home address visible"}
+{"id": 96, "category": "true_miss", "cue": "context_sentence", "reason": "Username visible in upload path"}
+{"id": 97, "category": "label_error", "cue": "none", "reason": "Verwendungszweck is a table header"}
+{"id": 98, "category": "label_error", "cue": "none", "reason": "Rente means interest, a table header"}
+{"id": 99, "category": "label_error", "cue": "none", "reason": "Detta is a pronoun"}
+{"id": 100, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only final IBAN letter visible"}
+{"id": 101, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only XML markup visible; address hidden"}
+{"id": 102, "category": "harmless_leftover", "cue": "format_only", "reason": "Only word 'plac' visible"}
+{"id": 103, "category": "true_miss", "cue": "name_knowledge", "reason": "Guest surname visible in katakana"}
+{"id": 104, "category": "true_miss", "cue": "label_or_field", "reason": "Dependent first name fully visible"}
+{"id": 105, "category": "ambiguous", "cue": "label_or_field", "reason": "W-2 control number; private status debatable"}
+{"id": 106, "category": "true_miss", "cue": "label_or_field", "reason": "Employer state ID number fully visible"}
+{"id": 107, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only check digits 99 visible"}
+{"id": 108, "category": "true_miss", "cue": "label_or_field", "reason": "Child's date of birth visible"}
+{"id": 109, "category": "label_error", "cue": "none", "reason": "Template placeholder, not real data"}
+{"id": 110, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only passport prefix visible"}
+{"id": 111, "category": "ambiguous", "cue": "context_sentence", "reason": "Gate access code; not clearly an address"}
+{"id": 112, "category": "true_miss", "cue": "context_sentence", "reason": "Most licence digits visible"}
+{"id": 113, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only form caption visible; address hidden"}
+{"id": 114, "category": "true_miss", "cue": "name_knowledge", "reason": "Most of employee's Thai name visible"}
+{"id": 115, "category": "label_error", "cue": "none", "reason": "Contract role term, not a name"}
+{"id": 116, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Source already masked; only fragment visible"}
+{"id": 117, "category": "true_miss", "cue": "format_only", "reason": "House number and street visible"}
+{"id": 118, "category": "label_error", "cue": "none", "reason": "'Andere Mitarbeiter' means other employees"}
+{"id": 119, "category": "label_error", "cue": "none", "reason": "'dina behov' means your needs"}
+{"id": 120, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only first two digits visible"}
+{"id": 121, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Card digits hidden; only 'ending in'"}
+{"id": 122, "category": "true_miss", "cue": "name_knowledge", "reason": "User's first name fully visible"}
+{"id": 123, "category": "label_error", "cue": "none", "reason": "'Een Partij' means a party"}
+{"id": 124, "category": "true_miss", "cue": "context_sentence", "reason": "Personnel number fully visible"}
+{"id": 125, "category": "harmless_leftover", "cue": "format_only", "reason": "Handle hidden; only digit visible"}
+{"id": 126, "category": "label_error", "cue": "none", "reason": "Summer is a term/semester, not a name"}
+{"id": 127, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only ID suffix letters visible"}
+{"id": 128, "category": "label_error", "cue": "none", "reason": "Kreditkarte is payment method word"}
+{"id": 129, "category": "true_miss", "cue": "format_only", "reason": "Full membership card number visible"}
+{"id": 130, "category": "ambiguous", "cue": "label_or_field", "reason": "W-2 control number; private status debatable"}
+{"id": 131, "category": "label_error", "cue": "none", "reason": "Omzet is an accounting term"}
+{"id": 132, "category": "ambiguous", "cue": "context_sentence", "reason": "Sign-off initials of employee"}
+{"id": 133, "category": "true_miss", "cue": "label_or_field", "reason": "Child's date of birth visible"}
+{"id": 134, "category": "label_error", "cue": "label_or_field", "reason": "Idempotency key, not an account number"}
+{"id": 135, "category": "label_error", "cue": "none", "reason": "Ordinary German words"}
+{"id": 136, "category": "label_error", "cue": "none", "reason": "Bilancio is a heading"}
+{"id": 137, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Card digits hidden"}
+{"id": 138, "category": "harmless_leftover", "cue": "format_only", "reason": "Only word Studio visible"}
+{"id": 139, "category": "true_miss", "cue": "context_sentence", "reason": "SSN area and group digits visible"}
+{"id": 140, "category": "true_miss", "cue": "label_or_field", "reason": "Employer state ID visible on W-2"}
+{"id": 141, "category": "true_miss", "cue": "label_or_field", "reason": "Employer state ID visible on W-2"}
+{"id": 142, "category": "label_error", "cue": "none", "reason": "Kosten is a table header"}
+{"id": 143, "category": "true_miss", "cue": "context_sentence", "reason": "House number, unit and postal code visible"}
+{"id": 144, "category": "ambiguous", "cue": "context_sentence", "reason": "Only SSN last four given"}
+{"id": 145, "category": "label_error", "cue": "none", "reason": "Certificate serial, not personal"}
+{"id": 146, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Only account prefix KF visible"}
+{"id": 147, "category": "label_error", "cue": "none", "reason": "Sobald is a conjunction"}
+{"id": 148, "category": "label_error", "cue": "context_sentence", "reason": "Public office title, not a private person"}
+{"id": 149, "category": "true_miss", "cue": "label_or_field", "reason": "Cashier first name visible"}
+{"id": 150, "category": "true_miss", "cue": "label_or_field", "reason": "Payer account number fully visible"}
+{"id": 151, "category": "true_miss", "cue": "label_or_field", "reason": "Payee first name visible"}
+{"id": 152, "category": "harmless_leftover", "cue": "format_only", "reason": "Handle hidden; only digits visible"}
+{"id": 153, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Street name and town hidden"}
+{"id": 154, "category": "true_miss", "cue": "context_sentence", "reason": "Child's date of birth visible"}
+{"id": 155, "category": "true_miss", "cue": "format_only", "reason": "Full social security number visible"}
+{"id": 156, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only version code JK visible"}
+{"id": 157, "category": "label_error", "cue": "none", "reason": "Belopp is a table header"}
+{"id": 158, "category": "label_error", "cue": "none", "reason": "Ordinary words 'my future'"}
+{"id": 159, "category": "true_miss", "cue": "context_sentence", "reason": "Home unit number visible"}
+{"id": 160, "category": "ambiguous", "cue": "label_or_field", "reason": "W-2 control number; private status debatable"}
+{"id": 161, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Surname hidden; only generic words visible"}
+{"id": 162, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only last two digits visible"}
+{"id": 163, "category": "true_miss", "cue": "label_or_field", "reason": "Employee surname visible"}
+{"id": 164, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only particle 'de' visible"}
+{"id": 165, "category": "label_error", "cue": "none", "reason": "Template placeholder"}
+{"id": 166, "category": "true_miss", "cue": "format_only", "reason": "Street, town and postcode visible"}
+{"id": 167, "category": "harmless_leftover", "cue": "format_only", "reason": "Only letter o visible"}
+{"id": 168, "category": "true_miss", "cue": "name_knowledge", "reason": "Private user's full name visible"}
+{"id": 169, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only key digits visible"}
+{"id": 170, "category": "label_error", "cue": "none", "reason": "Ordinary Swedish phrase"}
+{"id": 171, "category": "ambiguous", "cue": "label_or_field", "reason": "W-2 control number; private status debatable"}
+{"id": 172, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only RIB key visible"}
+{"id": 173, "category": "label_error", "cue": "none", "reason": "Restbedrag is a table header"}
+{"id": 174, "category": "label_error", "cue": "context_sentence", "reason": "City alone is not private"}
+{"id": 175, "category": "harmless_leftover", "cue": "format_only", "reason": "Handle hidden; only 'epic' visible"}
+{"id": 176, "category": "true_miss", "cue": "format_only", "reason": "Full employee ID visible"}
+{"id": 177, "category": "ambiguous", "cue": "name_knowledge", "reason": "Unclear if CSV value is person or company"}
+{"id": 178, "category": "true_miss", "cue": "context_sentence", "reason": "Employee phone extension visible"}
+{"id": 179, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only floor and door visible"}
+{"id": 180, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only particle DOS visible"}
+{"id": 181, "category": "label_error", "cue": "none", "reason": "'are' is a verb"}
+{"id": 182, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only first three SSN digits visible"}
+{"id": 183, "category": "label_error", "cue": "none", "reason": "Reserven is an accounting term"}
+{"id": 184, "category": "label_error", "cue": "none", "reason": "Generic role 'juror'"}
+{"id": 185, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only OCR suffix visible"}
+{"id": 186, "category": "true_miss", "cue": "format_only", "reason": "Part of Twitter handle visible"}
+{"id": 187, "category": "ambiguous", "cue": "label_or_field", "reason": "W-2 control number; private status debatable"}
+{"id": 188, "category": "true_miss", "cue": "context_sentence", "reason": "Personnel number fully visible"}
+{"id": 189, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only prefix CC visible"}
+{"id": 190, "category": "ambiguous", "cue": "name_knowledge", "reason": "Unclear if CSV value is person or company"}
+{"id": 191, "category": "label_error", "cue": "none", "reason": "Accounting line item"}
+{"id": 192, "category": "true_miss", "cue": "label_or_field", "reason": "Witness date of birth visible"}
+{"id": 193, "category": "true_miss", "cue": "name_knowledge", "reason": "Groom's first name visible"}
+{"id": 194, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only 'Cc' header visible"}
+{"id": 195, "category": "label_error", "cue": "context_sentence", "reason": "Judge acting in official capacity"}
+{"id": 196, "category": "true_miss", "cue": "format_only", "reason": "Username fully visible"}
+{"id": 197, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only check letter visible"}
+{"id": 198, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Contract serial hidden; only branch prefix"}
+{"id": 199, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Card digits hidden"}
+{"id": 200, "category": "true_miss", "cue": "label_or_field", "reason": "User display name visible"}
+{"id": 201, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only ID suffix letters visible"}
+{"id": 202, "category": "true_miss", "cue": "label_or_field", "reason": "All SSN digits visible"}
+{"id": 203, "category": "label_error", "cue": "context_sentence", "reason": "City name only"}
+{"id": 204, "category": "true_miss", "cue": "format_only", "reason": "Partnership EIN fully visible on tax form"}
+{"id": 205, "category": "label_error", "cue": "none", "reason": "Transaction description word"}
+{"id": 206, "category": "ambiguous", "cue": "context_sentence", "reason": "ZIP code alone; borderline locating detail"}
+{"id": 207, "category": "label_error", "cue": "none", "reason": "'@_' fragment is not a real handle"}
+{"id": 208, "category": "true_miss", "cue": "context_sentence", "reason": "Loan number fully visible"}
+{"id": 209, "category": "true_miss", "cue": "label_or_field", "reason": "Identity Protection PIN fully visible"}
+{"id": 210, "category": "label_error", "cue": "none", "reason": "Ondertekening means signature"}
+{"id": 211, "category": "true_miss", "cue": "context_sentence", "reason": "Customer ID visible in file path"}
+{"id": 212, "category": "label_error", "cue": "context_sentence", "reason": "City name only"}
+{"id": 213, "category": "ambiguous", "cue": "context_sentence", "reason": "Company president; public role debatable"}
+{"id": 214, "category": "label_error", "cue": "none", "reason": "Tipo is a table header"}
+{"id": 215, "category": "ambiguous", "cue": "label_or_field", "reason": "Card last four only"}
+{"id": 216, "category": "label_error", "cue": "none", "reason": "Financiering is an accounting term"}
+{"id": 217, "category": "label_error", "cue": "none", "reason": "Ordinary Dutch words"}
+{"id": 218, "category": "label_error", "cue": "none", "reason": "Random hex string, not a name"}
+{"id": 219, "category": "label_error", "cue": "none", "reason": "Certificate serial, not personal"}
+{"id": 220, "category": "true_miss", "cue": "format_only", "reason": "Full membership card number visible"}
+{"id": 221, "category": "true_miss", "cue": "label_or_field", "reason": "Username fully visible"}
+{"id": 222, "category": "label_error", "cue": "none", "reason": "Detta is a pronoun"}
+{"id": 223, "category": "label_error", "cue": "none", "reason": "Marca is a field caption"}
+{"id": 224, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only title Madame visible"}
+{"id": 225, "category": "ambiguous", "cue": "context_sentence", "reason": "Business phone extension of manager"}
+{"id": 226, "category": "label_error", "cue": "none", "reason": "Generic role 'juror'"}
+{"id": 227, "category": "true_miss", "cue": "label_or_field", "reason": "Employer state ID fully visible"}
+{"id": 228, "category": "true_miss", "cue": "format_only", "reason": "Employee ID fully visible"}
+{"id": 229, "category": "true_miss", "cue": "context_sentence", "reason": "Username visible in file path"}
+{"id": 230, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only 'ext' visible"}
+{"id": 231, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only passport prefix visible"}
+{"id": 232, "category": "label_error", "cue": "none", "reason": "Generic role 'juror'"}
+{"id": 233, "category": "harmless_leftover", "cue": "format_only", "reason": "Handle hidden; only RT visible"}
+{"id": 234, "category": "true_miss", "cue": "label_or_field", "reason": "Dependent date of birth visible"}
+{"id": 235, "category": "true_miss", "cue": "label_or_field", "reason": "Employee surname visible"}
+{"id": 236, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Street hidden; only floor info visible"}
+{"id": 237, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only title Mme visible"}
+{"id": 238, "category": "true_miss", "cue": "format_only", "reason": "Licence number fully visible"}
+{"id": 239, "category": "label_error", "cue": "context_sentence", "reason": "Public office title"}
+{"id": 240, "category": "true_miss", "cue": "format_only", "reason": "Full membership card number visible"}
+{"id": 241, "category": "label_error", "cue": "none", "reason": "Company name"}
+{"id": 242, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only initial letter visible"}
+{"id": 243, "category": "true_miss", "cue": "name_knowledge", "reason": "Interpreter surname visible"}
+{"id": 244, "category": "true_miss", "cue": "context_sentence", "reason": "Mobile number fully visible"}
+{"id": 245, "category": "label_error", "cue": "label_or_field", "reason": "Company address, not private"}
+{"id": 246, "category": "true_miss", "cue": "name_knowledge", "reason": "Executive surname reading visible"}
+{"id": 247, "category": "ambiguous", "cue": "label_or_field", "reason": "W-2 control number; private status debatable"}
+{"id": 248, "category": "label_error", "cue": "none", "reason": "Accounting line item"}
+{"id": 249, "category": "harmless_leftover", "cue": "label_or_field", "reason": "Only ID suffix letters visible"}
+{"id": 250, "category": "true_miss", "cue": "label_or_field", "reason": "Employer state ID fully visible"}
+{"id": 251, "category": "ambiguous", "cue": "context_sentence", "reason": "Card last four only"}
+{"id": 252, "category": "harmless_leftover", "cue": "name_knowledge", "reason": "Only initial visible"}
+{"id": 253, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Only initial visible"}
+{"id": 254, "category": "harmless_leftover", "cue": "context_sentence", "reason": "Only state, postcode, country visible"}
