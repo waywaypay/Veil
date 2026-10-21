@@ -784,3 +784,23 @@ def test_a_surname_known_as_one_word_still_ends_the_name_before_it(text, name):
     r.add_person("Okonkwo")
     out = r.redact_text(text)
     assert out == text.replace(name, "NAME_001") and r.restore_text(out) == text
+
+
+@pytest.mark.parametrize("written, year, month", [
+    ("14/03/1990", "1990", "March 1990"),
+    ("1990-03-14", "1990", "March 1990"),
+    ("March 14, 1990", "1990", "March 1990"),
+    ("04/05/1990", "1990", "1990"),        # day and month could be either way round
+])
+def test_reveal_birth_year_or_month(written, year, month):
+    for level, born in (("year", year), ("month", month)):
+        r = Redactor(reveal={"DOB": level})
+        out = r.redact_text(f"DOB: {written}")
+        assert out == f"DOB: DOB_001 (born {born})"
+        assert r.restore_text(f"She was born DOB_001 (born {born}).") == f"She was born {written}."
+
+
+def test_reveal_is_off_by_default_and_checked():
+    assert Redactor().redact_text("DOB: 14/03/1990") == "DOB: DOB_001"
+    with pytest.raises(ValueError):
+        Redactor(reveal={"DOB": "day"})

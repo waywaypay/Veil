@@ -221,6 +221,19 @@ def fill_form(name: str, ssn: str, address: str):   # real values by the time th
 If the model really does need to read a kind of value, leave that kind out
 of `detect` so it stays visible (see below).
 
+A birth date can let part of itself through. With `reveal`, the model sees
+the year, or the month and year, next to the placeholder, so it can tell who
+is older or roughly how old someone is without seeing the date:
+
+```python
+r = Redactor(reveal={"DOB": "month"})         # or {"DOB": "year"}
+r.redact_text("DOB: 14/03/1990")               # "DOB: DOB_001 (born March 1990)"
+r.restore_text("Born DOB_001 (born March 1990).")   # "Born 14/03/1990."
+```
+
+A numeric date whose day and month could be either way round ("04/05/1990")
+shows only its year. The note is taken off again when the reply is restored.
+
 ## Profiles
 
 A profile tells veil which words in a kind of document look like names but

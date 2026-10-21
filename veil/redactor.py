@@ -776,6 +776,34 @@ def _vocab(profile: Profile, kinds: frozenset[str]) -> _Vocab:
         member_interest=profile.member_interest_words)
 
 
+_DOB_PLACEHOLDER = re.compile(r"\bDOB_\d{3,}\b(?! \(born )")
+_BORN_NOTE = re.compile(r"\b(DOB_\d{3,}) \(born [^()\n]{1,20}\)")
+_MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+                "November", "December")
+
+
+def _born(value: str, level: str) -> str | None:
+    """"1990" or "March 1990" from a written birth date, or None when its year can't be told.  A numeric date
+    whose day and month could be either way round ("04/05/1990") gives only the year."""
+    year = re.search(r"(?<!\d)(19|20)\d\d(?!\d)", value)
+    if not year:
+        return None
+    if level == "year":
+        return year.group()
+    named = [i for i, m in enumerate(_MONTH_NAMES, 1) for w in re.findall(r"[^\W\d_]+", value.casefold())
+             if len(w) >= 3 and m.casefold().startswith(w)]
+    rest = [int(n) for n in re.findall(r"\d+", value[:year.start()] + " " + value[year.end():])]
+    month = named[0] if named else None
+    if month is None and len(rest) == 2:
+        if value.strip().startswith(year.group()):   # 1990-03-14
+            month = rest[0]
+        elif rest[0] > 12 >= rest[1]:
+            month = rest[1]
+        elif rest[1] > 12 >= rest[0]:
+            month = rest[0]
+    return f"{_MONTH_NAMES[month - 1]} {year.group()}" if month and 1 <= month <= 12 else year.group()
+
+
 class Redactor(TaxIdRedactor):
     """One conversation's placeholders for taxpayer IDs and personal information.
 
@@ -790,10 +818,17 @@ class Redactor(TaxIdRedactor):
     A piece of a name ("Luigi" of "Luigi Clelia Togliatti") leaves the name found around it whole.  The built-in
     name finding works from word lists, so it misses names it has no word for in prose that has no label or
     title before them ("CEO Satya Nadella").
+    ``reveal``: what the model may still see of a hidden value, as {kind: how much}.  {"DOB": "year"} sends
+    a birth date as "DOB_001 (born 1990)", {"DOB": "month"} as "DOB_001 (born March 1990)", so the model can
+    tell who is older or roughly how old someone is.  The note is taken off again when the reply is restored.
     """
 
-    def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None):
+    def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None, reveal=None):
         super().__init__(profile)
+        self._reveal = dict(reveal or {})
+        for kind, level in self._reveal.items():
+            if kind != "DOB" or level not in ("year", "month"):
+                raise ValueError(f"Can't reveal {kind!r} as {level!r}: use {{'DOB': 'year'}} or {{'DOB': 'month'}}.")
         self._name_finder = name_finder
         self._detect = frozenset(KINDS if detect is None else detect)
         unknown = self._detect - set(KINDS)
@@ -983,7 +1018,18 @@ class Redactor(TaxIdRedactor):
             finally:
                 self._guessing = False
         text = self._redact_personal(self._prepare(text), typed)
-        return self._redact_ids(text) if self._detect & set(TAX_ID_KINDS) else text
+        text = self._redact_ids(text) if self._detect & set(TAX_ID_KINDS) else text
+        return self._noted(text) if self._reveal else text
+
+    def _noted(self, text: str) -> str:
+        """Each birth date's placeholder followed by the part of it ``reveal`` lets through."""
+        def note(m: re.Match) -> str:
+            born = _born(self._real.get(m.group(), ""), self._reveal["DOB"])
+            return f"{m.group()} (born {born})" if born else m.group()
+        return _DOB_PLACEHOLDER.sub(note, text)
+
+    def restore_text(self, text: str) -> str:
+        return super().restore_text(_BORN_NOTE.sub(r"\1", text) if self._reveal else text)
 
     def redact(self, value, typed: bool = False):
         if not typed:
