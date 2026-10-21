@@ -1,4 +1,6 @@
-from veil.tagged import Span, TaggedRedactor, _join, chunks, merged, veil_hidden
+import pytest
+
+from veil.tagged import Span, TaggedRedactor, _join, chunks, extend_name, merged, veil_hidden
 
 
 def test_chunks_keep_offsets():
@@ -11,6 +13,38 @@ def test_chunks_keep_offsets():
 def test_merged_joins_a_first_and_last_name():
     text = "Maria Lopez called"
     assert merged([(0, 5, "NAME", 0.9), (6, 11, "NAME", 0.8)], text) == [(0, 11, "NAME", 0.8)]
+
+
+@pytest.mark.parametrize("text, name, rest", [
+    ("Reporting person: Osborne William H\n5. Relationship", "Osborne William", " H"),
+    ("Name | Andrew P. Sutor, IV | Director", "Andrew P. Sutor", ", IV"),
+    ("signed by Robert Hale Jr. on Monday", "Robert Hale", " Jr."),
+    ("Dr. Anna Wu, MD, PhD", "Dr. Anna Wu", ", MD, PhD"),
+    ("Walter Boyd M. Reeves", "Walter Boyd", " M."),
+    ("Dana Cole III and Mary Ng", "Dana Cole", " III"),
+])
+def test_a_name_takes_in_its_trailing_initial_and_suffix(text, name, rest):
+    end = text.index(name) + len(name)
+    assert text[end:extend_name(text, end)] == rest
+
+
+@pytest.mark.parametrize("text, name", [
+    ("Mary Jones I think so", "Mary Jones"),
+    ("Please ask John Smith A new form is due", "John Smith"),
+    ("Tell Maria Lopez about it", "Maria Lopez"),
+    ("Chair Pat Noor V of the board", "Pat Noor"),
+    ("Anna Wu\nIV. Next item", "Anna Wu"),
+])
+def test_a_name_keeps_the_words_that_are_not_part_of_it(text, name):
+    end = text.index(name) + len(name)
+    assert extend_name(text, end) == end
+
+
+def test_merged_extends_a_name_up_to_the_next_span():
+    text = "Osborne William H, 11892 South Brookglen Drive"
+    spans = [(0, 15, "NAME", 0.9), (19, 46, "ADDRESS", 0.8)]
+    assert merged(spans, text)[0][:2] == (0, 17)
+    assert merged([(0, 15, "NAME", 0.9), (16, 17, "NAME", 0.9)], text)[0][:2] == (0, 17)
 
 
 def test_veil_hidden_finds_the_words_veil_replaced():
