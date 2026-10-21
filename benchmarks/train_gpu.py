@@ -4,6 +4,7 @@ if it beats it, a bigger model is worth having.
 
     python benchmarks/train_gpu.py build EXAMPLES... --out train.jsonl.gz    the examples, deduplicated
     python benchmarks/train_gpu.py train BASE train.jsonl.gz OUT [--steps N]
+    python benchmarks/train_gpu.py segments BASE round8.jsonl.gz OUT [--n 4]    round 8's four 500-step segments
 
 BASE: knowledgator/gliner-pii-large-v1.0 or knowledgator/gliner-pii-edge-v1.0.  The recipe is fixed in advance and
 is the one the tagger's rounds used: lr 1e-5 (others 2e-5), batch 8, focal loss (alpha 0.75, gamma 2), warmup 0.1,
@@ -33,10 +34,10 @@ def build(paths, out):
     print(f"{len(rows)} examples from {len(paths)} files to {out}", file=sys.stderr)
 
 
-def train(base, data, out, steps=None):
+def train(base, data, out, steps=None, rows=None):
     import torch
     from gliner import GLiNER
-    rows = [json.loads(line) for line in gzip.open(data, "rt")]
+    rows = rows if rows is not None else [json.loads(line) for line in gzip.open(data, "rt")]
     steps = steps or len(rows) // 8
     gpu = torch.cuda.is_available()
     model = GLiNER.from_pretrained(base)
@@ -54,6 +55,16 @@ def train(base, data, out, steps=None):
           file=sys.stderr)
 
 
+def segments(base, data, out, n=4, steps=500):
+    """The CPU rounds' way, on a GPU: ``n`` segments of ``steps`` steps on the next ``steps * 8`` examples of the data
+    taken twice over in order, each from the last one's weights; the data is not shuffled or deduplicated (a source's
+    repeats are its weighting).  Saves OUT_1 ... OUT_n."""
+    rows = [json.loads(line) for line in gzip.open(data, "rt")] * 2
+    for i in range(n):
+        piece = rows[i * steps * 8:(i + 1) * steps * 8]
+        train(base if i == 0 else f"{out}_{i}", None, f"{out}_{i + 1}", steps, rows=piece)
+
+
 def main():
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -65,8 +76,15 @@ def main():
     t.add_argument("data")
     t.add_argument("out")
     t.add_argument("--steps", type=int)
+    c = sub.add_parser("segments")
+    c.add_argument("base")
+    c.add_argument("data")
+    c.add_argument("out")
+    c.add_argument("--n", type=int, default=4)
     a = p.parse_args()
-    if a.cmd == "build":
+    if a.cmd == "segments":
+        segments(a.base, a.data, a.out, a.n)
+    elif a.cmd == "build":
         build(a.examples, a.out)
     else:
         train(a.base, a.data, a.out, a.steps)
