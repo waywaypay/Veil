@@ -124,10 +124,14 @@ class Gliner:
 
 
 class Gliner2:
-    """Fastino's GLiNER2 models (pip install gliner2): the same label list, spans with a confidence."""
+    """Fastino's GLiNER2 and GLiNER2.5 models (pip install gliner2): the same label list, spans with a confidence.
+    AutoExtractor loads either kind (GLiNER2.5's boundary models need it); older gliner2 releases have only GLiNER2."""
     def __init__(self, model):
-        from gliner2 import GLiNER2
-        self.m = GLiNER2.from_pretrained(model)
+        try:
+            from gliner2 import AutoExtractor as load
+        except ImportError:
+            from gliner2 import GLiNER2 as load
+        self.m = load.from_pretrained(model)
         self.labels = list(tagged.LABELS)
 
     def spans(self, texts):
@@ -336,6 +340,11 @@ SYSTEMS = {
     "nvidia-gliner-pii": (lambda: Gliner("nvidia/gliner-PII", nemo=True), "nvidia/gliner-PII", 0.5),
     "gliner2-pii-multi": (lambda: Gliner2("fastino/gliner2-privacy-filter-PII-multi"), "fastino/gliner2-privacy-filter-PII-multi (GLiNER2, 278M)", 0.5),
     "gliner2-guardrails-pii": (lambda: Gliner2("fastino/GLiNER2-Guardrails-PII-Multi"), "fastino/GLiNER2-Guardrails-PII-Multi", 0.5),
+    "gliner2-base": (lambda: Gliner2("fastino/gliner2-base-v1"), "fastino/gliner2-base-v1 (general GLiNER2)", 0.5),
+    "gliner2-large": (lambda: Gliner2("fastino/gliner2-large-v1"), "fastino/gliner2-large-v1 (general GLiNER2)", 0.5),
+    "gliner2.5-small": (lambda: Gliner2("fastino/gliner2.5-small-v1"), "fastino/gliner2.5-small-v1 (GLiNER2.5, 74M)", 0.5),
+    "gliner2.5-base": (lambda: Gliner2("fastino/gliner2.5-base-v1"), "fastino/gliner2.5-base-v1 (GLiNER2.5, 194M)", 0.5),
+    "gliner2.5-multi": (lambda: Gliner2("fastino/gliner2.5-multi-v1"), "fastino/gliner2.5-multi-v1 (GLiNER2.5, 287M, multilingual)", 0.5),
     "piiranha": (lambda: TokenClassifier("iiiorg/piiranha-v1-detect-personal-information"), "iiiorg/piiranha-v1 (non-commercial licence)", 0.0),
     "ai4privacy-openpii": (lambda: TokenClassifier("ai4privacy/llama-ai4privacy-english-anonymiser-openpii"), "ai4privacy/llama-ai4privacy-english-anonymiser-openpii", 0.0),
     "deberta-ai4privacy": (lambda: TokenClassifier("Isotonic/deberta-v3-base_finetuned_ai4privacy_v2"), "Isotonic/deberta-v3-base_finetuned_ai4privacy_v2 (non-commercial)", 0.0),
