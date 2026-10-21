@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import time
 
 import pytest
@@ -784,3 +785,122 @@ def test_a_surname_known_as_one_word_still_ends_the_name_before_it(text, name):
     r.add_person("Okonkwo")
     out = r.redact_text(text)
     assert out == text.replace(name, "NAME_001") and r.restore_text(out) == text
+
+
+@pytest.mark.parametrize("written, year, month", [
+    ("14/03/1990", "1990", "March 1990"),
+    ("1990-03-14", "1990", "March 1990"),
+    ("March 14, 1990", "1990", "March 1990"),
+    ("04/05/1990", "1990", "1990"),        # day and month could be either way round
+])
+def test_reveal_birth_year_or_month(written, year, month):
+    for level, born in (("year", year), ("month", month)):
+        r = Redactor(reveal={"DOB": level})
+        out = r.redact_text(f"DOB: {written}")
+        assert out == f"DOB: DOB_001 (born {born})"
+        assert r.restore_text(f"She was born DOB_001 (born {born}).") == f"She was born {written}."
+
+
+def test_reveal_is_off_by_default_and_checked():
+    assert Redactor().redact_text("DOB: 14/03/1990") == "DOB: DOB_001"
+    with pytest.raises(ValueError):
+        Redactor(reveal={"DOB": "day"})
+
+
+def test_finder_adds_what_the_rules_miss_and_restores():
+    text = "Member No. MTS-009914, ID No. 22604718, call 0733 905 261."
+    def finder(t):
+        return [(t.index("MTS-009914"), t.index("MTS-009914") + 10, "ID"), (t.index("22604718"), t.index("22604718") + 8, "ID")]
+    r = Redactor(finder=finder)
+    out = r.redact_text(text)
+    assert "MTS-009914" not in out and "22604718" not in out
+    assert r.restore_text(out) == text
+
+
+def test_finder_only_adds_and_names_spread():
+    def finder(t):
+        i = t.find("Zorblax Vrenquist")
+        return [(i, i + 17, "NAME")] if i >= 0 else []
+    r = Redactor(finder=finder)
+    out = r.redact_text("Zorblax Vrenquist signed. Email zv@example.com")
+    assert "Zorblax" not in out and "zv@example.com" not in out
+    assert "Zorblax" not in r.redact_text("Later, Mr. Vrenquist called.")   # the name is now known however it's written
+
+
+def test_finder_new_kind_and_partial_overlap():
+    text = "Badge BX-7731 issued to the visitor."
+    r = Redactor(finder=lambda t: [(t.index("BX-7731"), t.index("BX-7731") + 7, "BADGE")])
+    out = r.redact_text(text)
+    assert out == "Badge BADGE_001 issued to the visitor." and r.restore_text(out) == text
+
+
+@pytest.mark.parametrize("text, kept", [
+    ("CARD ending in 4796\nThank you", "CARD ending in ACCOUNT_001\nThank you"),
+    ("Tarjeta de crédito: terminada en 0938, límite 3.000 €", "Tarjeta de crédito: terminada en ACCOUNT_001, límite 3.000 €"),
+    ("last four digits of your card are 5521", "last four digits of your card are ACCOUNT_001"),
+    ("Karte         ############3906\nFolge-Nr. 00", "Karte         ACCOUNT_001\nFolge-Nr. 00"),
+    ("Visa XXXX-XXXX-XXXX-3906 approved", "Visa ACCOUNT_001 approved"),
+    # no card named, or a form's blank: left alone
+    ("the fiscal year ending in 2019", "the fiscal year ending in 2019"),
+    ("Year XXXX 2024", "Year XXXX 2024"),
+])
+def test_a_cards_last_four(text, kept):
+    r = Redactor(FINANCE)
+    out = r.redact_text(text)
+    assert out == kept and r.restore_text(out) == text
+
+
+@pytest.mark.parametrize("text", [
+    "Indirizzo: Via delle Industrie 12, 20135 Milano, Italia",
+    "Domicilio: C/ de Sueca, 41, pta. 9, 46006 València",
+    "Av. Insurgentes Sur #1600, Ciudad de México, México",
+    "Adres: Caferağa Mahallesi, Moda Caddesi No: 141 Daire: 9\n34710 Kadıköy/İSTANBUL",
+    "C/ SANT PERE MÉS ALT, 42, 3º 2ª - 08003 BARCELONA",
+    "ul. Morska 45, 81-323 Gdynia",
+    "서울특별시 마포구 월드컵북로 396, 101동 1504호 (상암동)",
+    "2328 ADKINS VISTA APT. 381",
+    "Anschrift: Am Wetterkreuz 18\n91058 Erlangen",
+    "Opsigelse – Ryesgade 30B, 2. th.",
+    "Studio 19, Joel Island, Ryanview, NG72 0AG",
+    "1050 COMMONWEALTH AVE APT 6F\nBOSTON MA 02215 US",
+])
+def test_addresses_abroad_are_hidden_whole(text):
+    r = Redactor(FINANCE)
+    out = r.redact_text(text)
+    assert not re.search(r"\d", re.sub(r"[A-Z]+_\d{3}", "", out)), out
+    assert not any(w in out for w in ("Milano", "València", "México", "BARCELONA", "Gdynia", "Erlangen", "Studio", " US"))
+    assert r.restore_text(out) == text
+
+
+def test_an_address_found_grows_over_its_number_and_town():
+    text = " 1192 Michael Cove\n"   # a street read as a name, after its number
+    out = Redactor(FINANCE).redact_text(text)
+    assert out == " ADDRESS_001\n"
+    def finder(t):   # the model marks the street; its number and town come with it
+        i = t.index("Michael")
+        return [(i, i + len("Michael Cove"), "ADDRESS")]
+    text = "Ship to 88 Michael Cove, Ryanview, NG72 0AG today"
+    r = Redactor(FINANCE, finder=finder)
+    out = r.redact_text(text)
+    assert out == "Ship to ADDRESS_001 today" and r.restore_text(out) == text
+
+
+def test_names_and_forms_are_not_streets():
+    for text in ("Signed /e-signed/ Marguerite-Anne R. Thibodeaux      Date 01/05/2026",
+                 "OMB No. 1545-2726", "07/09   RENFE VIAJEROS SA                         MADRID      58,40"):
+        assert "ADDRESS" not in Redactor(FINANCE).redact_text(text)
+
+
+def test_quoted_printable_and_word_markup_are_read_through():
+    text = ("Content-Transfer-Encoding: quoted-printable\n\nMailing address is 2210 E C=\nesar Chavez St, Austin TX "
+            "78702=E2=80=914718. My cell is (512) 4=\n08-3317.")
+    r = Redactor(FINANCE)
+    out = r.redact_text(text)
+    assert "Chavez" not in out and "78702" not in out and "3317" not in out and r.restore_text(out) == text
+    text = ('<w:p><w:r><w:t xml:space="preserve">Address: </w:t></w:r><w:r><w:t>4410 N Milwaukee Ave, Apt 2F</w:t>'
+            '</w:r><w:r><w:br/></w:r><w:r><w:t>Chicago, IL 60630-1208</w:t></w:r></w:p>')
+    r = Redactor(FINANCE)
+    out = r.redact_text(text)
+    assert out.count("ADDRESS_") == 1 and "Chicago" not in out and r.restore_text(out) == text
+    text = '<w:del w:id="3" w:author="Harriet O&apos;Donoghue" w:date="2026-01-12T09:14:00Z"><w:r><w:t>x</w:t></w:r></w:del>'
+    assert "Donoghue" not in Redactor(FINANCE).redact_text(text)   # a name inside a tag is still read

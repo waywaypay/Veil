@@ -106,3 +106,21 @@ Written on 18 October 2026, after round 6's locked test was scored and before an
 * **Measurement ceiling**: on the first locked test, a second reviewer agreed on whether a span is a private
   person's detail 97.8% (Enron) to 98.8% (tweets) of the time, so a 99% found on the judged sets is near what the
   judging itself can tell apart. This is reported beside the result.
+
+## Round 8: real public records
+
+Written on 21 October 2026, after round 7 was published and before any round 8 model existed.
+
+* **Data**: 320 real public documents (SEC Form 4, Form D and employment, separation and consulting agreements; IRS 990
+  returns; CORD receipts; fetched by `r8_fetch.py`), labelled by agents under `r8/LABEL.md`. 40 more are held out of
+  everything for a human-labelled real-document test. A fifth of the 320 is dev. Training mix: the 256 training
+  documents three times over, plus 6,000 chunks of round 7's mix replayed.
+* **Starting point**: round 7's published model. Four 500-step segments at most, no more whatever the dev scores say.
+* **Choosing**: the rule above, on dev only: the segment and threshold that find the most, hiding no more other words
+  than round 7's model at 0.35 does on the same dev sets. Dev is round 7's dev plus the public-record fifth.
+* **The second locked test is no longer untouched.** Round 7's model was scored on it, and its misses were studied for
+  the hide-by-default experiments. Round 8 is scored on it and reported, but as a second look and not a clean test.
+  The clean readouts are the 40 held-out public records, scored once, and, when people have labelled them, the real
+  documents.
+* **Reported whichever way it falls**, with round 7's number beside it on the same sets. A gain on public records that
+  costs found or other words hidden elsewhere is reported as that.

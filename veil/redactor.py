@@ -19,6 +19,7 @@ as taxpayer IDs, so odd characters hide nothing.  The word lists are in
 
 from __future__ import annotations
 
+import bisect
 import gzip
 import re
 import unicodedata
@@ -340,7 +341,9 @@ _STREET_SUFFIX_MORE = ("Alley Anex Annex Arcade Bayou Beach Bend Bluff Bluffs Bo
                        "Stravenue Stream Streets Summit Throughway Trace Track Trafficway Tunnel Underpass Union Unions "
                        "Valley Valleys Viaduct View Views Village Villages Ville Vista Walks Wall Ways Well Wells Cross Gate Close "
                        "Rise Parade Yard Embankment Grange Rue Via Nagar Chowk Marg Zila Colony Layout Enclave Vihar Bagh Ganj").split()
-_ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:\\?!}+\]]|$|\.(?!\w)|(?:Suite|Ste|Apt|Apartment|Unit|Floor|\#)\b)"
+_SUFFIX_WORDS = frozenset(w.casefold() for w in _STREET_SUFFIX + _STREET_SUFFIX_MORE) | frozenset(
+    w.casefold() + "s" for w in _STREET_SUFFIX_MORE)
+_ADDRESS_END = (r"(?=[ \t]*(?:[,;|*\n\"'<>()/:\\?!}+\]]|$|\.(?!\w)|(?i:suite|ste|apt|apartment|unit|floor)\b|\#)"
                 r"|[ \t]+(?:and|was|is|in|for|to|with|as|has|have|had|where|which|on|at|from|since|by)\b)")
 # A street name of one word with its kind in it, before or after the number: "Xaviweg 5", "36 Ringtorget".
 _EURO_STREET = (r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'-]*(?i:strasse|stra\u00dfe|str\.|gasse|weg|platz|allee|ring|damm"
@@ -378,14 +381,26 @@ _TYPED_CITY_STATE_ZIP = re.compile(rf"(?<![\w'])(?P<city>(?:[a-z][\w'.-]*[ \t]+)
 _COUNTRIES = ("France Germany Switzerland Austria Italy Spain Belgium Netherlands Luxembourg Sweden Denmark Norway "
               "Finland Portugal Ireland Mexico Japan Canada Brazil Israel Singapore Australia").split()
 _FOREIGN = re.compile(
-    rf"(?<![\w])(?:{_EURO_STREET}[ \t]+\d{{1,5}}[a-z]?|(?:\d{{1,5}}/)?\d{{1,5}}[a-z]?,?[ \t]+{_EURO_STREET})(?![\w])"
+    rf"(?<![\w])(?:{_EURO_STREET}(?:[ \t]+|(?<=\.))\d{{1,5}}[a-zA-Z]?|(?:\d{{1,5}}/)?\d{{1,5}}[a-z]?,?[ \t]+{_EURO_STREET})(?![\w])"
+    r"|(?<![\w])(?:Am|Im|Zum|Zur|An[ \t]+der|Auf[ \t]+der|In[ \t]+der|Unter[ \t]+den)[ \t]+[A-Z\u00c0-\u00de][\w\u00c0-\u024f-]+"
+    r"[ \t]+(?!(?:19|20)\d\d\b)\d{1,4}[a-zA-Z]?(?![\w])"
     # Ronda Macario Merino 88, Via Roma 12
     r"|(?<![\w])(?:Ronda|Calle|Avenida|Paseo|Plaza|Pasaje|Carrer|Rua|Via|Viale|Piazza|Corso|Contrada|Strada|Vicolo"
+    r"|VIA|VIALE|PIAZZA|CORSO|CALLE|AVENIDA|RUA|Av\.|AV\.|Avda\.|C/|Cl\.|Cra\.|Ul\.|ul\.|al\.|pl\.|os\."
+    r"|vul\.|\u0432\u0443\u043b\.|\u043f\u0440\u043e\u0441\u043f\.|\u043f\u0440\.|\u0443\u043b\."
     r"|Largo|Rue|Avenue|Boulevard|Chemin|Place|Quai|Travessa|Traves\u00eda|Glorieta|Rotonda|Stretto|Callej\u00f3n|Callejon"
     r"|Camino|Cuesta|Alameda|Avinguda|Passatge|Pra\u00e7a|Rambla|Acceso|Borgo|Viale|Salita|Vico|Ulitsa|Ulica|Ul\.|Utca"
     r"|Prospekt|Pereulok|Sharia|Shari|Sharaa|Jalan|Jl\.|Thanon|Soi|Calea|Strada|Rruga|Odos|Sokak|Caddesi|Cad\.)"
-    r"(?:[ \t]+(?:(?:de|del|della|di|da|do|das|dos|la|las|los|le|les|du|des|el|al|Al)[ \t]+){0,2}"
-    r"[A-Z\u00c0-\u024f][\w\u00c0-\u024f'.-]*){1,4},?[ \t]+(?:No\.?[ \t]*)?\d{1,5}[a-z]?(?![\w])"
+    r"(?:(?:[ \t]+|(?<=[./]))(?:(?:de|del|della|delle|dello|degli|dei|di|da|do|das|dos|la|las|los|le|les|du|des|el|al|Al|DE|DEL|DELLA"
+    r"|DI|LA)[ \t]+|(?:dell|d|DELL)['\u2019]){0,2}"
+    r"[A-Z\u00c0-\u024f\u0400-\u042f][\w\u00c0-\u024f\u0400-\u04ff'.-]*){1,4},?[ \t]+(?:No\.?[ \t]*|n\.[ \t]*|\#)?"
+    r"\d{1,5}[a-zA-Z]?(?:/\d{1,4}[A-Za-z]?|/[A-Z])?(?![\w])"
+    # Moda Caddesi No: 141, Bağdat Cad. No:5 D:3: a Turkish street's kind after its name
+    r"|(?<![\w])(?:[A-Z\u00c0-\u024f\u0130][\w\u00c0-\u024f]*\.?[ \t]+){1,3}(?:Caddesi|Cad\.|Sokak|Soka\u011f\u0131|Sok\.|Sk\."
+    r"|Bulvar\u0131|Blv\.)[ \t,]*(?:No[:.]?[ \t]*)?\d{1,5}[A-Za-z]?(?:[ \t]*(?:/|Daire[:.]?|D[:.])[ \t]*\d{1,4})?"
+    # 월드컵북로 396, 101동 1504호 (상암동): a Korean street and number, with the city and district before it
+    r"|(?:[\uac00-\ud7a3]+(?:\uc2dc|\ub3c4|\uad6c|\uad70)[ \t]+){0,3}[\uac00-\ud7a3\d]+(?:\ub85c|\uae38|\ub300\ub85c)"
+    r"[ \t]*\d{1,5}(?:-\d{1,4})?(?:,?[ \t]*\d{1,4}\ub3d9)?(?:[ \t]*\d{1,5}\ud638)?"
     # Herzl Street 42, Al Wajba Street, 34, King Fahd Road, Bldg 45: the number after an English kind
     r"|(?<![\w])(?:[A-Z][\w'-]+[ \t]+){1,3}(?:Street|Road|Avenue|Lane|Boulevard|St\.|Rd\.)"
     r",?[ \t]+(?:No\.?[ \t]*|Bldg\.?[ \t]*|Building[ \t]+|House[ \t]+)?(?!(?:19|20)\d\d\b)\d{1,4}[A-Za-z]?(?![\w.,]\d|\w)"
@@ -410,7 +425,8 @@ _ADDRESS_LABEL = re.compile(r"(?<![^\W\d_])(?i:(?<!ip\s)(?<!ipv4\s)(?<!ipv6\s)(?
                             re.MULTILINE)
 _DIRECTION = r"(?:N|S|E|W|NE|NW|SE|SW|North|South|East|West)\.?"
 _UNIT = (r"(?:Suite|Ste|STE|SUITE|Apartment|Apartamento|Appartamento|Apt|APT|Unit|UNIT|Floor|FLOOR|Flat|FLAT|Fl|Room|Rm"
-         r"|Building|Bldg|Piso|Puerta|Planta|Interno|Scala|Piano|Etage|\#)(?![a-z])")
+         r"|Building|Bldg|Piso|Puerta|Planta|Interno|Scala|Piano|Etage|apto|Apto|ap\.|Ap\.|depto|Depto|dpto|Dpto|pta|Pta"
+         r"|Daire|kv|Hinterhaus|Vorderhaus|Studio|STUDIO|\#)(?![a-z])")
 _NUMBER_WORDS = "One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Fifteen Twenty Fifty Hundred".split()
 _STREET = re.compile(
     rf"(?:\d{{1,3}}(?:st|nd|rd|th)[ \t]+(?:Floor|FLOOR|Fl)\.?,?[ \t]+)?"
@@ -455,27 +471,51 @@ _UNIT_LINE = re.compile(r"(?m)^[ \t]*(?:Apt|Apartment|Suite|Ste|Unit|Floor|Fl|Ro
 _POSTCODES = re.compile(r"(?<![A-Za-z0-9])(?:[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d"
                         r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})(?![A-Za-z0-9])")
 _COUNTRY_NAMES = ("USA|U\\.S\\.A\\.|US|United States(?: of America)?|UK|U\\.K\\.|United Kingdom|Great Britain|England"
-                  "|Scotland|Wales|Ireland|Canada|Australia|New Zealand|" + "|".join(_COUNTRIES))
+                  "|Scotland|Wales|Ireland|Canada|Australia|New Zealand|Italia|ITALIA|Espa\u00f1a|ESPA\u00d1A|M\u00e9xico"
+                  "|Brasil|BRASIL|Chile|Argentina|Deutschland|Polska|T\u00fcrkiye|Turkey|Nederland|Philippines|PHILIPPINES"
+                  "|India|Korea|Ukraine|Colombia|Peru|" + "|".join(_COUNTRIES + [c.upper() for c in _COUNTRIES]))
 _COUNTRY_WORDS = frozenset(w.casefold() for w in re.findall(r"[A-Za-z]+", _COUNTRY_NAMES) if len(w) > 2) | \
     frozenset("india china japan brazil mexico russia nigeria egypt kenya pakistan bangladesh indonesia malaysia "
               "thailand vietnam philippines singapore israel turkey iran iraq argentina chile peru colombia".split())
 # a town's words; a period only after a short one ("St. Louis"), so "Israel. Please" is no town
-_CITY_WORDS = (r"(?:(?:[A-Z][a-z]{0,2}\.|[A-Z\u00c0-\u00de][\w'\u00c0-\u024f-]*)[ \t]+){0,2}"
-               r"[A-Z\u00c0-\u00de][\w'\u00c0-\u024f-]*\.?")
-_POSTAL = (r"(?:\d{3}[ ]\d{2}(?![\d])|\d{4,6}(?:-\d{3,4})?|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d"
+_CITY_WORDS = (r"(?:(?:[A-Z][a-z]{0,2}\.|[A-Z\u00c0-\u00de\u0130][\w'\u00c0-\u024f-]*)[ \t]+"
+               r"(?:(?:de|del|da|do|dos|di|la|el|am|an|im|sur)[ \t]+)?){0,2}"
+               r"[A-Z\u00c0-\u00de\u0130][\w'\u00c0-\u024f-]*\.?")
+_POSTAL = (r"(?:\d{3}[ ]\d{2}(?![\d])|\d{2}-\d{3}(?!\d)|\d{4}[ ]?[A-Z]{2}(?![A-Za-z])|CEP[ \t:]*\d{5}-?\d{3}"
+           r"|[AC-FHKNPRTV-Y]\d[\dW][ ]?[0-9AC-FHKNPRTV-Y]{4}(?![\w])|\(?[A-Z]?\d{4,6}(?:-\d{3,4})?\)?|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d"
            r"|(?:[A-Z]{1,2}\d[A-Z\d]?|GIR)[ ]\d[ABD-HJLNP-UW-Z]{2})")
+# A floor and a door after a street: "3º 2ª", "5è 1a", "2º dcha.", "3. OG li."
+_FLOOR_DOOR = (r"\d{1,2}(?:[\u00ba\u00aa\u00b0\u00e8oa]|\.)?(?:[ \t]*(?:\d{1,2}[\u00ba\u00aaoa]|[A-Z]\b|dcha|izq|izqda|izda"
+               r"|der|OG|EG|DG|th|tv|st)\.?){1,2}(?:[ \t]+(?:li|re|links|rechts|mitte)\.?)?")
 # What may follow a street, piece by piece: ", 19821", ", New Shrewsbury", ", London, EC4M 2JR, UK", and lines
 # under it that are the rest of the address ("Toronto, ON M3H 2T6", "Canada").
 _TAIL_PIECE = re.compile(
-    rf"[,;]?[ \t]*{_UNIT}(?:[.:,]|[ \t]+[.:,]){{0,3}}[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
+    rf"(?:[,;]|[ \t]+-)?[ \t]*{_UNIT}(?:[.:,]|[ \t]+[.:,]){{0,3}}[ \t]*\#?[\w-]{{1,8}}(?![\w-])"
+    rf"|,?[ \t]+{_FLOOR_DOOR}(?=[ \t]*(?:[,;\n(-]|$))"
+    # a house number's letter: "Hoogstraat 112 B"
+    r"|(?<=\d)[ \t]+[A-Za-z](?=[ \t]*(?:[,\n]|$))"
+    r"|\.?[ \t]*(?:OG|EG|DG|UG)\.?(?:[ \t]+(?:li|re|links|rechts|mitte)\.?)?(?=[ \t]*(?:[,;\n]|$))"
+    # a country after a space, ending the line: "BOSTON MA 02215 US"
+    rf"|[ \t]+(?:{_COUNTRY_NAMES})(?=[ \t]*(?:\n|$))"
+    # a region in brackets: "(VR)", "(Navarra)", "(상암동)"
+    r"|[ \t]*\((?:[A-Z]{2}|[A-Z\u00c0-\u00de][a-z\u00e0-\u00ff]+(?:[ \t][A-Z\u00c0-\u00de][a-z\u00e0-\u00ff]+)?"
+    r"|[\uac00-\ud7a3][\uac00-\ud7a3, \t]*)\)"
+    # after a dash: "- 08003 BARCELONA", "– Curitiba – PR"
+    rf"|[ \t]+[-\u2013\u2014][ \t]+(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_CITY_WORDS})"
+    rf"(?=[ \t]*(?:[,;\n/\u2013\u2014(]|[ \t]-|$))"
+    # after a wide gap on a form: "3011 PV   ROTTERDAM"
+    rf"|[ \t]{{2,}}{_POSTAL}[ \t]+{_CITY_WORDS}(?=[ \t]*(?:\n|$))"
     rf"|(?:[,;:][.,;:]?[ \t]*(?:\n[ \t]*)?|/(?=[A-Z0-9]))(?:{_POSTAL}(?:[ \t]+{_CITY_WORDS})?|{_STATE}[ \t]*{_ZIP}"
     rf"|(?!{_UNIT}\b){_CITY_WORDS}(?:,?[ \t]+{_STATE})?(?:,?[ \t]+{_POSTAL})?)"
-    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\\]]|\[|$|\.(?!\w)|[ \t]+(?:and|as|was|is|for|to|with|in|on|has|had|have|may|will|shall|can|could|would"
+    rf"(?=[ \t]*(?:[,;|*\n\"'<>()/:?!}}+\\\]]|\[|$|\.(?!\w)|[ \t]+[-\u2013\u2014][ \t]"
+    rf"|[ \t]+(?:and|as|was|is|for|to|with|in|on|has|had|have|may|will|shall|can|could|would"
     rf"|should|must|are|were|or|but|at|from|by|if|which|where|that|within|until|before|after|so)\b))"
     rf"|[ \t]*\n(?:[ \t]*\n)?[ \t]*(?:{_UNIT}\.?[ \t]*\#?[\w-]{{1,8}}"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|[A-Z][\w'.-]+(?:[ \t]+[A-Z][\w'.-]+)?),?[ \t]+{_POSTAL}"
-    rf"|{_CITY_WORDS},?[ \t]+(?:{_POSTAL}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})|{_POSTAL}[ \t]+{_CITY_WORDS}"
+    rf"|{_CITY_WORDS},?[ \t]+(?:{_POSTAL}|[A-Z]{{1,2}}\d[A-Z\d]?[ ]\d[A-Z]{{2}})|{_POSTAL}[ \t]+{_CITY_WORDS}(?:/{_CITY_WORDS})?"
+    r"(?:[ \t]*-[ \t]*[A-Z]{2}|[ \t]*\([A-Z\u00c0-\u00de][\w\u00c0-\u024f]{1,20}\))?"
     rf"|(?:{_COUNTRY_NAMES})"
+    rf"|{_CITY_WORDS}(?:[ \t]*-[ \t]*(?:[A-Z]{{2}}|{_POSTAL}))+"
     rf"|{_CITY_WORDS},?[ \t]+(?:{_STATE}|{_COUNTRY_NAMES})|\d{{5,6}}(?:-\d{{4}})?"
     rf"|[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ ]?\d[ABCEGHJ-NPRSTV-Z]\d|(?:[A-Z]{{1,2}}\d[A-Z\d]?)[ ]\d[ABD-HJLNP-UW-Z]{{2}})"
     rf"[ \t]*(?=\n|$)")
@@ -547,6 +587,16 @@ _IBAN = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?:[ ]?[A-Za-z0-9]{4}){2,7}
                    r"(?![A-Za-z0-9])")
 _CARD = re.compile(r"(?<![\d.,$])(?:\d{4}([ -])\d{4}\1\d{4}\1\d{3,4}(?:\1\d{1,3})?|\d{4}([ -])\d{6}\2\d{5})"
                    rf"{_END}")
+# A card's last four digits, after words that say so ("ending in 4796", "terminada en 0938") or after its masked
+# digits ("############3906", "XXXX-XXXX-XXXX-3906", "**** 3906").
+_CARD_LAST4 = re.compile(
+    r"(?<![^\W\d_])(?i:(?:ending|ends)[ \t]+(?:in|with)|last[ \t]+(?:4|four)(?:[ \t]+digits)?(?:[ \t]+(?:of|on)"
+    r"[ \t]+(?:the|your|my|his|her|their)?[ \t]*card)?(?:[ \t]+(?:is|are))?|terminad[ao][ \t]+en|terminando[ \t]+en"
+    r"|se[ \t]+terminant[ \t]+par|finissant[ \t]+par|termin(?:a|ante)[ \t]+(?:con|in)|endet[ \t]+(?:auf|mit)"
+    r"|endend[ \t]+auf|eindigend[ \t]+op|eindigt[ \t]+op)[ \t]*[:#*.-]?[ \t]*(?P<value>\d{4})(?![\d.,]?\d)"
+    r"|(?<![\w*#\u2022])(?P<mask>(?:[*#\u2022xX]{4}[ -]?){1,3}[*#\u2022xX]{0,4})[ -]?(?P<tail>\d{4})(?![\w])")
+_CARD_WORD = re.compile(r"(?i)(?:card|visa|master|amex|american[ \t]+express|discover|debit|credit|account|acct|a/c"
+                        r"|tarjeta|carte|karte|kaart|carta|cartao|conto|cuenta|konto|\*|#|\u2022)")
 # A date and a time written as one number, as a SWIFT field has it (":32A:20210311120000"): no ID
 _TIMESTAMP = re.compile(r"(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:[01]\d|2[0-3])[0-5]\d(?:[0-5]\d(?:\d{1,6})?)?")
 _LONG_NUMBER = re.compile(rf"(?<![\d.,$])\d{{11,24}}{_END}")
@@ -573,6 +623,37 @@ def _base(c: str) -> str:
 def _ascii(text: str) -> str:
     """``text`` with accents taken off, character for character, so offsets still line up."""
     return "".join(map(_base, text))
+
+
+# What may stand before an address found: its number, its street's kind, its flat, its quarter.
+_HEAD_PIECE = re.compile(
+    r"(?:(?<![\w#/.,-])(?!(?:19|20)\d\d\b)\d{1,6}[A-Za-z]?(?:[-/]\d{1,5}[A-Za-z]?)?,?[ \t]+"
+    r"|(?<![^\W\d_])(?:Via|VIA|Viale|Av|AV|Avda|Calle|C/|Cl|Cra|Rua|Rue|ul|al|pl|vul"
+    r"|USNS|USS|rang|chemin|mont\u00e9e)\.?[ \t]*"
+    r"|(?<![^\W\d_])(?:Unit|UNIT|Apt|APT|Suite|SUITE|Studio|STUDIO|Flat|FLAT)\.?[ \t]*\#?[\w-]{1,6},?[ \t]+"
+    r"|(?<![^\W\d_])[A-Z\u00c0-\u024f\u0130][\w\u00c0-\u024f]+[ \t]+(?:Mahallesi|Mah\.)[ \t]*,?[ \t]*"
+    r"|(?:[\uac00-\ud7a3]+(?:\uc2dc|\ub3c4|\uad6c|\uad70)[ \t]+){1,3}"
+    r")\Z")
+
+
+# ... and before its number alone: "Studio 19", "No. 14", not a form's number ("OMB No. 1545-2726", "Cat. No. 11949M")
+_HEAD_BEFORE_NUMBER = re.compile(
+    r"(?:(?<![^\W\d_])(?:Unit|UNIT|Apt|APT|Suite|SUITE|Studio|STUDIO|Flat|FLAT)\.?[ \t]*\#?[ \t]*"
+    r"|(?<!OMB )(?<!Cat\. )(?<!Form )(?<![^\W\d_])(?:No|NO|N\u00ba|N\u00b0)\.?[ \t]*"
+    r")\Z")
+
+
+def _address_head(copy: str, start: int) -> int:
+    """Where an address that has its street start at ``start`` starts, with its number, its street's kind or
+    its flat before it: "1192" of "1192 Michael Cove", "ul." of "ul. Morska 45", "Studio 19," of a street."""
+    for _ in range(3):
+        m = _HEAD_PIECE.search(copy, max(0, start - 40), start)
+        if (m is None or m.start() == start) and copy[start:start + 1].isdigit():
+            m = _HEAD_BEFORE_NUMBER.search(copy, max(0, start - 20), start)
+        if m is None or m.start() == start:
+            break
+        start = m.start()
+    return start
 
 
 def _address_tail(copy: str, end: int) -> int:
@@ -776,6 +857,35 @@ def _vocab(profile: Profile, kinds: frozenset[str]) -> _Vocab:
         member_interest=profile.member_interest_words)
 
 
+_TRIM = " \t\n,;:.-()/|"
+_DOB_PLACEHOLDER = re.compile(r"\bDOB_\d{3,}\b(?! \(born )")
+_BORN_NOTE = re.compile(r"\b(DOB_\d{3,}) \(born [^()\n]{1,20}\)")
+_MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+                "November", "December")
+
+
+def _born(value: str, level: str) -> str | None:
+    """"1990" or "March 1990" from a written birth date, or None when its year can't be told.  A numeric date
+    whose day and month could be either way round ("04/05/1990") gives only the year."""
+    year = re.search(r"(?<!\d)(19|20)\d\d(?!\d)", value)
+    if not year:
+        return None
+    if level == "year":
+        return year.group()
+    named = [i for i, m in enumerate(_MONTH_NAMES, 1) for w in re.findall(r"[^\W\d_]+", value.casefold())
+             if len(w) >= 3 and m.casefold().startswith(w)]
+    rest = [int(n) for n in re.findall(r"\d+", value[:year.start()] + " " + value[year.end():])]
+    month = named[0] if named else None
+    if month is None and len(rest) == 2:
+        if value.strip().startswith(year.group()):   # 1990-03-14
+            month = rest[0]
+        elif rest[0] > 12 >= rest[1]:
+            month = rest[1]
+        elif rest[1] > 12 >= rest[0]:
+            month = rest[0]
+    return f"{_MONTH_NAMES[month - 1]} {year.group()}" if month and 1 <= month <= 12 else year.group()
+
+
 class Redactor(TaxIdRedactor):
     """One conversation's placeholders for taxpayer IDs and personal information.
 
@@ -790,10 +900,23 @@ class Redactor(TaxIdRedactor):
     A piece of a name ("Luigi" of "Luigi Clelia Togliatti") leaves the name found around it whole.  The built-in
     name finding works from word lists, so it misses names it has no word for in prose that has no label or
     title before them ("CEO Satya Nadella").
+    ``finder``: a function from text to more to hide, as [(start, end, kind)], such as a model that marks
+    personal details (``veil.tagged``).  What it marks is hidden where nothing else is, with a placeholder of
+    its kind (a kind it names that isn't built in gets placeholders of its own); a name of two words or more
+    that it marks is hidden however it's written, as with ``add_person``.  Like the name finder, it can only add to what's hidden.
+    ``reveal``: what the model may still see of a hidden value, as {kind: how much}.  {"DOB": "year"} sends
+    a birth date as "DOB_001 (born 1990)", {"DOB": "month"} as "DOB_001 (born March 1990)", so the model can
+    tell who is older or roughly how old someone is.  The note is taken off again when the reply is restored.
     """
 
-    def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None):
+    def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None, reveal=None,
+                 finder=None):
         super().__init__(profile)
+        self._finder = finder
+        self._reveal = dict(reveal or {})
+        for kind, level in self._reveal.items():
+            if kind != "DOB" or level not in ("year", "month"):
+                raise ValueError(f"Can't reveal {kind!r} as {level!r}: use {{'DOB': 'year'}} or {{'DOB': 'month'}}.")
         self._name_finder = name_finder
         self._detect = frozenset(KINDS if detect is None else detect)
         unknown = self._detect - set(KINDS)
@@ -975,15 +1098,39 @@ class Redactor(TaxIdRedactor):
         """``text`` with taxpayer IDs and personal information replaced.  ``typed``: the user typed it, so any
         two or three capitalized words (that aren't the profile's words, or a business's) are taken for
         a name, and so are a common first name and surname in lower case."""
-        if self._name_finder is not None and "NAME" in self._detect and text and not text.isspace():
+        text = self._prepare(text)
+        marked: list[tuple[int, int, str]] = []
+        if self._finder is not None and text and not text.isspace():
+            for start, end, kind in self._finder(text) or ():
+                if 0 <= start < end <= len(text) and text[start:end].strip():
+                    if kind not in self.kinds:
+                        self.register_kind(kind)
+                    marked.append((start, end, kind))
+        # A name the finder marks is learned, so it's hidden however else it's written, if it has two words or
+        # more: a lone word it took for a name ("Jan" of "Fri, Jan 30") is only hidden where it stands.
+        names = [text[s:e] for s, e, k in marked if k == "NAME" and len(_name_words(text[s:e])) >= 2]
+        if self._name_finder is not None and text and not text.isspace():
+            names += list(self._name_finder(text) or ())
+        if names and "NAME" in self._detect:
             self._guessing = True
             try:
-                for name in self._name_finder(text) or ():
+                for name in names:
                     self.add_person(name)
             finally:
                 self._guessing = False
-        text = self._redact_personal(self._prepare(text), typed)
-        return self._redact_ids(text) if self._detect & set(TAX_ID_KINDS) else text
+        text = self._redact_personal(text, typed, marked)
+        text = self._redact_ids(text) if self._detect & set(TAX_ID_KINDS) else text
+        return self._noted(text) if self._reveal else text
+
+    def _noted(self, text: str) -> str:
+        """Each birth date's placeholder followed by the part of it ``reveal`` lets through."""
+        def note(m: re.Match) -> str:
+            born = _born(self._real.get(m.group(), ""), self._reveal["DOB"])
+            return f"{m.group()} (born {born})" if born else m.group()
+        return _DOB_PLACEHOLDER.sub(note, text)
+
+    def restore_text(self, text: str) -> str:
+        return super().restore_text(_BORN_NOTE.sub(r"\1", text) if self._reveal else text)
 
     def redact(self, value, typed: bool = False):
         if not typed:
@@ -991,7 +1138,7 @@ class Redactor(TaxIdRedactor):
         self._walk(value, lambda text: self.redact_text(text, True))
         return self._walk(value, lambda text: self.redact_text(text, True))
 
-    def _redact_personal(self, text: str, typed: bool = False) -> str:
+    def _redact_personal(self, text: str, typed: bool = False, marked=()) -> str:
         if not text or text.isspace():
             return text
         copy, starts, ends = _shadow(text)
@@ -1080,6 +1227,13 @@ class Redactor(TaxIdRedactor):
         scan(_CARD, lambda m: (re.fullmatch(r"\d{4}([ -])\d{4}\1\d{4}\1\d{3,4}|\d{4}([ -])\d{6}\2\d{5}", m.group()) or
                                _luhn(re.sub(r"\D", "", m.group()))) and
              take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:" + re.sub(r"\D", "", m.group())))
+        # after words, only with a card or an account named just before ("the year ending in 2019" is no card);
+        # after a mask of x's, only a long one ("XXXX 2024" is a form's blank)
+        scan(_CARD_LAST4, lambda m: take(m.start("value"), m.end("value"), "ACCOUNT", "ACCOUNT:*" + m.group("value"))
+             if m.group("value") and _CARD_WORD.search(fold[max(0, m.start() - 40):m.start("value")])
+             else m.group("tail") is not None and (len(m.group("mask").replace(" ", "").replace("-", "")) >= 8 or
+                                                   m.group("mask").strip("xX -")) and
+             take(m.start(), m.end(), "ACCOUNT", "ACCOUNT:*" + m.group("tail")))
         for pattern in _PHONES + (_TYPED_PHONES if typed else []):
             scan(pattern, lambda m: self._phone(m, take))
         # not a sentence that talks of an address ("Address: The updated system will be deployed to ...")
@@ -1151,6 +1305,45 @@ class Redactor(TaxIdRedactor):
              take(m.start(), m.end(),
                                           *(("ACCOUNT", f"ACCOUNT:{m.group()}") if len(m.group()) >= 13 and
                                             _luhn(m.group()) else ("ID", f"ID:{m.group()}"))))
+        # The finder's marks last, where nothing else is: each run of it the rules left free, trimmed.
+        for source_start, source_end, kind in sorted(marked):
+            start, end = bisect.bisect_left(starts, source_start), bisect.bisect_right(ends, source_end)
+            for run in re.finditer(rb"\x00+", bytes(covered[start:end])):
+                part = copy[start + run.start():start + run.end()]
+                lead = len(part) - len(part.lstrip(_TRIM))
+                a, b = start + run.start() + lead, start + run.start() + len(part.rstrip(_TRIM))
+                if a < b and any(c.isalnum() for c in copy[a:b]):
+                    digits = "".join(c for c in copy[a:b] if c.isdigit())
+                    take(a, b, kind, digits if kind in TAX_ID_KINDS and digits else None)
+        # A street read as a person's name, after its number: "1192 Michael Cove", "Studio 19, Joel Island".
+        for i, (start, end, kind, key, real) in enumerate(found):
+            if kind == "NAME" and re.search(r"(?:(?<![\w.,/-])\d{1,6}[A-Za-z]?|(?i:studio|flat|unit|apt)\.?[ \t]+\w{1,5},?)"
+                                             r"[ \t]+\Z", copy[max(0, start - 20):start]):
+                words = copy[start:end].split()
+                if len(words) >= 2 and words[-1].rstrip(".").casefold() in _SUFFIX_WORDS:
+                    found[i] = (start, end, "ADDRESS", f"ADDRESS:{_fold(copy[start:end])}", None)
+        # An address found grows over what's free around it: its number or street's kind before it, its flat,
+        # town, postcode and country after it, so no piece of it is left showing.
+        for i, (start, end, kind, key, real) in enumerate(found):
+            if kind != "ADDRESS":
+                continue
+            head = _address_head(copy, start)
+            while head < start and covered[head]:
+                head += 1
+            if any(covered[head:start]):
+                head = start
+            tail = free(end, _address_tail(copy, end))
+            if (head, tail) != (start, end):
+                covered[head:start] = b"\x01" * (start - head)
+                covered[end:tail] = b"\x01" * (tail - end)
+                found[i] = (head, tail, kind, key, None)
+        # Pieces of one address with nothing but a comma or a line between them are one: "4410 N Milwaukee Ave,
+        # Apt 2F" and "Chicago, IL 60630" on the next line of a Word file, with its markup between them.
+        found.sort()
+        for i in range(len(found) - 1, 0, -1):
+            (a, b, kind, key, _), (c, d, kind2, _, _) = found[i - 1], found[i]
+            if kind == kind2 == "ADDRESS" and re.fullmatch(r"[ \t]*[,;]?[ \t]*\n?[ \t]*", copy[b:c]):
+                found[i - 1:i + 1] = [(a, d, kind, f"ADDRESS:{_fold(copy[a:d])}", None)]
         if not found:
             return text
         # Numbered in reading order, replaced from the end so the offsets hold.

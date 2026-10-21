@@ -4,6 +4,7 @@ either one marks is hidden.  The model only adds to what veil hides.
     from veil.tagged import TaggedRedactor
     r = TaggedRedactor()                       # downloads Deerpark/veil-tagger-edge on first use
     text, spans = r.redact("Call Maria Lopez on 0412 555 019.")
+    rr = r.redactor(reveal={"DOB": "month"})   # numbered placeholders that restore, as veil's own
 
 Needs the ``tagger`` extra (gliner, torch).  ``system`` picks what hides: "union" (veil and the model), "model" or "veil"."""
 from __future__ import annotations
@@ -120,6 +121,20 @@ class TaggedRedactor:
             out += [Span(s, e, "VEIL", "veil") for s, e in veil_hidden(text, Redactor(self.profile).redact_text(text))
                     if not any(a <= s and e <= b for a, b in covered)]
         return _join(sorted(out, key=lambda s: (s.start, -s.end)))
+
+    def redactor(self, reveal=None, **kwargs) -> Redactor:
+        """A veil ``Redactor`` with the model beside its rules: numbered placeholders that restore, for one
+        conversation (``veil.anthropic.wrap`` takes it).  ``reveal`` and other keywords go to the Redactor."""
+        seen: dict[str, list[tuple[int, int, str]]] = {}
+
+        def finder(text: str) -> list[tuple[int, int, str]]:
+            if text not in seen:   # a conversation's earlier turns are redacted again with every request
+                if len(seen) > 512:
+                    seen.clear()
+                seen[text] = [(s, e, k) for s, e, k, _ in merged(self.model_spans([text])[0], text)]
+            return seen[text]
+
+        return Redactor(self.profile, finder=finder, reveal=reveal, **kwargs)
 
     def redact(self, text: str) -> tuple[str, list[Span]]:
         """``text`` with each hidden span replaced by [KIND], and the spans."""
