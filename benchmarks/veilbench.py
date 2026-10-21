@@ -146,6 +146,27 @@ class Gliner2:
         return out
 
 
+class PiiTracer:
+    """Perplexity's PII-Tracer: a bidirectional Qwen3 encoder whose own predict() decodes BIOES tags into spans with a
+    score (transformers>=5.2, trust_remote_code).  It reads up to 4,096 tokens, so it is given long passages; a threshold
+    only drops spans from its one decoded path, so every span is kept and the sweep starts at 0."""
+    def __init__(self, model="perplexity-ai/PII-Tracer", revision="d25c16f2e57e321f6d2527715c01df9112f956f5"):
+        import torch
+        from transformers import AutoModel
+        torch.set_grad_enabled(False)
+        self.m = AutoModel.from_pretrained(model, revision=revision, trust_remote_code=True).eval()   # the code read, pinned
+
+    def spans(self, texts):
+        out = []
+        for t in texts:
+            found = []
+            for off, p in tagged.chunks(t, 1500):
+                sp, _ = self.m.predict(p)
+                found += [(off + s.start, off + s.end, s.label, round(s.score, 3)) for s in sp]
+            out.append(found)
+        return out
+
+
 class TokenClassifier:
     """A Hugging Face token-classification model, its own label set, private-looking labels kept."""
     def __init__(self, model):
@@ -345,6 +366,7 @@ SYSTEMS = {
     "gliner2.5-small": (lambda: Gliner2("fastino/gliner2.5-small-v1"), "fastino/gliner2.5-small-v1 (GLiNER2.5, 74M)", 0.5),
     "gliner2.5-base": (lambda: Gliner2("fastino/gliner2.5-base-v1"), "fastino/gliner2.5-base-v1 (GLiNER2.5, 194M)", 0.5),
     "gliner2.5-multi": (lambda: Gliner2("fastino/gliner2.5-multi-v1"), "fastino/gliner2.5-multi-v1 (GLiNER2.5, 287M, multilingual)", 0.5),
+    "pii-tracer": (PiiTracer, "perplexity-ai/PII-Tracer (bidirectional Qwen3, 596M)", 0.5),
     "piiranha": (lambda: TokenClassifier("iiiorg/piiranha-v1-detect-personal-information"), "iiiorg/piiranha-v1 (non-commercial licence)", 0.0),
     "ai4privacy-openpii": (lambda: TokenClassifier("ai4privacy/llama-ai4privacy-english-anonymiser-openpii"), "ai4privacy/llama-ai4privacy-english-anonymiser-openpii", 0.0),
     "deberta-ai4privacy": (lambda: TokenClassifier("Isotonic/deberta-v3-base_finetuned_ai4privacy_v2"), "Isotonic/deberta-v3-base_finetuned_ai4privacy_v2 (non-commercial)", 0.0),
