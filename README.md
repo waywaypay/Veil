@@ -283,7 +283,7 @@ text, spans = r.redact("Call Maria Lopez on 0412 555 019.")
 
 ```
 pip install -e ".[bench]" && python -m spacy download en_core_web_lg
-python benchmarks/veilbench.py systems                  # veil, the tagger, Presidio, scrubadub, spaCy, 12 PII models
+python benchmarks/veilbench.py systems                  # veil, the tagger, Presidio, scrubadub, spaCy, the PII models
 python benchmarks/veilbench.py score my_docs.jsonl --systems union,model,veil,presidio --out report/
 python benchmarks/veilbench.py redact contract.pdf notes.txt --out redacted.html
 ```
