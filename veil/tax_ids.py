@@ -116,6 +116,34 @@ def _norm(c: str) -> str:
     return folded if len(folded) == 1 else c
 
 
+# An email's quoted-printable text: its soft line breaks ("C=\nesar") and its bytes ("=E2=80=91"); and a Word file's
+# markup between the runs of one line ("</w:t></w:r><w:r><w:t>"), a line break where it has one.  Read through only in
+# a text that has them, so "x=3D" in a formula is left alone.
+_QUOTED_PRINTABLE = re.compile(r"=\r?\n|(?:=[0-9A-F]{2})+")
+_WORD_MARKUP = re.compile(r"(?:</?w:(?:t|r|p|br|tab|rPr|pPr|b|i|u|sz|lang|rFonts)\b(?:[ \t]+[\w:]+=\"[\w ./-]*\")*"
+                          r"[ \t]*/?>)+")
+
+
+def _decode_more(text: str) -> list[tuple[int, int, str]]:
+    """Where ``text`` has quoted-printable text or Word markup, and what each reads as."""
+    found = []
+    if "quoted-printable" in text.lower() or (len(re.findall(r"=\r?\n", text)) >= 2 and
+                                              re.search(r"=[0-9A-F]{2}", text)):
+        for m in _QUOTED_PRINTABLE.finditer(text):
+            if m.group()[1] in "\r\n":
+                found.append((m.start(), m.end(), ""))
+                continue
+            raw = bytes(int(h, 16) for h in m.group().split("=")[1:])
+            try:
+                found.append((m.start(), m.end(), raw.decode("utf-8")))
+            except UnicodeDecodeError:
+                found.append((m.start(), m.end(), raw.decode("latin-1")))
+    if "<w:t" in text:
+        for m in _WORD_MARKUP.finditer(text):
+            found.append((m.start(), m.end(), "\n" if re.search(r"<w:br\b|</w:p>", m.group()) else ""))
+    return found
+
+
 def _decode(escape: str) -> str | None:
     try:
         if escape[0] == "&":
@@ -144,13 +172,13 @@ def _shadow(text: str) -> tuple[str, list[int], list[int]]:
                 ends.append(start + i + 1 if step else end)
 
     pos = 0
-    for m in _ESCAPE.finditer(text):
-        decoded = _decode(m.group())
-        if decoded is None:
+    spans = [(m.start(), m.end(), _decode(m.group())) for m in _ESCAPE.finditer(text)] + _decode_more(text)
+    for start, end, decoded in sorted(spans):
+        if decoded is None or start < pos:
             continue
-        put(text[pos:m.start()], pos, m.start(), True)
-        put(decoded, m.start(), m.end(), False)
-        pos = m.end()
+        put(text[pos:start], pos, start, True)
+        put(decoded, start, end, False)
+        pos = end
     put(text[pos:], pos, len(text), True)
     return "".join(chars), starts, ends
 
