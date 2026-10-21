@@ -123,6 +123,25 @@ class Gliner:
         return found
 
 
+class Gliner2:
+    """Fastino's GLiNER2 models (pip install gliner2): the same label list, spans with a confidence."""
+    def __init__(self, model):
+        from gliner2 import GLiNER2
+        self.m = GLiNER2.from_pretrained(model)
+        self.labels = list(tagged.LABELS)
+
+    def spans(self, texts):
+        out = []
+        for t in texts:
+            found = []
+            for off, p in tagged.chunks(t):
+                r = self.m.extract_entities(p, self.labels, threshold=FLOOR, include_spans=True, include_confidence=True)["entities"]
+                for label, items in r.items():
+                    found += [(off + e["start"], off + e["end"], label, round(e["confidence"], 3)) for e in items]
+            out.append(found)
+        return out
+
+
 class TokenClassifier:
     """A Hugging Face token-classification model, its own label set, private-looking labels kept."""
     def __init__(self, model):
@@ -195,6 +214,8 @@ SYSTEMS = {
     "gliner-pii-large": (lambda: Gliner("knowledgator/gliner-pii-large-v1.0"), "knowledgator/gliner-pii-large-v1.0", 0.5),
     "gliner-multi-pii": (lambda: Gliner("urchade/gliner_multi_pii-v1"), "urchade/gliner_multi_pii-v1", 0.5),
     "nvidia-gliner-pii": (lambda: Gliner("nvidia/gliner-PII", nemo=True), "nvidia/gliner-PII", 0.5),
+    "gliner2-pii-multi": (lambda: Gliner2("fastino/gliner2-privacy-filter-PII-multi"), "fastino/gliner2-privacy-filter-PII-multi (GLiNER2, 278M)", 0.5),
+    "gliner2-guardrails-pii": (lambda: Gliner2("fastino/GLiNER2-Guardrails-PII-Multi"), "fastino/GLiNER2-Guardrails-PII-Multi", 0.5),
     "piiranha": (lambda: TokenClassifier("iiiorg/piiranha-v1-detect-personal-information"), "iiiorg/piiranha-v1 (non-commercial licence)", 0.0),
     "ai4privacy-openpii": (lambda: TokenClassifier("ai4privacy/llama-ai4privacy-english-anonymiser-openpii"), "ai4privacy/llama-ai4privacy-english-anonymiser-openpii", 0.0),
     "deberta-ai4privacy": (lambda: TokenClassifier("Isotonic/deberta-v3-base_finetuned_ai4privacy_v2"), "Isotonic/deberta-v3-base_finetuned_ai4privacy_v2 (non-commercial)", 0.0),
