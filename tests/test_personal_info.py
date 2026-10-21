@@ -933,3 +933,56 @@ def test_staff_numbers(text, hidden_value):
 def test_not_staff_numbers(text):
     out = Redactor(FINANCE).redact_text(text)
     assert "ID_0" not in out, out
+
+
+def _finder_for(*names):
+    def finder(t):
+        out = []
+        for n in names:
+            i = t.find(n)
+            if i >= 0:
+                out.append((i, i + len(n), "NAME"))
+        return out
+    return finder
+
+
+@pytest.mark.parametrize("text, found, hidden", [
+    ("2   DE LUCA Francesco Pio      17/06/2012", "LUCA Francesco Pio", ["DE", "LUCA"]),
+    ("| VAN DER WALT | BIN RAMLI |", "RAMLI", ["BIN"]),
+    ("SIGNATURE: W.L. TAN        DATE", "TAN", ["W.L."]),
+    ("[ v. d. Heydt, Hans-Jürgen ]", "Heydt, Hans-Jürgen", ["v. d."]),
+    ("Employee\nJERRY ROBINSON JR.\n6670 BRUCE", "JERRY ROBINSON", ["JR"]),
+    ("Represented by Mr I. Thrilling of Leeds", "Thrilling", ["I."]),
+    ("Frau von Stetten zur Info", "Stetten", ["von"]),
+    ("Sprachmittlung: Oleksandr (Sasha) Bondar, Caritas", "Oleksandr", ["Sasha", "Bondar"]),
+    ("Rosalinda de la Cruz Vda. de Ibarra   Mother", "Rosalinda", ["Cruz", "Ibarra"]),
+    ("Member: KOWALCZYK, H.     MBI", "KOWALCZYK", ["H."]),
+    ("課長代理　渡辺 翔太　M-02210", "渡辺", ["翔太"]),
+    ("高橋 恒一（たかはし こういち）　執行役員", "高橋 恒一", ["たかはし"]),
+])
+def test_a_name_found_grows_over_its_parts(text, found, hidden):
+    r = Redactor(FINANCE, finder=_finder_for(found))
+    out = r.redact_text(text)
+    assert not any(h in out for h in hidden), out
+
+
+@pytest.mark.parametrize("text, name", [
+    ("C-3 山田太郎様は司会者です。", "山田太郎"),
+    ("집주인분(김옥순 님) 임대차계약서", "김옥순"),
+    ("نشهد بأن السيد/ سيف بن حمد سعيد النعيمي، إماراتي", "النعيمي"),
+    ("SPAR\nStore #4471\nOperator Joy\n12 February 2018", "Joy"),
+    ("Preferred Name: Teo\nGender M", "Teo"),
+])
+def test_names_by_honorific_label_or_role(text, name):
+    assert name not in Redactor(FINANCE).redact_text(text)
+
+
+@pytest.mark.parametrize("text", [
+    "お客様へ。皆様こんにちは。印刷会社様へ",
+    "PROSPECTO DE VALORES",
+    "la oferta de Valores Garantizados",
+    "Operator Manual and Server Error",
+])
+def test_not_names(text):
+    assert "NAME_" not in Redactor(FINANCE).redact_text(text)
+    assert "S.L." in Redactor(FINANCE).redact_text("SOLMAR RENT A CAR, S.L. · CIF")   # a company's form, no initials
