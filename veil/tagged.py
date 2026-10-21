@@ -57,8 +57,28 @@ def chunks(text: str, max_words: int = 200) -> list[tuple[int, str]]:
     return [(o, p) for o, p in out if p.strip()]
 
 
+# what can trail a name: a suffix (Jr., III, Esq.), or a single initial: "H." anywhere, a bare "H" only where the line or
+# table cell ends (a bare capital elsewhere is as likely to be "A" or "I" the word)
+_SUFFIX = r"(?:Jr|JR|Sr|SR|Esq|ESQ|II|III|IV|MD|M\.D|PhD|Ph\.D|CPA)"
+_AFTER_NAME = re.compile(rf",?[ \t]+{_SUFFIX}(?!\w)\.?|[ \t]+[A-Z](?:\.(?!\w)|(?=[ \t]*(?:\n|\Z|[|;,)])))")
+
+
+def extend_name(text: str, end: int) -> int:
+    """Where a name that ends at ``end`` ends once its trailing initial and suffix are taken in: the model marks
+    "Osborne William" and "Andrew P. Sutor" and leaves the "H" and the ", IV" showing."""
+    if end <= 0 or not (text[end - 1].isalnum() or text[end - 1] == "."):
+        return end
+    for _ in range(2):
+        m = _AFTER_NAME.match(text, end)
+        if not m:
+            break
+        end = m.end()
+    return end
+
+
 def merged(found: list[tuple[int, int, str, float]], text: str) -> list[tuple[int, int, str, float]]:
-    """Adjacent spans of one kind joined: a first and a last name, a street and its town and postcode."""
+    """Adjacent spans of one kind joined: a first and a last name, a street and its town and postcode.  A name takes in
+    the initial or suffix that trails it, up to the next span."""
     out: list[tuple[int, int, str, float]] = []
     for s, e, kind, sc in sorted(found):
         if out and out[-1][2] == kind and s >= out[-1][1] and \
@@ -66,6 +86,10 @@ def merged(found: list[tuple[int, int, str, float]], text: str) -> list[tuple[in
             out[-1] = (out[-1][0], e, kind, min(sc, out[-1][3]))
         elif not out or s >= out[-1][1]:
             out.append((s, e, kind, sc))
+    for i, (s, e, kind, sc) in enumerate(out):
+        if kind == "NAME":
+            nxt = out[i + 1][0] if i + 1 < len(out) else len(text)
+            out[i] = (s, max(e, min(extend_name(text, e), nxt)), kind, sc)
     return out
 
 

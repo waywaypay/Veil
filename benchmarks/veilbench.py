@@ -407,16 +407,26 @@ def system_spans(name, texts):
     return have
 
 
+NAME_EXT = os.environ.get("VEIL_NAME_EXT", "1") != "0"   # 0: the tagger's names as it marks them, without their initial and suffix
+
+
+def _named(text, spans):
+    """The tagger's name spans taking in the initial or suffix that trails them (tagged.extend_name)."""
+    if not NAME_EXT:
+        return spans
+    return [(s, tagged.extend_name(text, e) if k == "NAME" else e, k, sc) for s, e, k, sc in spans]
+
+
 def outputs(spec, texts):
     """Each text with what system ``spec`` ("name" or "name@threshold") hides replaced."""
     name, _, th = spec.partition("@")
     th = float(th) if th else SYSTEMS[name][2]
     if name == "union":
         m, v = system_spans("model", texts), system_spans("veil", texts)
-        get = lambda t: [x for x in m[_key(t)] if x[3] >= th] + v[_key(t)]   # noqa: E731
+        get = lambda t: [x for x in _named(t, m[_key(t)]) if x[3] >= th] + v[_key(t)]   # noqa: E731
     else:
         sp = system_spans(name, texts)
-        get = lambda t: [x for x in sp[_key(t)] if x[3] >= th]   # noqa: E731
+        get = lambda t: [x for x in (_named(t, sp[_key(t)]) if name == "model" else sp[_key(t)]) if x[3] >= th]   # noqa: E731
     out = []
     for t in texts:
         rs = sorted((s, e) for s, e, *_ in get(t))
