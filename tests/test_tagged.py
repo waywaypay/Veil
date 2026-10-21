@@ -27,3 +27,13 @@ def test_veil_alone_needs_no_model():
 def test_join_prefers_the_model_kind():
     spans = [Span(0, 5, "VEIL", "veil"), Span(3, 11, "NAME", "model")]
     assert _join(spans) == [Span(0, 11, "NAME", "model")]
+
+
+def test_redactor_puts_the_model_beside_the_rules(monkeypatch):
+    r = TaggedRedactor()
+    text = "Member No. MTS-009914 for Kipchumba arap Ruto."
+    i = text.index("MTS-009914")
+    monkeypatch.setattr(r, "model_spans", lambda texts, threshold=None: [[(i, i + 10, "ID", 0.9)] for _ in texts])
+    red = r.redactor()
+    out = red.redact_text(text)
+    assert "MTS-009914" not in out and red.restore_text(out) == text

@@ -19,6 +19,7 @@ as taxpayer IDs, so odd characters hide nothing.  The word lists are in
 
 from __future__ import annotations
 
+import bisect
 import gzip
 import re
 import unicodedata
@@ -776,6 +777,7 @@ def _vocab(profile: Profile, kinds: frozenset[str]) -> _Vocab:
         member_interest=profile.member_interest_words)
 
 
+_TRIM = " \t\n,;:.-()/|"
 _DOB_PLACEHOLDER = re.compile(r"\bDOB_\d{3,}\b(?! \(born )")
 _BORN_NOTE = re.compile(r"\b(DOB_\d{3,}) \(born [^()\n]{1,20}\)")
 _MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -818,13 +820,19 @@ class Redactor(TaxIdRedactor):
     A piece of a name ("Luigi" of "Luigi Clelia Togliatti") leaves the name found around it whole.  The built-in
     name finding works from word lists, so it misses names it has no word for in prose that has no label or
     title before them ("CEO Satya Nadella").
+    ``finder``: a function from text to more to hide, as [(start, end, kind)], such as a model that marks
+    personal details (``veil.tagged``).  What it marks is hidden where nothing else is, with a placeholder of
+    its kind (a kind it names that isn't built in gets placeholders of its own); a name of two words or more
+    that it marks is hidden however it's written, as with ``add_person``.  Like the name finder, it can only add to what's hidden.
     ``reveal``: what the model may still see of a hidden value, as {kind: how much}.  {"DOB": "year"} sends
     a birth date as "DOB_001 (born 1990)", {"DOB": "month"} as "DOB_001 (born March 1990)", so the model can
     tell who is older or roughly how old someone is.  The note is taken off again when the reply is restored.
     """
 
-    def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None, reveal=None):
+    def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None, reveal=None,
+                 finder=None):
         super().__init__(profile)
+        self._finder = finder
         self._reveal = dict(reveal or {})
         for kind, level in self._reveal.items():
             if kind != "DOB" or level not in ("year", "month"):
@@ -1010,14 +1018,27 @@ class Redactor(TaxIdRedactor):
         """``text`` with taxpayer IDs and personal information replaced.  ``typed``: the user typed it, so any
         two or three capitalized words (that aren't the profile's words, or a business's) are taken for
         a name, and so are a common first name and surname in lower case."""
-        if self._name_finder is not None and "NAME" in self._detect and text and not text.isspace():
+        text = self._prepare(text)
+        marked: list[tuple[int, int, str]] = []
+        if self._finder is not None and text and not text.isspace():
+            for start, end, kind in self._finder(text) or ():
+                if 0 <= start < end <= len(text) and text[start:end].strip():
+                    if kind not in self.kinds:
+                        self.register_kind(kind)
+                    marked.append((start, end, kind))
+        # A name the finder marks is learned, so it's hidden however else it's written, if it has two words or
+        # more: a lone word it took for a name ("Jan" of "Fri, Jan 30") is only hidden where it stands.
+        names = [text[s:e] for s, e, k in marked if k == "NAME" and len(_name_words(text[s:e])) >= 2]
+        if self._name_finder is not None and text and not text.isspace():
+            names += list(self._name_finder(text) or ())
+        if names and "NAME" in self._detect:
             self._guessing = True
             try:
-                for name in self._name_finder(text) or ():
+                for name in names:
                     self.add_person(name)
             finally:
                 self._guessing = False
-        text = self._redact_personal(self._prepare(text), typed)
+        text = self._redact_personal(text, typed, marked)
         text = self._redact_ids(text) if self._detect & set(TAX_ID_KINDS) else text
         return self._noted(text) if self._reveal else text
 
@@ -1037,7 +1058,7 @@ class Redactor(TaxIdRedactor):
         self._walk(value, lambda text: self.redact_text(text, True))
         return self._walk(value, lambda text: self.redact_text(text, True))
 
-    def _redact_personal(self, text: str, typed: bool = False) -> str:
+    def _redact_personal(self, text: str, typed: bool = False, marked=()) -> str:
         if not text or text.isspace():
             return text
         copy, starts, ends = _shadow(text)
@@ -1197,6 +1218,16 @@ class Redactor(TaxIdRedactor):
              take(m.start(), m.end(),
                                           *(("ACCOUNT", f"ACCOUNT:{m.group()}") if len(m.group()) >= 13 and
                                             _luhn(m.group()) else ("ID", f"ID:{m.group()}"))))
+        # The finder's marks last, where nothing else is: each run of it the rules left free, trimmed.
+        for source_start, source_end, kind in sorted(marked):
+            start, end = bisect.bisect_left(starts, source_start), bisect.bisect_right(ends, source_end)
+            for run in re.finditer(rb"\x00+", bytes(covered[start:end])):
+                part = copy[start + run.start():start + run.end()]
+                lead = len(part) - len(part.lstrip(_TRIM))
+                a, b = start + run.start() + lead, start + run.start() + len(part.rstrip(_TRIM))
+                if a < b and any(c.isalnum() for c in copy[a:b]):
+                    digits = "".join(c for c in copy[a:b] if c.isdigit())
+                    take(a, b, kind, digits if kind in TAX_ID_KINDS and digits else None)
         if not found:
             return text
         # Numbered in reading order, replaced from the end so the offsets hold.

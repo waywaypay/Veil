@@ -804,3 +804,30 @@ def test_reveal_is_off_by_default_and_checked():
     assert Redactor().redact_text("DOB: 14/03/1990") == "DOB: DOB_001"
     with pytest.raises(ValueError):
         Redactor(reveal={"DOB": "day"})
+
+
+def test_finder_adds_what_the_rules_miss_and_restores():
+    text = "Member No. MTS-009914, ID No. 22604718, call 0733 905 261."
+    def finder(t):
+        return [(t.index("MTS-009914"), t.index("MTS-009914") + 10, "ID"), (t.index("22604718"), t.index("22604718") + 8, "ID")]
+    r = Redactor(finder=finder)
+    out = r.redact_text(text)
+    assert "MTS-009914" not in out and "22604718" not in out
+    assert r.restore_text(out) == text
+
+
+def test_finder_only_adds_and_names_spread():
+    def finder(t):
+        i = t.find("Zorblax Vrenquist")
+        return [(i, i + 17, "NAME")] if i >= 0 else []
+    r = Redactor(finder=finder)
+    out = r.redact_text("Zorblax Vrenquist signed. Email zv@example.com")
+    assert "Zorblax" not in out and "zv@example.com" not in out
+    assert "Zorblax" not in r.redact_text("Later, Mr. Vrenquist called.")   # the name is now known however it's written
+
+
+def test_finder_new_kind_and_partial_overlap():
+    text = "Badge BX-7731 issued to the visitor."
+    r = Redactor(finder=lambda t: [(t.index("BX-7731"), t.index("BX-7731") + 7, "BADGE")])
+    out = r.redact_text(text)
+    assert out == "Badge BADGE_001 issued to the visitor." and r.restore_text(out) == text

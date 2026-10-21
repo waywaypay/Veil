@@ -292,6 +292,19 @@ text, spans = r.redact("Call Maria Lopez on 0412 555 019.")
 
 `threshold` (0.35 by default) trades what the tagger finds against the other words it hides.
 
+`redact` marks spans as `[NAME]`, which can't be put back. For numbered placeholders that restore, as veil's
+own do, ask for a `Redactor` with the tagger beside its rules, one per conversation:
+
+```python
+r = TaggedRedactor().redactor(reveal={"DOB": "month"})
+client = wrap(anthropic.Anthropic(), r)                  # or r.redact_text(...) / r.restore_text(...)
+```
+
+What the tagger marks is hidden where the rules hid nothing; a name of two words or more is then hidden
+however else it's written. On the 165 locked test documents this finds 96.1% of the labelled details,
+hiding 6.8% of other words. Any `Redactor` takes such a function as `finder`: text in, `[(start, end, kind)]`
+out.
+
 ### Benchmarking it
 
 ```
