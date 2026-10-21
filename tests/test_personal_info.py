@@ -904,3 +904,32 @@ def test_quoted_printable_and_word_markup_are_read_through():
     assert out.count("ADDRESS_") == 1 and "Chicago" not in out and r.restore_text(out) == text
     text = '<w:del w:id="3" w:author="Harriet O&apos;Donoghue" w:date="2026-01-12T09:14:00Z"><w:r><w:t>x</w:t></w:r></w:del>'
     assert "Donoghue" not in Redactor(FINANCE).redact_text(text)   # a name inside a tag is still read
+
+
+@pytest.mark.parametrize("text, hidden_value", [
+    ("<Ustrd>Salaris oktober 2026 pnr 10731 per. 10/2026</Ustrd>", "10731"),
+    ("Onkostendeclaratie sep 2026 pers.nr 0412", "0412"),
+    ("Vydal: Ondřej Kubát (prac. č. 07)", "07"),
+    ("keyed into UKG as EE# 20417, eff. PP02", "20417"),
+    ("Kasse 04  Bed.-Nr. 118  02.10.26 17:42", "118"),
+    ("Form W-2 Wage and Tax Statement\nd Control number\n 98122\n12a Code", "98122"),
+    ("Form W-2\ncontrol # RB UT 0911. ssn ends 5527", "0911"),
+    ("Phlebotomist  : Ravinder Singh (EMP/GGN/0388)\n---", "0388"),
+    ("DD ****4410\n04-0122 TRAN, THI BICH NGOC        xxx-xx-1987     1,921.56", "04-0122"),
+])
+def test_staff_numbers(text, hidden_value):
+    out = Redactor(FINANCE).redact_text(text)
+    assert hidden_value not in out and "ID_001" in out
+
+
+@pytest.mark.parametrize("text", [
+    "Volo AZ 610 del 03/10/2026, PNR K7XQ2M",            # a booking reference
+    "4. Enter the employee ID.\n5. Enter the code",
+    "Form W-2\nControl number 2 10. Dependent care benefits",
+    "1   Ó Ceallaigh, Diarmuid       2241  IRL  *  ½  1",   # a chess rating beside a name
+    "GWEN JOHN (1876–1939)\nGirl in a Blue Dress",
+    "John Smith (34) and Mary Jones (2019) met.",
+])
+def test_not_staff_numbers(text):
+    out = Redactor(FINANCE).redact_text(text)
+    assert "ID_0" not in out, out

@@ -558,6 +558,27 @@ _CONTEXT_ID = re.compile(
     r"|licen[cs]e[ \t]+(?:number|no\b)|account[ \t]+holder|staff|student|policy[ \t]*holder)(?:'s)?(?![^\W\d_])"
     r"(?:(?!\.\s)[^\n;()\[\]{}<>\"]|\n(?![ \t]*\n)){0,40}?[ \t:(\",/*]"
     r"(?P<value>(?=[A-Za-z0-9-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+){0,3})(?![\w-])")
+# A staff number after a label that can mean nothing else, however short ("pnr 10518", "Pers.-Nr. 0412",
+# "prac. c. 07", "EE# 20417", "Bed.-Nr. 118"); read in the copy without accents.
+_STAFF_ID = re.compile(
+    r"(?<![^\W\d_])(?i:pnr|pers(?:onal|oneels)?[ \t]*\.?[ \t]*-?[ \t]*(?:nr|nummer|no)\b\.?|personalnummer|personeelsnummer"
+    r"|matricule|matricula|legajo|n[o\u00ba\u00b0][ \t]*(?:de[ \t]+)?(?:salarie|empleado|employe)|numero[ \t]+de[ \t]+empleado"
+    r"|employee[ \t]*(?:\#|no\b\.?|number|id\b|code)|emp[ \t]*(?:\#|no\b\.?|id\b)|ee[ \t]*(?:\#|id\b)|staff[ \t]*(?:\#|no\b\.?|number|id\b)"
+    r"|badge[ \t]*(?:\#|no\b\.?|number|id\b)|payroll[ \t]*(?:\#|no\b\.?|number|id\b)|clock[ \t]*(?:\#|no\b\.?|number)"
+    r"|prac\.?[ \t]*c\.|os\.?[ \t]*c\.|bed\.?[ \t]*-?[ \t]*nr\.?|bediener(?:[ \t]*nr\.?)?|kassierer(?:[ \t]*nr\.?)?"
+    r"|pcso|collar[ \t]+(?:no\b\.?|number))"
+    r"[ \t]*[:#=]?[ \t]*(?:\n[ \t]*)?(?P<value>(?=[A-Za-z0-9/-]*\d)[A-Za-z0-9][A-Za-z0-9/-]{0,15})(?![\w-])")
+# A W-2's control number (box d) and a payroll file number, after their label on the same line or the next:
+# "d Control number 98122", "Control number:\n C6773-70", "control # RB UT 0911".  Only in a W-2.
+_W2_CONTROL = re.compile(
+    r"(?<![^\W\d_])(?i:control[ \t]*(?:number|no\b\.?|\#)|control(?=[ \t]{2,})|file[ \t]*(?:number|no\b\.?|\#))"
+    r"[ \t]*[:#.]?[ \t]*(?:\n[ \t]*)?"
+    r"(?P<value>(?=[A-Za-z0-9 -]*\d)[A-Za-z0-9][A-Za-z0-9-]{1,11}(?:[ ][A-Za-z0-9-]{2,6}){0,2})(?=[ \t]*(?:\n|$|\.(?:\s|$)))")
+_W2 = re.compile(r"(?i)\bW-?2\b|wage and tax statement")
+_BRACKETED_ID = re.compile(r"[ \t]*\((?P<value>\d{4,7}|(?=[A-Za-z0-9/-]*\d)(?=[A-Za-z0-9/-]*[A-Za-z])[A-Za-z0-9][A-Za-z0-9/-]{5,19})\)")
+_COLUMN_VALUE = r"(?P<value>\d{2}-\d{4}|(?!(?:0[1-9]|1[0-2])(?:19|20)\d\d\b)(?:\d{5,7}|0\d{3}))"
+_COLUMN_AFTER = re.compile(rf"(?:\t|[ ]{{2,}}){_COLUMN_VALUE}(?=\t|[ ]{{2,}}|[ \t]*$)")
+_COLUMN_BEFORE = re.compile(rf"(?:^|\t|[ ]{{2,}})[ \t]*{_COLUMN_VALUE}(?:\t|[ ]+)", re.MULTILINE)
 # An ID by its shape alone: one to four capital letters and six to ten digits (EMP286818, G4830770), not an amount
 # in a currency (USD52482349) and not an ISIN (US1234567890).
 _SHAPED_ID = re.compile(r"(?<![\w$.\-])(?P<letters>[A-Z]{1,4})(?P<digits>\d{6,30})(?![\w-])")
@@ -1264,6 +1285,15 @@ class Redactor(TaxIdRedactor):
                                           any(c.isalpha() for c in m.group("value")))) and
                  not re.fullmatch(_DATE, m.group("value"), re.IGNORECASE) and
                  take(m.start("value"), m.end("value"), "ID", "ID:" + m.group("value").replace("-", "").upper()))
+            # two digits only after a Czech or German one ("prac. c. 07", "Bed.-Nr. 18"); "PNR K7XQ2M" is a booking
+            scan(_STAFF_ID, lambda m: not re.fullmatch(_DATE, m.group("value"), re.IGNORECASE) and
+                 not re.fullmatch(r"(?:19|20)\d\d", m.group("value")) and
+                 (len(m.group("value")) >= 3 or re.match(r"(?i)prac|os|bed", m.group())) and
+                 not (re.match(r"(?i)pnr", m.group()) and re.search(r"[A-Za-z]", m.group("value"))) and
+                 take(m.start("value"), m.end("value"), "ID", "ID:" + m.group("value").replace("-", "").upper()), fold)
+            if _W2.search(fold):
+                scan(_W2_CONTROL, lambda m: len(m.group("value")) >= 4 and not re.fullmatch(r"[\d,]+\.\d\d", m.group("value")) and
+                     take(m.start("value"), m.end("value"), "ID", "ID:" + m.group("value").replace(" ", "").upper()), fold)
             scan(_SHAPED_ID, lambda m: m.group("letters") not in _CURRENCIES and
                  not (m.group("letters") in _ISO_COUNTRIES and len(m.group("digits")) == 10) and
                  take(m.start(), m.end(), "ID", "ID:" + m.group()))
@@ -1322,6 +1352,27 @@ class Redactor(TaxIdRedactor):
                 words = copy[start:end].split()
                 if len(words) >= 2 and words[-1].rstrip(".").casefold() in _SUFFIX_WORDS:
                     found[i] = (start, end, "ADDRESS", f"ADDRESS:{_fold(copy[start:end])}", None)
+        # A staff number beside a person's name: in brackets after it ("N. Arregui (7731)", "Ravinder Singh
+        # (EMP/GGN/0388)"), or in the column next to it in a table's row ("04-0122 TRAN, THI", "Baker, Will<tab>21154").
+        # Not a year, an age ("(34)"), a date or an amount.
+        if "ID" in self._detect:
+            for start, end, kind, key, real in [f for f in found if f[2] == "NAME"]:
+                line_start = copy.rfind("\n", 0, start) + 1
+                line_end = len(copy) if (n := copy.find("\n", end)) < 0 else n
+                line = copy[line_start:line_end]
+                table = line.count("\t") >= 2 or len(re.findall(r"[ ]{2,}", line)) >= 2
+                spots = []
+                if (m := _BRACKETED_ID.match(copy, end)) is not None:
+                    spots.append((m.start("value"), m.end("value")))
+                if table and (m := _COLUMN_AFTER.match(copy, end, line_end)) is not None:
+                    spots.append((m.start("value"), m.end("value")))
+                if table and (m := _COLUMN_BEFORE.search(copy, line_start, start)) is not None and m.end() == start:
+                    spots.append((m.start("value"), m.end("value")))
+                for a, b in spots:
+                    value = copy[a:b]
+                    if not re.fullmatch(r"(?:19|20)\d\d(?:-(?:19|20)?\d\d)?|\d{1,3}", value) and \
+                            not re.fullmatch(_DATE, value, re.IGNORECASE):
+                        take(a, b, "ID", "ID:" + re.sub(r"[^0-9A-Za-z]", "", value).upper())
         # An address found grows over what's free around it: its number or street's kind before it, its flat,
         # town, postcode and country after it, so no piece of it is left showing.
         for i, (start, end, kind, key, real) in enumerate(found):
