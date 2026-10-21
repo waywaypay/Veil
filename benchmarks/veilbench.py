@@ -123,18 +123,59 @@ class Gliner:
         return found
 
 
+class Gliner2:
+    """Fastino's GLiNER2 and GLiNER2.5 models (pip install gliner2): the same label list, spans with a confidence.
+    AutoExtractor loads either kind (GLiNER2.5's boundary models need it); older gliner2 releases have only GLiNER2."""
+    def __init__(self, model):
+        try:
+            from gliner2 import AutoExtractor as load
+        except ImportError:
+            from gliner2 import GLiNER2 as load
+        self.m = load.from_pretrained(model)
+        self.labels = list(tagged.LABELS)
+
+    def spans(self, texts):
+        out = []
+        for t in texts:
+            found = []
+            for off, p in tagged.chunks(t):
+                r = self.m.extract_entities(p, self.labels, threshold=FLOOR, include_spans=True, include_confidence=True)["entities"]
+                for label, items in r.items():
+                    found += [(off + e["start"], off + e["end"], label, round(e["confidence"], 3)) for e in items]
+            out.append(found)
+        return out
+
+
 class TokenClassifier:
     """A Hugging Face token-classification model, its own label set, private-looking labels kept."""
     def __init__(self, model):
         from transformers import pipeline
         self.p = pipeline("token-classification", model=model, aggregation_strategy="simple", device=-1)
 
+    def _run(self, batch):
+        """The pipeline's entities for each passage; a passage that is too long for the model (more than its token limit
+        after tokenizing) is cut into smaller ones and read in pieces."""
+        try:
+            return self.p([p for _, _, p in batch])
+        except RuntimeError:
+            outs = []
+            for _, _, passage in batch:
+                merged = []
+                for off, piece in tagged.chunks(passage, 25):
+                    try:
+                        es = self.p([piece])[0]
+                    except RuntimeError:
+                        es = []
+                    merged += [{**e, "start": e["start"] + off, "end": e["end"] + off} for e in es]
+                outs.append(merged)
+            return outs
+
     def spans(self, texts):
         found = [[] for _ in texts]
         pieces = [(i, off, p) for i, t in enumerate(texts) for off, p in tagged.chunks(t, 120)]
         for b in range(0, len(pieces), 2 * BATCH):
             batch = pieces[b:b + 2 * BATCH]
-            for (i, off, _), es in zip(batch, self.p([p for _, _, p in batch])):
+            for (i, off, _), es in zip(batch, self._run(batch)):
                 for e in es:
                     lab = e.get("entity_group") or e.get("entity", "")
                     if lab and lab not in ("O", "o") and not _not_private(lab):
@@ -178,6 +219,105 @@ class Spacy:
                 for t in texts]
 
 
+def _retry(call, tries=6):
+    """call() again after a rate limit or a passing server error, waiting longer each time."""
+    for k in range(tries):
+        try:
+            return call()
+        except Exception as e:   # noqa: BLE001
+            code = getattr(getattr(e, "response", None), "status_code", None)
+            if k == tries - 1 or code not in (429, 500, 502, 503, 504):
+                raise
+            time.sleep(2 ** k * 3)
+
+
+class GoogleDLP:
+    """Google Cloud Sensitive Data Protection (DLP) content:inspect with its default detectors, every likelihood kept.
+    Needs pip install google-auth requests, GOOGLE_APPLICATION_CREDENTIALS (a service account allowed to use the DLP
+    API) and GOOGLE_CLOUD_PROJECT, or a project in the credentials.  A finding's likelihood becomes its score:
+    VERY_UNLIKELY 0.1, UNLIKELY 0.3, POSSIBLE 0.5 (the service's own default floor), LIKELY 0.7, VERY_LIKELY 0.9."""
+    LIKELY = {"VERY_UNLIKELY": .1, "UNLIKELY": .3, "POSSIBLE": .5, "LIKELY": .7, "VERY_LIKELY": .9}
+    PUBLIC = {"LOCATION", "ORGANIZATION_NAME", "DOMAIN_NAME", "ETHNIC_GROUP", "MEDICAL_TERM", "COUNTRY_DEMOGRAPHIC", "TIME"}
+
+    def __init__(self):
+        import google.auth
+        from google.auth.transport.requests import AuthorizedSession
+        creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        self.project = os.environ.get("GOOGLE_CLOUD_PROJECT") or project
+        self.s = AuthorizedSession(creds)
+
+    def _inspect(self, text):
+        r = self.s.post(f"https://dlp.googleapis.com/v2/projects/{self.project}/content:inspect",
+                        json={"item": {"value": text}, "inspectConfig": {"minLikelihood": "VERY_UNLIKELY", "includeQuote": False,
+                                                                          "limits": {"maxFindingsPerRequest": 0}}})
+        r.raise_for_status()
+        return r.json().get("result", {}).get("findings", [])
+
+    def spans(self, texts):
+        out = []
+        for t in texts:
+            found = []
+            for f in _retry(lambda: self._inspect(t)):
+                kind, cp = f["infoType"]["name"], f["location"].get("codepointRange", {})
+                if kind in self.PUBLIC or _not_private(kind):
+                    continue
+                found.append((int(cp.get("start", 0)), int(cp["end"]), kind, self.LIKELY.get(f.get("likelihood"), .5)))
+            out.append(found)
+        return out
+
+
+class AzureLanguage:
+    """Azure AI Language PII detection (kind PiiEntityRecognition, the service's default categories), each entity with
+    its confidence.  Needs AZURE_LANGUAGE_ENDPOINT and AZURE_LANGUAGE_KEY.  Passages go five to a request, as the free
+    tier allows; offsets are counted in code points to match Python's."""
+    PUBLIC = {"Organization", "DateTime", "Age", "URL", "Quantity", "PersonType", "IPAddress"}
+
+    def __init__(self):
+        import requests
+        self.s = requests.Session()
+        self.url = os.environ["AZURE_LANGUAGE_ENDPOINT"].rstrip("/") + "/language/:analyze-text?api-version=2023-04-01"
+        self.s.headers["Ocp-Apim-Subscription-Key"] = os.environ["AZURE_LANGUAGE_KEY"]
+
+    def _call(self, docs):
+        r = self.s.post(self.url, json={"kind": "PiiEntityRecognition", "parameters": {"stringIndexType": "UnicodeCodePoint"},
+                                        "analysisInput": {"documents": [{"id": str(k), "language": "en", "text": p}
+                                                                        for k, p in enumerate(docs)]}})
+        r.raise_for_status()
+        res = r.json()["results"]
+        got = {d["id"]: d["entities"] for d in res["documents"]}
+        return [got.get(str(k), []) for k in range(len(docs))]
+
+    def spans(self, texts):
+        found = [[] for _ in texts]
+        pieces = [(i, off + o2, q) for i, t in enumerate(texts) for off, p in tagged.chunks(t)
+                  for o2, q in ([(0, p)] if len(p) <= 5000 else tagged.chunks(p, 60))]
+        for b in range(0, len(pieces), 5):
+            batch = pieces[b:b + 5]
+            for (i, off, _), es in zip(batch, _retry(lambda: self._call([p for _, _, p in batch]))):
+                found[i] += [(off + e["offset"], off + e["offset"] + e["length"], e["category"], round(e["confidenceScore"], 3))
+                             for e in es if e["category"] not in self.PUBLIC and not _not_private(e["category"])]
+        return found
+
+
+class AwsComprehend:
+    """Amazon Comprehend DetectPiiEntities (English), each entity with its score.  Needs boto3 and AWS credentials with
+    comprehend:DetectPiiEntities; AWS_REGION picks the region (default us-east-1)."""
+    PUBLIC = {"DATE_TIME", "AGE", "URL", "IP_ADDRESS", "MAC_ADDRESS"}
+
+    def __init__(self):
+        import boto3
+        self.c = boto3.client("comprehend", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+
+    def spans(self, texts):
+        found = [[] for _ in texts]
+        for i, t in enumerate(texts):
+            for off, p in tagged.chunks(t):
+                es = _retry(lambda: self.c.detect_pii_entities(Text=p, LanguageCode="en"))["Entities"]
+                found[i] += [(off + e["BeginOffset"], off + e["EndOffset"], e["Type"], round(e["Score"], 3))
+                             for e in es if e["Type"] not in self.PUBLIC]
+        return found
+
+
 class Veil:
     def spans(self, texts):
         return [[(s, e, "VEIL", 1.0) for s, e in tagged.veil_hidden(t, Redactor(FINANCE).redact_text(t))] for t in texts]
@@ -190,11 +330,21 @@ SYSTEMS = {
     "presidio": (Presidio, "Microsoft Presidio, default recognizers, spaCy en_core_web_lg", 0.0),
     "scrubadub": (Scrubadub, "scrubadub, default detectors", 0.0),
     "spacy": (Spacy, "spaCy en_core_web_lg, PERSON and FAC entities", 0.0),
+    "google-dlp": (GoogleDLP, "Google Cloud Sensitive Data Protection (DLP), default detectors", 0.5),
+    "azure-language": (AzureLanguage, "Azure AI Language PII detection, default categories", 0.01),
+    "aws-comprehend": (AwsComprehend, "Amazon Comprehend DetectPiiEntities", 0.01),
     "gliner-pii-edge": (lambda: Gliner("knowledgator/gliner-pii-edge-v1.0"), "knowledgator/gliner-pii-edge-v1.0 (the tagger's base)", 0.5),
     "gliner-pii-base": (lambda: Gliner("knowledgator/gliner-pii-base-v1.0"), "knowledgator/gliner-pii-base-v1.0", 0.5),
     "gliner-pii-large": (lambda: Gliner("knowledgator/gliner-pii-large-v1.0"), "knowledgator/gliner-pii-large-v1.0", 0.5),
     "gliner-multi-pii": (lambda: Gliner("urchade/gliner_multi_pii-v1"), "urchade/gliner_multi_pii-v1", 0.5),
     "nvidia-gliner-pii": (lambda: Gliner("nvidia/gliner-PII", nemo=True), "nvidia/gliner-PII", 0.5),
+    "gliner2-pii-multi": (lambda: Gliner2("fastino/gliner2-privacy-filter-PII-multi"), "fastino/gliner2-privacy-filter-PII-multi (GLiNER2, 278M)", 0.5),
+    "gliner2-guardrails-pii": (lambda: Gliner2("fastino/GLiNER2-Guardrails-PII-Multi"), "fastino/GLiNER2-Guardrails-PII-Multi", 0.5),
+    "gliner2-base": (lambda: Gliner2("fastino/gliner2-base-v1"), "fastino/gliner2-base-v1 (general GLiNER2)", 0.5),
+    "gliner2-large": (lambda: Gliner2("fastino/gliner2-large-v1"), "fastino/gliner2-large-v1 (general GLiNER2)", 0.5),
+    "gliner2.5-small": (lambda: Gliner2("fastino/gliner2.5-small-v1"), "fastino/gliner2.5-small-v1 (GLiNER2.5, 74M)", 0.5),
+    "gliner2.5-base": (lambda: Gliner2("fastino/gliner2.5-base-v1"), "fastino/gliner2.5-base-v1 (GLiNER2.5, 194M)", 0.5),
+    "gliner2.5-multi": (lambda: Gliner2("fastino/gliner2.5-multi-v1"), "fastino/gliner2.5-multi-v1 (GLiNER2.5, 287M, multilingual)", 0.5),
     "piiranha": (lambda: TokenClassifier("iiiorg/piiranha-v1-detect-personal-information"), "iiiorg/piiranha-v1 (non-commercial licence)", 0.0),
     "ai4privacy-openpii": (lambda: TokenClassifier("ai4privacy/llama-ai4privacy-english-anonymiser-openpii"), "ai4privacy/llama-ai4privacy-english-anonymiser-openpii", 0.0),
     "deberta-ai4privacy": (lambda: TokenClassifier("Isotonic/deberta-v3-base_finetuned_ai4privacy_v2"), "Isotonic/deberta-v3-base_finetuned_ai4privacy_v2 (non-commercial)", 0.0),
