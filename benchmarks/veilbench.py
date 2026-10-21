@@ -148,12 +148,30 @@ class TokenClassifier:
         from transformers import pipeline
         self.p = pipeline("token-classification", model=model, aggregation_strategy="simple", device=-1)
 
+    def _run(self, batch):
+        """The pipeline's entities for each passage; a passage that is too long for the model (more than its token limit
+        after tokenizing) is cut into smaller ones and read in pieces."""
+        try:
+            return self.p([p for _, _, p in batch])
+        except RuntimeError:
+            outs = []
+            for _, _, passage in batch:
+                merged = []
+                for off, piece in tagged.chunks(passage, 25):
+                    try:
+                        es = self.p([piece])[0]
+                    except RuntimeError:
+                        es = []
+                    merged += [{**e, "start": e["start"] + off, "end": e["end"] + off} for e in es]
+                outs.append(merged)
+            return outs
+
     def spans(self, texts):
         found = [[] for _ in texts]
         pieces = [(i, off, p) for i, t in enumerate(texts) for off, p in tagged.chunks(t, 120)]
         for b in range(0, len(pieces), 2 * BATCH):
             batch = pieces[b:b + 2 * BATCH]
-            for (i, off, _), es in zip(batch, self.p([p for _, _, p in batch])):
+            for (i, off, _), es in zip(batch, self._run(batch)):
                 for e in es:
                     lab = e.get("entity_group") or e.get("entity", "")
                     if lab and lab not in ("O", "o") and not _not_private(lab):
