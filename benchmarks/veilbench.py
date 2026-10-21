@@ -37,6 +37,7 @@ CACHE = DATA / "cache"
 TAGGER = os.environ.get("VEIL_TAGGER", tagged.MODEL)
 BATCH = int(os.environ.get("VEIL_BENCH_BATCH", 8))      # passages per forward pass; lower it for the 600M+ models on a small machine
 GROUP = int(os.environ.get("VEIL_BENCH_GROUP", 50))     # documents per cache write
+FLOOR = float(os.environ.get("VEIL_BENCH_FLOOR", 0.1))   # lowest score the GLiNER models keep, so each can be scored over a range of thresholds
 
 MARK = re.compile(r"⟦([^|⟦⟧]+)\|([^⟦⟧]*)⟧")
 # label in the documents' markup -> the type of detail it is scored as
@@ -117,7 +118,7 @@ class Gliner:
         with torch.inference_mode():
             for b in range(0, len(pieces), BATCH):
                 batch = pieces[b:b + BATCH]
-                for (i, off, _), es in zip(batch, self.m.batch_predict_entities([p for _, _, p in batch], self.labels, threshold=0.3)):
+                for (i, off, _), es in zip(batch, self.m.batch_predict_entities([p for _, _, p in batch], self.labels, threshold=FLOOR)):
                     found[i] += [(off + e["start"], off + e["end"], e["label"], round(e["score"], 3)) for e in es]
         return found
 
@@ -212,7 +213,7 @@ def _key(text):
 def system_spans(name, texts):
     """{key(text): [(start, end, label, score)]} for a system, from the cache or by running it on what is missing."""
     CACHE.mkdir(parents=True, exist_ok=True)
-    path = CACHE / f"bench_{name}.jsonl"
+    path = CACHE / (f"bench_{name}_f{FLOOR:g}.jsonl" if name.startswith(("gliner", "nvidia")) else f"bench_{name}.jsonl")
     have = {}
     if path.exists():
         for line in open(path):
@@ -304,7 +305,25 @@ def summarise(docs, per, idx=None, boot=2000):
     return {"found": H / max(1, N), "lo": lo, "hi": hi, "details": N, "other_hidden": fp / max(1, fpt), "other_words": fpt}
 
 
-def score(paths, systems, outdir):
+SWEEP = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+
+def sweep(name, docs, texts, budget):
+    """Found and other words hidden at each threshold from FLOOR up, and the point with the most found while other words
+    hidden stay within ``budget`` (None when no threshold gets there)."""
+    pts = []
+    for th in SWEEP:
+        floor = FLOOR if name.startswith(("gliner", "nvidia")) else 0.3 if name in ("model", "union") else 0.0   # what each cache keeps
+        if th < floor:
+            continue
+        outs = outputs(f"{name}@{th}", texts)
+        r = summarise(docs, [score_doc(d["text"], d["spans"], o) for d, o in zip(docs, outs)], boot=0)
+        pts.append({"threshold": th, "found": r["found"], "other_hidden": r["other_hidden"]})
+    ok = [p for p in pts if p["other_hidden"] <= budget]
+    return pts, (max(ok, key=lambda p: p["found"]) if ok else None)
+
+
+def score(paths, systems, outdir, budget=0.04, do_sweep=True):
     docs = read(paths)
     texts = [d["text"] for d in docs]
     report = {"data": [str(p) for p in paths], "documents": len(docs), "systems": {}}
@@ -314,6 +333,9 @@ def score(paths, systems, outdir):
         per = [score_doc(d["text"], d["spans"], o) for d, o in zip(docs, outs)]
         r = summarise(docs, per)
         r["about"] = SYSTEMS[name][1]
+        if do_sweep and "@" not in spec and name not in ("veil",) and SYSTEMS[name][2] > 0:
+            r["sweep"], r["at_budget"] = sweep(name, docs, texts, budget)
+            r["budget"] = budget
         types = sorted({g for p in per for g in p[1]})
         r["by_type"] = {g: [sum(p[0].get(g, 0) for p in per), sum(p[1].get(g, 0) for p in per)] for g in types}
         groups = sorted({d["group"] for d in docs})
@@ -324,6 +346,9 @@ def score(paths, systems, outdir):
         report["systems"][spec] = r
         print(f"{spec:22} found {r['found']:.1%} [{r['lo']:.1%}, {r['hi']:.1%}] of {r['details']}   "
               f"other words hidden {r['other_hidden']:.2%}", flush=True)
+        if r.get("at_budget"):
+            b = r["at_budget"]
+            print(f"{'':22} within {budget:.0%} other words hidden: found {b['found']:.1%} at threshold {b['threshold']}", flush=True)
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     json.dump(report, open(outdir / "report.json", "w"), indent=1, ensure_ascii=False)
@@ -333,10 +358,20 @@ def score(paths, systems, outdir):
 
 def markdown(report):
     rows = sorted(report["systems"].items(), key=lambda kv: -kv[1]["found"])
+    budget = next((r["budget"] for _, r in rows if "budget" in r), None)
     out = [f"{report['documents']} documents from {', '.join(report['data'])}.", "",
            "| System | Found | 95% interval | Other words hidden | |", "|---|---|---|---|---|"]
     for spec, r in rows:
         out.append(f"| {spec} | {r['found']:.1%} | {r['lo']:.1%}–{r['hi']:.1%} | {r['other_hidden']:.2%} | {r['about']} |")
+    if budget:
+        out += ["", f"Each model at the threshold that finds the most while hiding at most {budget:.0%} of other words "
+                    "(models without a score, such as veil's rules, as they are):", "",
+                "| System | Found | Other words hidden | Threshold |", "|---|---|---|---|"]
+        best = sorted(((s, r["at_budget"] if r.get("at_budget") else {"found": r["found"], "other_hidden": r["other_hidden"],
+                                                                        "threshold": None}) for s, r in rows if "sweep" in r or r["other_hidden"] <= budget),
+                      key=lambda x: -x[1]["found"])
+        for spec, b in best:
+            out.append(f"| {spec} | {b['found']:.1%} | {b['other_hidden']:.2%} | {b['threshold'] if b['threshold'] is not None else '–'} |")
     types = sorted({g for _, r in rows for g in r["by_type"]}, key=lambda g: -max(r["by_type"].get(g, [0, 0])[1] for _, r in rows))
     out += ["", "Found by type of detail:", "", "| Type | Details | " + " | ".join(s for s, _ in rows) + " |",
             "|---|---|" + "---|" * len(rows)]
@@ -381,6 +416,8 @@ def main():
     s.add_argument("data", nargs="+")
     s.add_argument("--systems", default="union,model,veil")
     s.add_argument("--out", default="veilbench_report")
+    s.add_argument("--budget", type=float, default=0.04, help="other words hidden allowed when comparing models at their best threshold")
+    s.add_argument("--no-sweep", action="store_true")
     r = sub.add_parser("redact")
     r.add_argument("files", nargs="+")
     r.add_argument("--system", default="union", choices=["union", "model", "veil"])
@@ -390,7 +427,7 @@ def main():
         for k, (_, about, th) in SYSTEMS.items():
             print(f"{k:22} threshold {th:<5} {about}")
     elif a.cmd == "score":
-        score(a.data, [x.strip() for x in a.systems.split(",") if x.strip()], a.out)
+        score(a.data, [x.strip() for x in a.systems.split(",") if x.strip()], a.out, a.budget, not a.no_sweep)
     else:
         redact(a.files, a.system, a.out)
 
