@@ -273,6 +273,23 @@ activations moves them under it, so the tagger alone found 73.0% on Gretel inste
 instead of 97.5% (Knowledgator's own models are trained for it). Storing the weights in 16 bits halves the file and
 changes nothing else.
 
+## PII-Tracer
+
+`veilbench.py score` on 300 development documents (`judged/docgen/test` and the first locked set; 6,802 labelled
+details), model revision `d25c16f`:
+
+| System | Found | 95% interval | Other words hidden |
+|---|---|---|---|
+| `perplexity-ai/PII-Tracer` (596M) | 98.5% | 98.0–98.8% | 14.22% |
+| veil's rules alone | 65.3% | 62.8–67.7% | 3.94% |
+
+Its misses are few: names 3,257 of 3,309, SSNs 76 of 79, credit cards 71 of 76, SWIFT codes 32 of 37, employee IDs 173
+of 181, everything else 97% or better. Its cost is the other words it hides. It scores nearly every span it decodes at
+about 1.0, so a threshold changes nothing (0.1 to 0.9 give the same figures). Dropping a label does: with its
+`private_date` and `other_pii` spans left out it finds 91.1% and hides 6.1%; leaving out `private_url`, `secret` and
+`private_address` as well, 83.4% and 3.6%. Those cuts were chosen on the same documents they are scored on. Why it
+hides the words it does, and whether some are real details these documents don't label, hasn't been judged.
+
 ## Caveats
 
 * Synthetic test sets come from generators the round 2 tagger (Nemotron) or veil and both rounds (Gretel) learned
