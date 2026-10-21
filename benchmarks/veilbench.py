@@ -35,6 +35,8 @@ from veil import FINANCE, Redactor, tagged  # noqa: E402
 DATA = Path(os.environ.get("VEIL_BENCH_DATA", Path(__file__).resolve().parent / "data"))
 CACHE = DATA / "cache"
 TAGGER = os.environ.get("VEIL_TAGGER", tagged.MODEL)
+BATCH = int(os.environ.get("VEIL_BENCH_BATCH", 8))      # passages per forward pass; lower it for the 600M+ models on a small machine
+GROUP = int(os.environ.get("VEIL_BENCH_GROUP", 50))     # documents per cache write
 
 MARK = re.compile(r"⟦([^|⟦⟧]+)\|([^⟦⟧]*)⟧")
 # label in the documents' markup -> the type of detail it is scored as
@@ -113,8 +115,8 @@ class Gliner:
         pieces = [(i, off, p) for i, t in enumerate(texts) for off, p in tagged.chunks(t)]
         found = [[] for _ in texts]
         with torch.inference_mode():
-            for b in range(0, len(pieces), 8):
-                batch = pieces[b:b + 8]
+            for b in range(0, len(pieces), BATCH):
+                batch = pieces[b:b + BATCH]
                 for (i, off, _), es in zip(batch, self.m.batch_predict_entities([p for _, _, p in batch], self.labels, threshold=0.3)):
                     found[i] += [(off + e["start"], off + e["end"], e["label"], round(e["score"], 3)) for e in es]
         return found
@@ -129,8 +131,8 @@ class TokenClassifier:
     def spans(self, texts):
         found = [[] for _ in texts]
         pieces = [(i, off, p) for i, t in enumerate(texts) for off, p in tagged.chunks(t, 120)]
-        for b in range(0, len(pieces), 16):
-            batch = pieces[b:b + 16]
+        for b in range(0, len(pieces), 2 * BATCH):
+            batch = pieces[b:b + 2 * BATCH]
             for (i, off, _), es in zip(batch, self.p([p for _, _, p in batch])):
                 for e in es:
                     lab = e.get("entity_group") or e.get("entity", "")
@@ -221,8 +223,8 @@ def system_spans(name, texts):
         make = SYSTEMS[name][0]
         sysobj = make()
         t0 = time.perf_counter()
-        for g in range(0, len(todo), 50):
-            group = todo[g:g + 50]
+        for g in range(0, len(todo), GROUP):
+            group = todo[g:g + GROUP]
             res = sysobj.spans(group)
             with open(path, "a") as f:
                 for t, s in zip(group, res):
