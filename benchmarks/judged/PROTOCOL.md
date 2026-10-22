@@ -124,3 +124,26 @@ Written on 21 October 2026, after round 7 was published and before any round 8 m
   documents.
 * **Reported whichever way it falls**, with round 7's number beside it on the same sets. A gain on public records that
   costs found or other words hidden elsewhere is reported as that.
+
+## Round 9: targeted synthetic documents with round 8's public records
+
+Written on 21 October 2026, before any round 9 model existed. Round 8 was never trained (the CPU runs were cut off),
+so its public records are folded in here.
+
+* **Data**: round 8's public-record training documents (three times over); 3,000 documents from `r9gen.py`, aimed at
+  what veil's rules and round 7's model still miss on practice data: addresses as other countries and scripts write them
+  (Arabic, Persian, Cyrillic, Thai, Korean, Japanese, Chinese, Greek, Hebrew, Turkish, Irish house names, Argentine,
+  Italian and German forms), forms with one box or space per letter, scanned copies with misread characters, names in
+  parts (particles, initials, suffixes, nicknames, surnames first in capitals), Japanese, Chinese, Korean and Arabic
+  names with honorifics and readings, a first name alone after a role, and staff numbers in payroll registers and
+  timesheets; 800 chunks of W-2 layouts (the real IRS form and payroll providers, the training shards only); and 6,000
+  chunks of round 7's mix replayed. 11,131 chunks in all. A fifth of `r9gen.py`'s documents is dev.
+* **Starting point**: round 7's published model. Four 500-step segments at most.
+* **Choosing**: the rule above, on dev only (round 7's dev, the public-record fifth and the `r9gen.py` fifth): the
+  segment and threshold that find the most, hiding no more other words than round 7's model at 0.35 does on the same
+  dev sets.
+* **Testing**: the second locked test once with the chosen model, through veil's redactor and as two layers, reported
+  beside round 7's model on the same documents. As for round 8, that test has been looked at (its misses guided the
+  hide-by-default experiment, and the rules added since were checked on it once each), so it is a second look, not a
+  clean test; the clean readouts are the 40 held-out public records and, once people label them, the real documents.
+* **Reported whichever way it falls.**

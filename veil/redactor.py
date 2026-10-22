@@ -575,6 +575,57 @@ _W2_CONTROL = re.compile(
     r"[ \t]*[:#.]?[ \t]*(?:\n[ \t]*)?"
     r"(?P<value>(?=[A-Za-z0-9 -]*\d)[A-Za-z0-9][A-Za-z0-9-]{1,11}(?:[ ][A-Za-z0-9-]{2,6}){0,2})(?=[ \t]*(?:\n|$|\.(?:\s|$)))")
 _W2 = re.compile(r"(?i)\bW-?2\b|wage and tax statement")
+# What may stand before a name found, and belong to it: its initials ("W.L. TAN", "Ö. Yildirim-Bauer"), a capital
+# alone before a name in capitals ("M ADEYEMI-CLARKE"), and the particles of a surname ("DE LUCA", "v. d. Heydt",
+# "BIN RAMLI", "D'AMBROSIO").
+_NAME_HEAD = re.compile(
+    r"(?:(?<![\w.])(?!P\.S\.|S\.[ALC]\.)[A-Z\u00c0-\u00de\u0130]\.(?:[ \t]?[A-Z\u00c0-\u00de\u0130]\.)+[ \t]*"
+    r"|(?<![\w.])(?:v\.[ \t]*d\.|vd\.|van[ \t]+'t)[ \t]*"
+    r"|(?<![^\W\d_])(?P<caps>DE|DEL|DELLA|DI|DA|VAN|VON|DER|DEN|BIN|BINTI|AL|EL|LA|LE|DU|DOS)[ \t]+"
+    r"|(?<![\w-])(?:D|O)['\u2019]"
+    r")\Z")
+# One initial, or a surname's particle in small letters, only after a title: "Mr I. Thrilling", "Frau von Stetten".
+_TITLED_HEAD = re.compile(r"(?<![^\W\d_])(?:Mr|Mrs|Ms|Mx|Dr|Prof|Herr|Frau|Mme|Sr|Sra|Sig|Sig\.ra)\.?[ \t]+"
+                          r"(?P<head>[A-Z\u00c0-\u00de]\.[ \t]*|(?:von|van|de|di|da|del|della|der|den|ten|ter|le|la|du)[ \t]+)\Z")
+_CAPITAL_BEFORE = re.compile(r"(?:^|(?<=\t)|(?<=[ ]{2}))(?![AI])[A-Z][ \t]+\Z", re.MULTILINE)
+# ... and after it: "Jr.", "II" (or "1I", as a scan reads it), more of the surname after its particles ("de la Cruz
+# Vda. de Ibarra"), a maiden name ("(née Lindqvist)"), the rest of a name broken at a line's end ("NDIA-\nYE").
+_NAME_TAIL = re.compile(
+    r",?[ \t]+(?:Jr|Sr|JR|SR|II|III|IV|1I|Il)(?:\.|(?![\w.]))(?![ \t]+[A-Z][a-z])"
+    r"|[ \t]+\((?:n[e\u00e9]e|geb\.|born|nacida|nata)[ \t]+[A-Z\u00c0-\u00de][\w\u00c0-\u024f'-]+\)"
+    r"|(?<=[A-Z\u00c0-\u00de])-\n[ \t]*[A-Z\u00c0-\u00de][A-Z\u00c0-\u00de'-]*(?![\w])"
+    r"|(?<=[A-Z]),[ \t]*(?!S\.[ALC]\.)[A-Z]\.(?:[ \t]?[A-Z]\.)?(?![\w])")
+# A Japanese surname of kanji, then the given name after a space: "渡辺 翔太", "港 誠一郎"; and a kana reading in
+# brackets after a name ("高橋 恒一（たかはし こういち）").
+_KANJI_GIVEN = re.compile(r"[ \u3000](?:[\u3400-\u9fff]{1,3}|[\u3040-\u309f]{2,4})(?![\u3040-\u30ff\u3400-\u9fff])")
+_KANA_BRACKETS = re.compile(r"[ \u3000]?[(（](?P<value>[\u3040-\u30ff]+(?:[ \u3000][\u3040-\u30ff]+)?)[)）]")
+# A nickname in brackets between a first name and the surname: "Oleksandr (Sasha) Bondar".
+_NICKNAME = re.compile(r"[ \t]+\((?P<nick>[A-Z][a-z]{1,15})\)[ \t]+[A-Z\u00c0-\u00de][\w\u00c0-\u024f'-]+")
+_PARTICLES_AFTER = re.compile(
+    r"(?:(?<=Vda)\.)?[ \t]+(?:(?:de|del|della|di|da|van|von|der|den|ter|ten|bin|binti|al|el|la|le|du|dos|das|Vda\.|vda\.|Wwe\.)[ \t]+)+"
+    r"['\u2019]?[A-Z\u00c0-\u00de][a-z\u00e0-\u024f'\u2019-]+")
+_SHORT_PARTICLES = frozenset("DE LA LE EL AL DU DOS DER DEN DEL".split())
+_CJK = "\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3"
+# A name in Japanese, Chinese or Korean before its honorific: "山田太郎様", "김옥순 님", "シュレーダー博士".
+_HONORIFIC_NAME = re.compile(
+    rf"(?<![{_CJK}])(?P<value>[{_CJK}]{{2,6}})[ \t]*(?:様|さん|さま|先生|博士|氏|くん|ちゃん|님|씨|선생님|교수님|女士|小姐)")
+_NOT_HONORED = frozenset("お客 客 皆 各位 皆さん 고객 회원 여러분 학생 부모 선생 교수 사장 부장 과장 患者 先生 学生 社員".split())
+# A name after its label in Japanese, Chinese, Korean or Arabic: "氏名: 高橋 誠一郎", "이름 박서연", "الاسم : ...".
+_NATIVE_NAME_LABEL = re.compile(
+    rf"(?:氏名|姓名|お名前|名前|이름|성명|الاسم(?:[ \t]+بالعربي)?|السيدة|السيد)(?:[\"']?[ \t]*[:：/][ \t]*[\"']?|[ \t]+)"
+    rf"(?P<value>[{_CJK}]{{2,6}}(?:[ \u3000][{_CJK}]{{1,6}})?|[\u0600-\u06ff]+(?:[ \t][\u0600-\u06ff]+){{0,4}})")
+# A name in Japanese, Chinese or Korean beside one already found: its own script after the romanised one
+# ("TSANG Hoi Ying, Natalie 曾凱盈"), its kana reading in the next column ("| 渡辺 小百合 | わたなべ さゆり |").
+_NATIVE_AFTER = re.compile(rf"[ \t,/]*\(?(?P<value>[{_CJK}]{{2,5}}(?:[ \u3000][{_CJK}]{{1,4}})?)\)?(?=[ \t]*(?:\n|$|[,;|]))")
+_KANA_CELL = re.compile(r"[ \t]*\|[ \t]*(?P<value>[\u3040-\u30ff]+(?:[ \u3000][\u3040-\u30ff]+)?)[ \t]*(?=\|)")
+# A first name alone after a word that says it is one: "Operator Joy", "Preferred Name: Teo", "Served by: Kim".
+_ONE_NAME = re.compile(
+    r"(?<![^\W\d_])(?i:operator|cashier|served[ \t]+by|your[ \t]+server|preferred[ \t]+(?:first[ \t]+)?name|nick[ \t]*name"
+    r"|known[ \t]+as|goes[ \t]+by|kassierer(?:in)?|bediener(?:in)?|cajer[oa]|atendido[ \t]+por|vendeuse|vendeur"
+    r"|caissi[e\u00e8]re?)[ \t]*[:#]?[ \t]*(?P<value>[A-Z\u00c0-\u00de][a-z\u00e0-\u00ff'-]+)(?![\w])")
+# In a table's row, a first name in the cell beside a surname found: "Adeyemi-Clarke<tab>Folake".
+_CELL_AFTER = re.compile(r"(?:\t|[ \t]*\|[ \t]*)(?P<value>[A-Z\u00c0-\u00de][a-z\u00e0-\u00ff'-]+)(?=\t|[ \t]*\||[ \t]*$)",
+                         re.MULTILINE)
 _BRACKETED_ID = re.compile(r"[ \t]*\((?P<value>\d{4,7}|(?=[A-Za-z0-9/-]*\d)(?=[A-Za-z0-9/-]*[A-Za-z])[A-Za-z0-9][A-Za-z0-9/-]{5,19})\)")
 _COLUMN_VALUE = r"(?P<value>\d{2}-\d{4}|(?!(?:0[1-9]|1[0-2])(?:19|20)\d\d\b)(?:\d{5,7}|0\d{3}))"
 _COLUMN_AFTER = re.compile(rf"(?:\t|[ ]{{2,}}){_COLUMN_VALUE}(?=\t|[ ]{{2,}}|[ \t]*$)")
@@ -1352,6 +1403,8 @@ class Redactor(TaxIdRedactor):
                 words = copy[start:end].split()
                 if len(words) >= 2 and words[-1].rstrip(".").casefold() in _SUFFIX_WORDS:
                     found[i] = (start, end, "ADDRESS", f"ADDRESS:{_fold(copy[start:end])}", None)
+        if "NAME" in self._detect:
+            self._grow_names(copy, found, covered, take)
         # A staff number beside a person's name: in brackets after it ("N. Arregui (7731)", "Ravinder Singh
         # (EMP/GGN/0388)"), or in the column next to it in a table's row ("04-0122 TRAN, THI", "Baker, Will<tab>21154").
         # Not a year, an age ("(34)"), a date or an amount.
@@ -1612,6 +1665,83 @@ class Redactor(TaxIdRedactor):
             kind = "ID" if m.group("id") else "ACCOUNT"
             return take(start, start + len(value), kind, f"{kind}:{re.sub(r'[^0-9A-Za-z]', '', value).upper()}")
         return False
+
+    def _grow_names(self, copy: str, found: list, covered: bytearray, take) -> None:
+        """Names found grow over what's free around them and belongs to them (initials, particles, suffixes, a maiden
+        name, the rest of a name broken at a line's end); then names in other scripts and first names alone, by
+        their honorific, their label, or a name found beside them."""
+        for i, (start, end, kind, key, real) in enumerate(found):
+            if kind != "NAME":
+                continue
+            head = start
+            caps = copy[start:end].isupper()
+            for _ in range(4):
+                m = _NAME_HEAD.search(copy, max(0, head - 12), head)
+                if m is not None and m.group("caps") and (not copy[head:end].split()[0].isupper() or
+                                                          (m.group("caps") in _SHORT_PARTICLES and   # with more words after
+                                                           len(re.match(r"[^ \t\n]*(?:[ ][^ \t\n]+)*", copy[start:]).group()
+                                                               .split()) < 2)):
+                    m = None
+                if m is None and (t := _TITLED_HEAD.search(copy, max(0, head - 16), head)) is not None:
+                    m = t
+                    if m.start("head") < head:
+                        head_start = m.start("head")
+                        if not any(covered[head_start:head]):
+                            head = head_start
+                    break
+                if m is None and caps:
+                    m = _CAPITAL_BEFORE.search(copy, max(0, head - 3), head)
+                if m is None or m.start() == head or any(covered[m.start():head]):
+                    break
+                head = m.start()
+            tail = end
+            first = copy[start:end].split()[0].casefold() if copy[start:end].split() else ""
+            if not copy[start:end].isupper() and (first in _GIVEN or first in _given_names()) and \
+                    (m := _PARTICLES_AFTER.match(copy, tail)) is not None and not any(covered[tail:m.end()]):
+                tail = m.end()
+            if (m := _NICKNAME.match(copy, tail)) is not None and not any(covered[tail:m.end()]) and \
+                    (m.group("nick").casefold() in _GIVEN or m.group("nick").casefold() in _given_names()):
+                tail = m.end()
+            while (m := _NAME_TAIL.match(copy, tail)) is not None and m.end() > tail and not any(covered[tail:m.end()]):
+                tail = m.end()
+            if re.fullmatch(r"[\u3400-\u9fff]{1,3}", copy[start:end]) and (m := _KANJI_GIVEN.match(copy, tail)) is not None \
+                    and not any(covered[tail:m.end()]):
+                tail = m.end()
+            if (head, tail) != (start, end):
+                covered[head:start] = b"\x01" * (start - head)
+                covered[end:tail] = b"\x01" * (tail - end)
+                found[i] = (head, tail, kind, f"NAME:{_fold(copy[head:tail])}", None)
+        def take_free(a: int, b: int) -> None:   # what of it is still free: the rest of a name the model took part of
+            for run in re.finditer(rb"\x00+", bytes(covered[a:b])):
+                part = copy[a + run.start():a + run.end()]
+                lead = len(part) - len(part.lstrip(_TRIM))
+                x, y = a + run.start() + lead, a + run.start() + len(part.rstrip(_TRIM))
+                if x < y:
+                    take(x, y, "NAME")
+
+        for pattern in (_HONORIFIC_NAME, _NATIVE_NAME_LABEL):
+            for m in pattern.finditer(copy):
+                value = m.group("value")
+                if value not in _NOT_HONORED and not value.startswith(("お", "ご")) and \
+                        not value.endswith(("会社", "社", "店", "部", "課", "局", "院", "所", "御中")):
+                    take_free(m.start("value"), m.end("value"))
+        for m in _ONE_NAME.finditer(copy):   # a common word only alone on its line: "Operator Joy", not "Operator Manual and"
+            word = m.group("value").casefold()
+            if word not in self._v.stop and word not in _ROLE_WORDS and \
+                    (word in _GIVEN or word in _given_names() or word not in _common_words() or
+                     re.match(r"[ \t]*(?:\n|$)", copy[m.end():])):
+                take(m.start("value"), m.end("value"), "NAME")
+        for start, end, kind, key, real in [f for f in found if f[2] == "NAME"]:
+            line_end = len(copy) if (n := copy.find("\n", end)) < 0 else n
+            if re.search(r"[A-Za-z]", copy[start:end]) and (m := _NATIVE_AFTER.match(copy, end, line_end)):
+                take(m.start("value"), m.end("value"), "NAME")
+            if re.search(f"[{_CJK}]", copy[start:end]) and ((m := _KANA_CELL.match(copy, end, line_end)) or
+                                                            (m := _KANA_BRACKETS.match(copy, end, line_end))):
+                take(m.start("value"), m.end("value"), "NAME")
+            if (m := _CELL_AFTER.match(copy, end, line_end)) is not None:
+                word = m.group("value").casefold()
+                if (word in _GIVEN or word in _given_names()) and word not in self._v.stop:
+                    take(m.start("value"), m.end("value"), "NAME")
 
     def _known_names(self, fold: str, take, typed: bool, guesses: bool = False) -> None:
         """Where the people known are written; ``guesses``: the name finder's guesses, and only them."""
