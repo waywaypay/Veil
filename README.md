@@ -253,6 +253,27 @@ CLINIC = FINANCE.extend("clinic", stop_words="Triage Discharge Intake", cues=[r"
                         cue_ends="physician")
 ```
 
+## Your own identifiers
+
+When your firm already has its own codes for people and accounts, such as
+an investor number for each LP, the model can see those instead of
+`NAME_001`:
+
+```python
+r = Redactor(US_TAX_K1, identifiers={"Avery K. Mockridge": "LP-0042", "123-45-6789": "INV-17"})
+r.add_identifier("000123456789", "ACCT-A", kind="ACCOUNT")   # one at a time, with its kind
+r.redact_text("MOCKRIDGE, AVERY K (SSN 123 45 6789)")          # "LP-0042 (SSN INV-17)"
+r.restore_text("Add LP-0042 as a member.")                      # "Add Avery K. Mockridge as a member."
+```
+
+A person is found however their name is written, as with `add_person`, and
+a taxpayer ID however its digits are written. Anything else is matched as
+written. Whatever has no identifier still gets a placeholder. Only
+whoever holds the table can say who `LP-0042` is, and the same person keeps
+the same code from one conversation to the next. An identifier that looks
+like a placeholder, or that's already in use for something else, is
+refused.
+
 ## Choosing what to look for, and adding your own
 
 ```python
