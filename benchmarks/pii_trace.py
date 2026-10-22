@@ -21,6 +21,9 @@ Scores, every one over (conversation, turn, start, end) in user messages:
 * consistent: an identifier (one value, compared by its letters and digits, in one conversation) counts only if every
   character of every mention is covered; by number of mentions.
 * other words hidden: of the words no gold span touches, the share a system's spans touch (veilbench's cost measure).
+
+--drop private_date,private_url scores only the labels veil sets out to hide: those gold spans are left out, and so are
+the spans a system labels as them (an untyped system's spans all stay).
 """
 import argparse
 import json
@@ -240,7 +243,7 @@ def markdown(rep):
     rows = list(rep["systems"].items())
     f = lambda x: f"{x:.3f}"   # noqa: E731
     out = [f"PII-TRACE public subset: {rep['conversations']} conversations, {rep['gold']} labelled spans, user messages "
-           "only.", "",
+           "only" + (f", leaving out {', '.join(rep['dropped'])}" if rep["dropped"] else "") + ".", "",
            "| System | Exact F1 (typed, micro) | Exact F1 (typed, macro) | Exact F1 (untyped) | Char P | Char R | Char F1 | "
            "Overlap F1 | Contained | Consistent (2+ mentions) | Other words hidden |",
            "|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -267,11 +270,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--systems", default="veil,model,union,pii-tracer,pii-tracer-conv")
     ap.add_argument("--out", default="pii_trace_report")
+    ap.add_argument("--drop", default="", help="labels to leave out of the gold spans and of typed predictions")
     a = ap.parse_args()
+    drop = set(filter(None, a.drop.split(",")))
+    LABELS[:] = [lab for lab in LABELS if lab not in drop]
     convs = load()
-    rep = {"conversations": len(convs), "gold": sum(len(c["gold"]) for c in convs), "systems": {}}
+    for c in convs:
+        c["gold"] = [g for g in c["gold"] if g[3] not in drop]
+    rep = {"dropped": sorted(drop), "conversations": len(convs), "gold": sum(len(c["gold"]) for c in convs), "systems": {}}
     for name in a.systems.split(","):
         pred, typed = run(name, convs)
+        pred = [[p for p in ps if p[3] not in drop] for ps in pred]
         r = rep["systems"][name] = score(convs, pred, typed)
         print(f"{name:18} exact F1 {r['exact']['f1']:.3f}  char F1 {r['char']['f1']:.3f}  contained {r['contained']:.1%}  "
               f"other words hidden {r['other_hidden']:.2%}", flush=True)
