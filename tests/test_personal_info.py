@@ -986,3 +986,34 @@ def test_names_by_honorific_label_or_role(text, name):
 def test_not_names(text):
     assert "NAME_" not in Redactor(FINANCE).redact_text(text)
     assert "S.L." in Redactor(FINANCE).redact_text("SOLMAR RENT A CAR, S.L. · CIF")   # a company's form, no initials
+
+
+@pytest.mark.parametrize("text, hidden", [
+    ("name\tusername\tcity\nAnna Adams\tadamsas\tParis\n", ["adamsas"]),   # a tab keeps a table's cells apart
+    ("Emp ID: E1012\nE1012     251.20    172.89\nFile E1012_review.pdf", ["E1012"]),   # repeated where the text repeats it
+    ("E1031   NOWAK, ANNA        PM    SALARY\n", ["E1031"]),
+    ("WARN SYNC: C:\\USERS\\DPASTOR\\APPDATA\\LOCAL\\TEMP", ["DPASTOR"]),
+    ("Saved to /home/besposito/pratiche/bp_set26.pdf", ["besposito"]),
+    ("kbjorns 9:51 AM\nrunning late\nmaple_tinkerer 9:52 AM\nnp", ["kbjorns", "maple_tinkerer"]),
+    ("[18/10/2026 21:43] GuiTheGoat: meu riot id GuiTheGoat#2206", ["GuiTheGoat"]),
+    ("Author:     tdlamini <38211946+tdlamini@users.noreply.github.com>", ["tdlamini", "github.com"]),
+    ("pix-recon-bench (github.com/lgso-dev/pix-recon-bench)", ["lgso-dev"]),
+    ("IDENTIFIANT .................. OGROS\nPORTABLE", ["OGROS"]),
+    ("inserito su portale FIPAV - utente segreteria.lbarbieri", ["lbarbieri"]),
+])
+def test_usernames_and_staff_numbers_where_only_they_can_be(text, hidden):
+    out = Redactor(FINANCE).redact_text(text)
+    assert not any(h in out for h in hidden), out
+
+
+@pytest.mark.parametrize("text", [
+    "The ID 21154 was flagged.",
+    "l'utente deve inserire la password. Usuario: perfecto, mil gracias",
+    "/home/deploy/apps/releases and /Users/Shared/",
+    "login prob. she changed her password",
+    "Check out the latest issue of eBiz at home.enron.com.",
+    "Order#1234 shipped. Meeting at 10:30 AM\nSummary: 10:30 AM",
+])
+def test_not_usernames(text):
+    out = Redactor(FINANCE).redact_text(text)
+    assert "ID_" not in out and "ADDRESS_" not in out and "EMAIL_" not in out, out
