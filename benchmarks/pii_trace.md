@@ -152,3 +152,22 @@ All nine labels:
   0.16% and it finds less than deerpark-PII-edge.
 * **Alone, PII-Tracer beats every Deerpark checkpoint in both modes.** With veil's rules beside them, the Deerpark
   models match it on these labels.
+
+### deerpark-PII-large's threshold, chosen on dev
+
+`benchmarks/pii_trace_threshold.py` picks deerpark-PII-large's threshold on the dev half (237 conversations, dates and
+URLs left out) by the rule in `judged/PROTOCOL.md`: the threshold that hides the most details in full while hiding no
+more other words than deerpark-PII-edge at 0.35 does on the same documents. It chooses for each mode on its own.
+
+| Mode | Chosen | Dev: large / edge, fully hidden | Test: large / edge, fully hidden | Test: other words hidden, large / edge |
+|---|---|---|---|---|
+| alone, one message | 0.65 | 82.3% / 89.3% | 82.4% / 86.4% | 0.19% / 0.17% |
+| alone, whole conversation | 0.95 | 45.8% / 93.5% | 44.4% / 92.6% | 0.03% / 0.15% |
+| + rules, one message | 0.65 | 99.1% / 99.7% | 98.9% / 99.6% | 0.19% / 0.17% |
+| + rules, whole conversation | 0.95 | 98.4% / 99.7% | 98.1% / 99.6% | 0.11% / 0.15% |
+
+No threshold gets deerpark-PII-large to deerpark-PII-edge's results at deerpark-PII-edge's cost in other words.
+One message at a time, it matches the edge's other words hidden only from 0.65 up, where it finds about 4–7 points
+less. Over the whole conversation, it hides more other words than the edge at every threshold below 0.95, and at 0.95
+it finds half as much. With veil's rules, it trails by under 1 point in every mode. Large only finds more if it may
+hide more: one message at a time at 0.45, it hides 91.5% of the dev details in full, at 0.37% of other words.
