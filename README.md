@@ -292,6 +292,10 @@ text, spans = r.redact("Call Maria Lopez on 0412 555 019.")
 
 `threshold` (0.35 by default) trades what the tagger finds against the other words it hides.
 
+The tagger was never trained on Korean, and in Hangul it takes ordinary words for names; `veil.hangul` drops a
+Korean "name" made of everyday words, using `wordfreq` (in the tagger extra). `benchmarks/korean_names.md` has
+what that changes.
+
 `redact` marks spans as `[NAME]`, which can't be put back. For numbered placeholders that restore, as veil's
 own do, ask for a `Redactor` with the tagger beside its rules, one per conversation:
 

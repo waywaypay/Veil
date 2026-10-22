@@ -411,7 +411,9 @@ NAME_EXT = os.environ.get("VEIL_NAME_EXT", "1") != "0"   # 0: the tagger's names
 
 
 def _named(text, spans):
-    """The tagger's name spans taking in the initial or suffix that trails them (tagged.extend_name)."""
+    """The tagger's spans as veil takes them (tagged.vetted: no Korean "name" of everyday words), its names taking in
+    the initial or suffix that trails them (tagged.extend_name)."""
+    spans = tagged.vetted(spans, text)
     if not NAME_EXT:
         return spans
     return [(s, tagged.extend_name(text, e) if k == "NAME" else e, k, sc) for s, e, k, sc in spans]

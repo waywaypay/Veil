@@ -13,7 +13,7 @@ import difflib
 import re
 from dataclasses import dataclass
 
-from . import FINANCE, Redactor
+from . import FINANCE, Redactor, hangul
 
 MODEL = "Deerpark/veil-tagger-edge"
 THRESHOLD = 0.35   # chosen on the dev sets for round 7's model
@@ -76,11 +76,16 @@ def extend_name(text: str, end: int) -> int:
     return end
 
 
+def vetted(found: list[tuple[int, int, str, float]], text: str) -> list[tuple[int, int, str, float]]:
+    """The model's spans without the names that can't be names: Korean ones made of everyday words (veil.hangul)."""
+    return [x for x in found if x[2] != "NAME" or hangul.could_be_name(text[x[0]:x[1]])]
+
+
 def merged(found: list[tuple[int, int, str, float]], text: str) -> list[tuple[int, int, str, float]]:
-    """Adjacent spans of one kind joined: a first and a last name, a street and its town and postcode.  A name takes in
-    the initial or suffix that trails it, up to the next span."""
+    """Adjacent spans of one kind joined, once ``vetted``: a first and a last name, a street and its town and postcode.
+    A name takes in the initial or suffix that trails it, up to the next span."""
     out: list[tuple[int, int, str, float]] = []
-    for s, e, kind, sc in sorted(found):
+    for s, e, kind, sc in sorted(vetted(found, text)):
         if out and out[-1][2] == kind and s >= out[-1][1] and \
                 re.fullmatch(r"[ \t.]*" if kind == "NAME" else r"[\s,.-]*", text[out[-1][1]:s]):
             out[-1] = (out[-1][0], e, kind, min(sc, out[-1][3]))
