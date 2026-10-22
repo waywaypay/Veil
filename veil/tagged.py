@@ -106,7 +106,10 @@ def veil_hidden(text: str, redacted: str) -> list[tuple[int, int]]:
 
 class TaggedRedactor:
     def __init__(self, model: str = MODEL, threshold: float = THRESHOLD, system: str = "union", profile=FINANCE,
-                 batch_size: int = 8):
+                 batch_size: int = 1):
+        # One piece at a time: in a batch every piece is padded to the longest, and on a CPU that padding costs more
+        # than batching saves (0.75 -> 0.37 s per 200 words for the edge model, 4.65 -> 1.66 for the large one; the
+        # same spans either way).
         if system not in ("union", "model", "veil"):
             raise ValueError("system is 'union', 'model' or 'veil'")
         self.model_name, self.threshold, self.system, self.profile = model, threshold, system, profile

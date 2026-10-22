@@ -71,3 +71,19 @@ def test_redactor_puts_the_model_beside_the_rules(monkeypatch):
     red = r.redactor()
     out = red.redact_text(text)
     assert "MTS-009914" not in out and red.restore_text(out) == text
+
+
+def test_one_piece_per_model_call_by_default():
+    pytest.importorskip("torch")   # model_spans runs under torch.inference_mode
+
+    class Model:   # records what each call is given
+        calls: list[int] = []
+
+        def batch_predict_entities(self, pieces, labels, threshold):
+            self.calls.append(len(pieces))
+            return [[] for _ in pieces]
+
+    r = TaggedRedactor()
+    r._model = Model()
+    r.model_spans(["word " * 450, "Maria Lopez called"])
+    assert Model.calls and set(Model.calls) == {1}   # a batch pads every piece to its longest: slower on a CPU
