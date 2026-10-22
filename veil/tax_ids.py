@@ -255,6 +255,12 @@ def _mark_amounts(copy: str, clusters) -> None:
                 group.money = groups[i + 1].money = True
 
 
+def _whole(text: str) -> str:
+    """A pattern for ``text`` as a whole word where it starts or ends with a letter or digit."""
+    return ("" if not text[:1].isalnum() else r"(?<![^\W_])") + re.escape(text) + \
+        ("" if not text[-1:].isalnum() else r"(?![^\W_])")
+
+
 class TaxIdRedactor:
     """One conversation's placeholders: the same number always gets the same one."""
 
@@ -459,7 +465,9 @@ class TaxIdRedactor:
         """``text`` with what another detector found replaced, and placeholder-shaped text that isn't
         ours broken up, since it would later be "put back" as a real value."""
         for literal in sorted(self._literals, key=len, reverse=True):
-            text = text.replace(literal, self._literals[literal])
+            # As a whole word where it starts or ends with one: a name hidden by hand ("Will") isn't
+            # taken out of another word ("Willow")
+            text = re.sub(_whole(literal), lambda m, p=self._literals[literal]: p, text)
         return self._placeholder_re.sub(lambda m: m.group() if self._resolve(m.group()) else m.group().replace("_", "\u2010"),
                                 text)
 

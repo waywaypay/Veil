@@ -28,7 +28,7 @@ from functools import lru_cache
 from importlib import resources
 
 from veil.profiles import Profile, word_file
-from veil.tax_ids import KINDS, TAX_ID_KINDS, TaxIdRedactor, _shadow
+from veil.tax_ids import KINDS, TAX_ID_KINDS, TaxIdRedactor, _shadow, _whole
 
 
 def _words(text: str) -> frozenset[str]:
@@ -1026,14 +1026,19 @@ class Redactor(TaxIdRedactor):
     personal details (``veil.tagged``).  What it marks is hidden where nothing else is, with a placeholder of
     its kind (a kind it names that isn't built in gets placeholders of its own); a name of two words or more
     that it marks is hidden however it's written, as with ``add_person``.  Like the name finder, it can only add to what's hidden.
+    ``identifiers``: your own identifiers for people and values, as {real: identifier}, such as an investor
+    number for each LP ({"Avery K. Mockridge": "LP-0042"}).  The model sees the identifier where it would
+    see a placeholder (``add_identifier``), so only whoever holds this table can tell who it is.
     ``reveal``: what the model may still see of a hidden value, as {kind: how much}.  {"DOB": "year"} sends
     a birth date as "DOB_001 (born 1990)", {"DOB": "month"} as "DOB_001 (born March 1990)", so the model can
     tell who is older or roughly how old someone is.  The note is taken off again when the reply is restored.
     """
 
     def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None, reveal=None,
-                 finder=None):
+                 finder=None, identifiers=None):
         super().__init__(profile)
+        self._identifier_of: dict[tuple[str, str], str] = {}   # (kind group, real value's key) -> identifier
+        self._identified: dict[str, tuple[str, str]] = {}      # identifier -> (kind, real value)
         self._finder = finder
         self._reveal = dict(reveal or {})
         for kind, level in self._reveal.items():
@@ -1053,6 +1058,8 @@ class Redactor(TaxIdRedactor):
         self._guessing = False   # what add_person is given comes from the name finder
         self._businesses: set[tuple[str, ...]] = set()   # every run of two to five words of a fund's name
         self._kinds_changed()
+        for real, identifier in (identifiers or {}).items():
+            self.add_identifier(real, identifier)
 
     def _kinds_changed(self) -> None:
         self._v = _vocab(self.profile, frozenset(k.casefold() for k in self.kinds))
@@ -1216,10 +1223,77 @@ class Redactor(TaxIdRedactor):
 
     # -- finding it ------------------------------------------------------------
 
+    # -- your own identifiers ---------------------------------------------------
+
+    def add_identifier(self, real: str, identifier: str, kind: str | None = None) -> None:
+        """Show ``identifier`` (yours, such as an investor number) where ``real`` would be a placeholder.
+        ``kind``: what ``real`` is; a person's name ("NAME") unless it's a taxpayer ID, or say ("ACCOUNT").
+        A person is found however their name is written, as with ``add_person``; a taxpayer ID however its
+        digits are; anything else as written.  The identifier comes back as the real value."""
+        real, identifier = (real or "").strip(), (identifier or "").strip()
+        if not real or not identifier:
+            raise ValueError("Both the real value and its identifier are needed.")
+        if self._placeholder_re.fullmatch(identifier) or self._PLACEHOLDER_SHAPE.fullmatch(identifier):
+            raise ValueError(f"{identifier!r} looks like a placeholder; use an identifier of your own.")
+        if identifier in self._identified and self._identified[identifier][1] != real:
+            raise ValueError(f"{identifier!r} is already the identifier of someone or something else.")
+        digits = "".join(c for c in _shadow(real)[0] if c.isdigit())
+        if kind is None:
+            kind = "TIN" if len(digits) == 9 and len(digits) >= len(re.sub(r"\W", "", real)) else "NAME"
+        if kind == "NAME":
+            self.add_person(real)
+        else:
+            self.register_kind(kind)
+            self.add(real, kind)
+        self._identifier_of[self._identity(kind, real)] = identifier
+        self._identified[identifier] = (kind, real)
+
+    @property
+    def identifiers(self) -> dict[str, str]:
+        """The identifiers given, as {identifier: real value}."""
+        return {identifier: real for identifier, (_kind, real) in self._identified.items()}
+
+    _PLACEHOLDER_SHAPE = re.compile(r"[A-Z][A-Z0-9]*_\d{3,}")
+
+    @staticmethod
+    def _identity(kind: str, real: str) -> tuple[str, str]:
+        """What makes two values the same for an identifier: a taxpayer ID's digits, else the text folded."""
+        if kind in TAX_ID_KINDS:
+            return "TAXID", "".join(c for c in _shadow(real)[0] if c.isdigit())
+        return kind, " ".join(_ascii(real).casefold().split())
+
+    def _placeholder_for(self, identifier: str) -> str:
+        """The placeholder of the value ``identifier`` stands for, handing one out if it has none yet."""
+        kind, real = self._identified[identifier]
+        key = self._identity(kind, real)
+        for placeholder, value in self._real.items():
+            if self._identity(placeholder.rsplit("_", 1)[0], value) == key:
+                return placeholder
+        found = self._placeholder_re.fullmatch(self._redact_core(real).strip())
+        return found.group() if found else identifier
+
     def redact_text(self, text: str, typed: bool = False) -> str:
-        """``text`` with taxpayer IDs and personal information replaced.  ``typed``: the user typed it, so any
+        """``text`` with taxpayer IDs and personal information replaced: by your identifier where you gave one
+        (``add_identifier``), and otherwise by a placeholder.  ``typed``: the user typed it, so any
         two or three capitalized words (that aren't the profile's words, or a business's) are taken for
         a name, and so are a common first name and surname in lower case."""
+        if not self._identified or not text:
+            return self._redact_core(text, typed)
+        # An identifier already in the text (typed, or in a reply going back) stands for its value: it's held
+        # as that value's placeholder, so nothing takes it for something else, and shown again after.
+        for identifier in sorted(self._identified, key=len, reverse=True):
+            if identifier in text:
+                text = re.sub(_whole(identifier), lambda m, i=identifier: self._placeholder_for(i), text)
+        text = self._redact_core(text, typed)
+
+        def swap(m: re.Match) -> str:
+            real = self._real.get(m.group())
+            if real is None:
+                return m.group()
+            return self._identifier_of.get(self._identity(m.group().rsplit("_", 1)[0], real), m.group())
+        return self._placeholder_re.sub(swap, text)
+
+    def _redact_core(self, text: str, typed: bool = False) -> str:
         text = self._prepare(text)
         marked: list[tuple[int, int, str]] = []
         if self._finder is not None and text and not text.isspace():
@@ -1252,6 +1326,9 @@ class Redactor(TaxIdRedactor):
         return _DOB_PLACEHOLDER.sub(note, text)
 
     def restore_text(self, text: str) -> str:
+        for identifier in sorted(self._identified, key=len, reverse=True):
+            if identifier in text:
+                text = re.sub(_whole(identifier), lambda m, i=identifier: self._placeholder_for(i), text)
         return super().restore_text(_BORN_NOTE.sub(r"\1", text) if self._reveal else text)
 
     def redact(self, value, typed: bool = False):
