@@ -219,7 +219,7 @@ _AT = r"(?:[ \t]*@[ \t]*|[ \t]*[\[({]at[\])}][ \t]*|[ \t]+at[ \t]+)"
 _DOT = r"(?:[ \t]*\.[ \t]*|[ \t]*[\[({]dot[\])}][ \t]*|[ \t]+dot[ \t]+)"
 _EMAIL = re.compile(rf"(?<![\w.%+-])(?:[\w%+-]|\.(?=[\w%+\[(-])|[ \t]+\.[ \t]+(?=\w)|[\[(]dot[\])])+{_AT}"
                     rf"[\w-]+(?:{_DOT}[\w-]+)*?"
-                    rf"(?:{_DOT}{_TLD}(?:\.[a-z]{{2}})?|\.[a-z]{{3,12}})(?![\w-])", re.IGNORECASE)
+                    rf"(?:{_DOT}{_TLD}(?:\.[a-z]{{2}})?|\.[a-z]{{3,12}})(?![\w-]|\.[a-z])", re.IGNORECASE)
 # Spelled out ("jane at example dot com"), the domain must end in a known suffix.
 _SPELLED_EMAIL = re.compile(rf"(?:[\w%+-]|\.(?=[\w%+\[(-])|[ \t]+\.[ \t]+(?=\w)|[\[(]dot[\])])+{_AT}[\w-]+"
                             rf"(?:{_DOT}[\w-]+)*?{_DOT}{_TLD}", re.IGNORECASE)
@@ -284,10 +284,26 @@ _ACCOUNT_NEAR = re.compile(
     r"(?:(?!\.\s)[^\n\d]){0,40}?(?<![\w-])(?P<value>\d{4}(?:[ -]\d{3,6}){2,4}|\d{12,24})(?![\w-])")
 # A username: after its label ("Username: mnewman", "User ID: JSMITH"), or an @handle.
 _USERNAME = re.compile(
-    r"(?<![^\W\d_])(?i:user[ \t_-]?name|login(?:[ \t_-]?(?:id|name))?|user[ \t_-]?id|screen[ \t_-]?name|handle)"
-    r"(?![^\W\d_])[\"'*]*[ \t]*(?:[:=]|,?[ \t]+(?:which[ \t]+)?is|[ \t]+to)[ \t]*[\"'*]*[ \t]*"
-    r"(?P<value>@?[A-Za-z0-9][\w.\-]{2,40}?)(?=[\"'*]*(?:[\s,;:)]|\.(?:\s|$)|$))(?![\w@])"
+    r"(?<![^\W\d_])(?i:user[ \t_-]?name|login(?:[ \t_-]?(?:id|name))?|user[ \t_-]?id|screen[ \t_-]?name|handle"
+    r"|identifiant|(?:nom[ \t]+d['\u2019])?utilisateur|usuario|utente|benutzer(?:[ \t_-]?name)?|gebruiker(?:s[ \t_-]?naam)?"
+    r"|brugernavn|anv[a\u00e4]ndarnamn|riot[ \t]+id|discord|gamertag|psn(?:[ \t]+id)?)"
+    r"(?![^\W\d_])[\"'*]*[ \t]*(?:[:=]|,?[ \t]+(?:which[ \t]+)?is|[ \t]+to|[ \t]*\.{2,}|[ ]+(?=[\w-]*[_\d#]|[\w-]+\.\w))[ \t]*[\"'*]*[ \t]*"
+    r"(?P<value>@?[A-Za-z0-9][\w.\-]{2,40}?(?:#\w{2,5})?)(?=[\"'*]*(?:[\s,;:)]|\.(?:\s|$)|$))(?![\w@])"
     r"|(?<![\w@.])(?P<handle>@[A-Za-z][\w.]{2,30})(?![\w@])")
+# A username where only one can be: a home folder ("C:\\Users\\jdoe\\", "/home/besposito/"), a code host's page
+# ("github.com/lgso-dev/"), a game's tag ("GuiTheGoat#2206"), a commit's author, a chat's speaker before the time
+# ("maple_tinkerer 9:52 AM", "[18/10/2026 21:40] xDiegoFPS: ...").
+_HANDLE = r"[A-Za-z0-9][\w.\-]{1,30}"
+_PATH_USER = re.compile(rf"(?i:(?<![\w])(?:[a-z]:)?[\\/]+(?:users|home|documents[ ]and[ ]settings)[\\/]+)(?P<value>{_HANDLE})(?=[\\/])")
+_CODE_HOST = re.compile(rf"(?i:(?<![\w.])(?:github|gitlab|bitbucket|codeberg)\.(?:com|org)/)(?P<value>{_HANDLE})(?=[/\s)\],;:]|\.(?:\s|$)|$)")
+_GAME_TAG = re.compile(r"(?<![\w#@])(?P<value>[A-Za-z][\w.]{2,31}#(?:\d{4,5}|[A-Z]{2,3}\d))(?![\w])")
+_GIT_AUTHOR = re.compile(r"(?m)^(?:Author|Commit|Committer):[ \t]+(?P<value>[a-z0-9][\w.\-]{2,38})[ \t]+<")
+_CHAT_SPEAKER = re.compile(rf"(?m)^(?:(?P<stamp>\[[^\]\n]{{4,25}}\])[ \t]*)?(?P<value>{_HANDLE})"
+                           r"(?:(?P<time>[ \t]+\d{1,2}:\d{2}(?:[ \t]?[AaPp]\.?[Mm]\.?)?)[ \t]*$|:[ \t])")
+_NOT_HANDLES = frozenset("public default shared all administrator admin root user users username guest system "
+                         "orgs features about settings login marketplace topics sponsors apps enterprise pricing "
+                         "explore search pulls issues notifications new deploy runner ubuntu ec2-user git www-data node "
+                         "app jenkins circleci vagrant docker postgres nginx".split())
 _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?|fax|ph)\b\.?(?:[ \t]*{_NO})?"
                 r"(?:[ \t]+is)?[ \t]*\**[ \t]*[:.#-]?|contact[ \t]*(?:number|no\b\.?|\#)?[ \t]*\**[ \t]*:|(?:direct|office|work|home|main)[ \t]*:"
                 r"|(?:call|text|phone|ring|fax|reach|reached|contact|contacting)(?:[ \t]+(?:us|me|him|her|them))?[ \t]+(?:at|on)"
@@ -366,6 +382,7 @@ _STATE = (rf"(?:(?:{'|'.join(_STATE_CODES)})\b\.?|(?:{'|'.join(_STATE_ABBREVIATI
 _ZIP = r"\d{5}(?:-\d{4})?(?!\d)"
 # Words before a state and five digits that say it's an amount, not a city: "Ordinary Income CA 45000".
 _NOT_CITY = _words("""
+the a an this that these those your my our his her their its
 income tax taxes paid total composite withheld withholding ordinary dividends interest gain gains loss losses
 credit credits deduction deductions distribution distributions contribution contributions amount amounts
 balance capital account net gross basis box line code section partner partners share estimated refund due
@@ -627,7 +644,7 @@ _ONE_NAME = re.compile(
 _CELL_AFTER = re.compile(r"(?:\t|[ \t]*\|[ \t]*)(?P<value>[A-Z\u00c0-\u00de][a-z\u00e0-\u00ff'-]+)(?=\t|[ \t]*\||[ \t]*$)",
                          re.MULTILINE)
 _BRACKETED_ID = re.compile(r"[ \t]*\((?P<value>\d{4,7}|(?=[A-Za-z0-9/-]*\d)(?=[A-Za-z0-9/-]*[A-Za-z])[A-Za-z0-9][A-Za-z0-9/-]{5,19})\)")
-_COLUMN_VALUE = r"(?P<value>\d{2}-\d{4}|(?!(?:0[1-9]|1[0-2])(?:19|20)\d\d\b)(?:\d{5,7}|0\d{3}))"
+_COLUMN_VALUE = r"(?P<value>\d{2}-\d{4}|(?!(?:0[1-9]|1[0-2])(?:19|20)\d\d\b)(?:\d{5,7}|0\d{3})|[A-Z]{1,2}-?\d{3,6}(?![\w-]))"
 _COLUMN_AFTER = re.compile(rf"(?:\t|[ ]{{2,}}){_COLUMN_VALUE}(?=\t|[ ]{{2,}}|[ \t]*$)")
 _COLUMN_BEFORE = re.compile(rf"(?:^|\t|[ ]{{2,}})[ \t]*{_COLUMN_VALUE}(?:\t|[ ]+)", re.MULTILINE)
 # An ID by its shape alone: one to four capital letters and six to ten digits (EMP286818, G4830770), not an amount
@@ -1271,6 +1288,7 @@ class Redactor(TaxIdRedactor):
         scan(_EMAIL, lambda m: ("@" in m.group() or (_SPELLED_EMAIL.fullmatch(m.group()) is not None and
                                                        not re.search(r"(?i)\bwww\b|^(?:website|site|web|us|online|"
                                                                      r"page|portal|home|link|webpage)\b", m.group()) and
+                                                       not re.search(r"(?i)[ \t]at[ \t]+(?:www|home|web)\.", m.group()) and
                                                        not re.search(r"\.[ \t]+[A-Z]", m.group()) and
                                                        re.split(r"[ \t]+at[ \t]+|[ \t]*[\[({]at", m.group())[0].casefold()
                                                        not in _common_words()))
@@ -1288,6 +1306,8 @@ class Redactor(TaxIdRedactor):
         scan(_DOB_NEAR, lambda m: take(m.start("value"), m.end("value"), "DOB"))
         if "ID" in self._detect:
             scan(_USERNAME, lambda m: self._username(m, fold, take))
+            for pattern in (_PATH_USER, _CODE_HOST, _GAME_TAG, _GIT_AUTHOR, _CHAT_SPEAKER):
+                scan(pattern, lambda m: self._handle(m, take))
         scan(_ACCOUNT_NEAR, lambda m: take(m.start("value"), m.end("value"), "ACCOUNT",
                                            "ACCOUNT:" + re.sub(r"\D", "", m.group("value"))))
 
@@ -1386,6 +1406,7 @@ class Redactor(TaxIdRedactor):
              take(m.start(), m.end(),
                                           *(("ACCOUNT", f"ACCOUNT:{m.group()}") if len(m.group()) >= 13 and
                                             _luhn(m.group()) else ("ID", f"ID:{m.group()}"))))
+        ruled = {(f[0], f[1]) for f in found}   # what the rules found, before the finder's marks
         # The finder's marks last, where nothing else is: each run of it the rules left free, trimmed.
         for source_start, source_end, kind in sorted(marked):
             start, end = bisect.bisect_left(starts, source_start), bisect.bisect_right(ends, source_end)
@@ -1448,6 +1469,17 @@ class Redactor(TaxIdRedactor):
             (a, b, kind, key, _), (c, d, kind2, _, _) = found[i - 1], found[i]
             if kind == kind2 == "ADDRESS" and re.fullmatch(r"[ \t]*[,;]?[ \t]*\n?[ \t]*", copy[b:c]):
                 found[i - 1:i + 1] = [(a, d, kind, f"ADDRESS:{_fold(copy[a:d])}", None)]
+        if "ID" in self._detect:
+            for start, end, kind, key, real in [f for f in found if f[2] == "ID" and (f[0], f[1]) in ruled]:
+                value = copy[start:end]
+                if len(value) < 4 or not re.fullmatch(r"[\w.#/-]+", value) or value.casefold() in _common_words() or \
+                        not re.search(r"[\d_.]", value) or re.fullmatch(_DATE, value, re.IGNORECASE) or \
+                        re.fullmatch(r"(?:19|20)\d\d(?:0[1-9]|1[0-2])[0-3]\d\d*", value):
+                    continue
+                edge = r"[A-Za-z0-9]" if sum(c.isdigit() for c in value) >= 4 else r"[\w@.\-]"
+                for m in re.finditer(rf"(?<!{edge}){re.escape(value)}(?!{edge}|[.\-]\w)", copy):
+                    if not any(covered[m.start():m.end()]):
+                        take(m.start(), m.end(), "ID", key, real)
         if not found:
             return text
         # Numbered in reading order, replaced from the end so the offsets hold.
@@ -1615,6 +1647,24 @@ class Redactor(TaxIdRedactor):
                 break
 
     @staticmethod
+    def _handle(m: re.Match, take) -> bool:
+        value = m.group("value")
+        if value.casefold() in _NOT_HANDLES or value.isdigit():
+            return False
+        if m.re is _CHAT_SPEAKER:
+            if not (m.group("stamp") or m.group("time")):
+                return False
+            # a speaker's handle, not a name ("Kimberly", "Dave"), which is the names' to find
+            if not (re.search(r"[_\d.]", value) or re.search(r"[a-z][A-Z]", value) or
+                    (value.islower() and value.casefold() not in _common_words() and len(value) >= 5)):
+                return False
+        if m.re is _GAME_TAG and not (re.search(r"[_\d]|[a-z][A-Z]", value.split("#")[0]) or
+                                      re.search(r"#\d{4,5}$", value)) or \
+                m.re is _GAME_TAG and value.split("#")[0].casefold() in _common_words():
+            return False
+        return take(m.start("value"), m.end("value"), "ID", "ID:" + value.casefold())
+
+    @staticmethod
     def _username(m: re.Match, fold: str, take) -> bool:
         group = "handle" if m.group("handle") else "value"
         value, start = m.group(group), m.start(group)
@@ -1624,6 +1674,11 @@ class Redactor(TaxIdRedactor):
             return False
         if group == "value" and value.casefold() in _common_words() and not any(c.isdigit() for c in value):
             return False   # "the username is required", "Username: The ..."
+        if group == "value" and re.search(r"(?i)utente|usuario|utilisateur|benutzer|gebruiker|discord|psn", m.group()[:start - m.start()]) \
+                and not re.search(r"[_.\d#]", value):
+            return False   # "l'utente deve", "Usuario: perfecto, ...": the words in prose, a chat's speaker
+        if value.casefold().startswith(("svc_", "svc-", "srv_")):
+            return False   # a service's account
         return take(start, start + len(value), "ID", "ID:" + value)
 
     @staticmethod

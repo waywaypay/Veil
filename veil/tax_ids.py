@@ -96,7 +96,7 @@ def _norm(c: str) -> str:
     if c == "\n":
         return "\n"
     if c in "\t\r":
-        return " " if c == "\t" else ""
+        return c if c == "\t" else ""   # a tab stays one: it parts a table's cells
     if c in _BLANKS:
         return " "
     category = unicodedata.category(c)
