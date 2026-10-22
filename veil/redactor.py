@@ -250,7 +250,11 @@ _ID_LABEL = (
     rf"|(?:certificate|licen[cs]e|permit)(?:[\s_\\]+licen[cs]e)?[\s_\\]*{_NO}"
     r"|cuit|cuil|npwp|nif|nie|cif|rfc|cpf|curp|dni|nric|pesel|bsn|tfn|sin\b(?=\s*[:#])"
     rf"|id(?=\s*[:#]\s*[A-Z]{{1,4}}\d)|social[\s_]+(?:number|no\b\.?)|(?<!employer\s)(?<!employer\s\s)identification[\s_]+(?:code|{_NO})")
-_DOB_LABEL = (r"(?:d\.?\s?o\.?\s?b\b\.?|date[\s_.\\]*of[\s_.\\]*birth|birth[\s_\\]*date|birthday|born(?:\s+on)?)"
+_DOB_LABEL = (r"(?:d\.?\s?o\.?\s?b\b\.?|date[\s_.\\]*(?:and[\s_]*place[\s_]*)?of[\s_.\\]*birth|birth[\s_\\]*date|birthday|born(?:\s+on)?"
+              r"|turned\s+\d{1,3}(?:\s+years?(?:\s+old)?)?\s+on|\d{1,3}(?:st|nd|rd|th)\s+birthday"
+              r"|geb\.|geboren(?:\s+am)?|geburtsdatum|geboortedatum|n[éée]e?\s+le|date\s+de\s+naissance"
+              r"|fecha\s+de\s+nacimiento|naci[óóo]\s+el|nacid[oa]\s+el|nat[oa](?:/a)?\s+(?=(?:a|il)\s)|data\s+di\s+nascita"
+              r"|data\s+de\s+nascimento|nascid[oa]\s+em|生年月日|出生日期|생\s*년\s*월\s*일)"
               r"(?:\s+of\s+(?:the\s+)?(?:partner|member|investor|owner|holder|spouse|beneficiary))?"
               r"(?:[ \t]*\([^()\n]{0,20}\))?")
 _MONTHS = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
@@ -258,6 +262,18 @@ _DATE = (r"\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})|\d{1,2}[ ]\d{1,2}[ ]\d{4}|\d{
          r"|(?:19|20)\d{6}(?!\d)"
          rf"|{_MONTHS}[ \t]+\d{{1,2}}(?:st|nd|rd|th)?(?:,[ \t]*|[ \t]+)\d{{4}}"
          rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t/.-]*{_MONTHS},?[ \t/.-]*\d{{2,4}}")
+_MONTHS_MORE = (r"(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre"
+                r"|janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[ûu]t|septembre|octobre|novembre|d[ée]cembre"
+                r"|januar|februar|m[äa]rz|juni|juli|oktober|dezember|gennaio|febbraio|aprile|maggio|giugno|luglio"
+                r"|settembre|ottobre|dicembre|janeiro|fevereiro|mar[çc]o|maio|junho|julho|setembro|outubro|dezembro"
+                r"|januari|februari|maart|mei|augustus|december)")
+_DOB_DATE = (rf"{_DATE}"
+             rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t]+of[ \t]+{_MONTHS},?[ \t]+\d{{4}}"
+             rf"|{_MONTHS}[ \t]+\d{{1,2}}(?:[ \t]?(?:st|nd|rd|th))?(?![\w,]?[ \t]*\d)"
+             rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t]+(?:of[ \t]+)?{_MONTHS}(?![ \t,]*\d)"
+             r"|\d{1,2}/\d{1,2}(?![\d/])"
+             rf"|\d{{1,2}}[ \t]+(?:de[ \t]+)?{_MONTHS_MORE}[ \t]+(?:de[ \t]+)?\d{{4}}"
+             r"|\d{4}[年년][ \t]*\d{1,2}[月월][ \t]*\d{1,2}[日일]")
 _SEP = (r"[\"'*\\_]*[ \t]*(?:\([^()\n]{0,20}\)[ \t]*)?"
         r"(?:[:#.=|,\u2013-]{1,2}[ \t]*|is[ \t]+|of[ \t]+|was[ \t]+|\((?:e\.g\.,?|i\.e\.,?)?[ \t]*)?(?:\*\*(?=\s))?[\"']*[ \t]*"
         r"(?:\n[ \t]*){0,2}")
@@ -271,7 +287,7 @@ _LABELLED = re.compile(
 # The first date after a birth date's label in the same sentence: "date of birth must be October 28, 1994",
 # "[Date of Birth]\n01/01/1999".
 _DOB_NEAR = re.compile(rf"(?<![^\W\d_])(?i:{_DOB_LABEL})(?P<gap>(?:(?!\.\s|\d)[^\n]|\n(?![ \t]*\n)){{0,45}}?)"
-                       rf"(?<![\w/.-])(?P<value>(?i:{_DATE}))(?![\w/-])")
+                       rf"(?<![\d/.-])(?P<value>(?i:{_DOB_DATE}))(?![\w/-])")
 # A UK National Insurance number: two letters, three pairs of digits, a letter.
 _NI_NUMBER = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2}[ ]?\d{2}[ ]?\d{2}[ ]?\d{2}[ ]?[A-Z](?![A-Za-z0-9])")
 # An SSN with all but its last four digits masked: ***-**-1234
@@ -563,7 +579,9 @@ _ADDRESS_KEY = re.compile(r"(?i)(?:(?:street|mailing|home|residential|billing|sh
                           r"|permanent|current|correspondence|property|primary)[ _-]?)?(?:address|addr)(?:[ _-]?(?:line)?"
                           r"[ _-]?[12])?|street")
 # Fields that hold a birth date or a person's ID number, by their key: "date_of_birth", "EmployeeID".
-_DOB_KEY = re.compile(r"(?i)(?:\w+[ _-]?)?(?:date[ _-]?of[ _-]?birth|birth[ _-]?date|dob|birthday)")
+_DOB_KEY = re.compile(r"(?i)(?:\w+[ _-]?)?(?:date[ _-]?of[ _-]?birth|birth[ _-]?date|dob|birthday|geburtsdatum|geboortedatum"
+                      r"|date[ _-]de[ _-]naissance|fecha[ _-]de[ _-]nacimiento|data[ _-]di[ _-]nascita|data[ _-]de[ _-]nascimento"
+                      r"|data[ _-]nascita|生年月日|出生日期|생년월일)")
 _ID_KEY = re.compile(r"(?i)(?:customer|client|employee|emp|user|member|patient|account[ _-]?holder|card[ _-]?holder"
                      r"|passport|driver'?s?[ _-]?licen[cs]e|national|staff|student|policy[ _-]?holder|insured|subscriber"
                      r"|person|personal|party|identity|citizen|voter|nhs|medicare|medicaid|loyalty|wallet|e-?wallet)"
@@ -1555,7 +1573,7 @@ class Redactor(TaxIdRedactor):
             lead = len(value) - len(value.lstrip())
             value = value.strip()
             if kind == "DOB":
-                if re.fullmatch(_DATE, value, re.IGNORECASE):
+                if re.fullmatch(_DOB_DATE, value, re.IGNORECASE):
                     take(start + lead, start + lead + len(value), "DOB")
             elif kind == "PLACE":   # a town's name, or a postcode: not a placeholder ("[City]", "N/A")
                 if re.fullmatch(r"(?:[A-Z\u00c0-\u00de][\w'\u00c0-\u024f.-]*[ ]?){1,4}|[A-Z0-9]{2,5}[ -]?[A-Z0-9]{2,5}", value) and \
