@@ -110,3 +110,44 @@ look-alikes.
 * What veil hides is read from its output: the words gone from it, plus the marks inside each value it replaced (the
   "+" of "+1 202 555 0133"). An earlier version of this page read only the words, which understated veil's phone
   numbers.
+
+## One message at a time or the whole conversation: edge and large
+
+The test half again, each GLiNER checkpoint at veil's threshold of 0.35, alone and with veil's rules ("+ rules",
+system `union:`). "Whole conversation" gives the tagger a conversation's user messages joined in one pass
+(`tagger-conv:` and `union-conv:`; no conversation has more than 232 words of them). veil's rules always keep one
+Redactor per conversation. The checkpoints:
+- **edge**: [Deerpark/veil-tagger-edge](https://huggingface.co/Deerpark/veil-tagger-edge), the published tagger (45M).
+- **control edge** and **control large**: `out_edge` and `out_large` in
+  [Deerpark/veil-control](https://huggingface.co/Deerpark/veil-control). Both were trained from their public bases
+  on one recipe: ettin-encoder-32m for the edge, deberta-v3-large for the large. Neither was chosen or tuned for
+  this, and 0.35 is the published edge's threshold, not the large's.
+
+Without dates and URLs (character F1 / details fully hidden / every mention of recurring details hidden / other words
+hidden):
+
+| Model | One message, alone | Whole conversation, alone | One message + rules | Whole conversation + rules |
+|---|---|---|---|---|
+| edge | 0.946 / 86.4% / 77.3% / 0.17% | 0.966 / 92.6% / 89.9% / 0.15% | 0.989 / 99.6% / 99.6% / 0.17% | 0.990 / 99.6% / 100% / 0.15% |
+| control edge | 0.912 / 81.4% / 64.4% / 0.25% | 0.957 / 91.2% / 87.4% / 0.15% | 0.981 / 99.8% / 100% / 0.25% | 0.988 / 99.7% / 100% / 0.16% |
+| control large | 0.934 / 93.3% / 90.3% / 0.85% | 0.951 / 90.6% / 88.7% / 0.16% | 0.956 / 98.9% / 100% / 0.85% | 0.986 / 99.4% / 100% / 0.16% |
+| PII-Tracer | 0.977 / 94.1% / 87.9% / 0.19% | 0.992 / 100% / 100% / 0.11% | | |
+
+All nine labels:
+
+| Model | One message, alone | Whole conversation, alone | One message + rules | Whole conversation + rules |
+|---|---|---|---|---|
+| edge | 0.841 / 72.9% / 66.2% / 0.13% | 0.858 / 77.6% / 76.6% / 0.12% | 0.883 / 83.9% / 85.2% / 0.13% | 0.881 / 83.4% / 85.2% / 0.12% |
+| control edge | 0.836 / 72.8% / 59.3% / 0.16% | 0.863 / 79.3% / 76.6% / 0.12% | 0.901 / 88.2% / 89.7% / 0.16% | 0.893 / 86.4% / 87.2% / 0.12% |
+| control large | 0.837 / 79.2% / 77.6% / 0.83% | 0.843 / 75.7% / 75.5% / 0.16% | 0.858 / 83.8% / 85.9% / 0.83% | 0.878 / 82.9% / 85.2% / 0.16% |
+| PII-Tracer | 0.980 / 94.8% / 87.9% / 0.19% | 0.992 / 99.6% / 99.3% / 0.11% | | |
+
+* **Alone, the whole conversation helps the edge models most.** Recurring details with every mention hidden rise from
+  77% to 90% (edge) and from 64% to 87% (control edge), and they hide fewer other words.
+* **With the rules, the mode hardly matters.** Every edge or large combination hides 98.9–99.8% of the details, since
+  the rules already carry an ID from turn to turn.
+* **Large is not better here.** One message at a time, it finds the most when used alone (93.3%), but it hides five
+  times as many other words (0.85%), at a threshold not chosen for it. Over the whole conversation, that falls to
+  0.16% and it finds less than the edge models.
+* **Alone, PII-Tracer beats every Deerpark checkpoint in both modes.** With veil's rules beside them, the Deerpark
+  models match it on these labels.
