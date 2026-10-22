@@ -281,13 +281,62 @@ def run(name, convs):
         return tracer_spans(convs), True
     if name == "pii-tracer-conv":
         return tracer_conv_spans(convs), True
-    if name.startswith("tagger:"):   # another GLiNER checkpoint of the tagger: tagger:<dir or repo>[@threshold]
-        model, _, th = name[7:].partition("@")
-        key = "tagger-" + re.sub(r"\W+", "_", model)
-        vb.SYSTEMS.setdefault(key, (lambda m=model: vb.Tagger(m), model, tagged.THRESHOLD))
-        ABOUT.setdefault(name, f"veil's tagger, checkpoint {model}")
-        return tagger_spans(key, convs, float(th) if th else tagged.THRESHOLD), True
+    # another GLiNER checkpoint of the tagger, alone or with veil's rules, one message at a time or a conversation's user
+    # messages in one pass: tagger:<dir or repo>[@threshold], and tagger-conv:, union:, union-conv: the same way
+    m = re.fullmatch(r"(tagger|union)(-conv)?:([^@]+)(?:@([\d.]+))?", name)
+    if m:
+        what, conv, model, th = m.groups()
+        th = float(th) if th else tagged.THRESHOLD
+        key = "tagger-" + re.sub(r"\W+", "_", model) + ("-conv" if conv else "")
+        vb.SYSTEMS.setdefault(key, (lambda m=model, w=CONV_WORDS if conv else 200: Wide(m, w), model, tagged.THRESHOLD))
+        ABOUT.setdefault(name, f"{'veil + ' if what == 'union' else ''}tagger checkpoint {model} at {th}, "
+                               f"{'a conversation in one pass' if conv else 'one message at a time'}")
+        spans = tagger_conv_spans(key, convs, th) if conv else tagger_spans(key, convs, th)
+        return (union(spans, veil_spans(convs)), False) if what == "union" else (spans, True)
     raise SystemExit(f"unknown system {name}")
+
+
+CONV_WORDS = 400   # more than any conversation's user messages hold (232 words at most), so each is read in one pass
+
+
+class Wide(vb.Tagger):
+    """veil's tagger reading passages of up to ``words`` words (TaggedRedactor reads 200)."""
+    def __init__(self, model, words):
+        super().__init__(model)
+        self.words = words
+
+    def spans(self, texts):
+        import torch
+        m = self.r._load()
+        found = [[] for _ in texts]
+        pieces = [(i, off, p) for i, t in enumerate(texts) for off, p in tagged.chunks(t, self.words)]
+        with torch.inference_mode():
+            for b in range(0, len(pieces), vb.BATCH):
+                batch = pieces[b:b + vb.BATCH]
+                for (i, off, _), es in zip(batch, m.batch_predict_entities([p for _, _, p in batch], list(tagged.LABELS),
+                                                                           threshold=0.3)):
+                    found[i] += [(off + e["start"], off + e["end"], tagged.LABELS[e["label"]], round(e["score"], 3)) for e in es]
+        return found
+
+
+def tagger_conv_spans(key, convs, th):
+    """The tagger on a conversation's user messages joined, its spans (joined as TaggedRedactor joins them) mapped
+    back to each message."""
+    joined = [SEP.join(c["users"]) for c in convs]
+    have = vb.system_spans(key, joined)
+    out = []
+    for c, j in zip(convs, joined):
+        starts, pos = [], 0
+        for u in c["users"]:
+            starts.append(pos)
+            pos += len(u) + len(SEP)
+        found = []
+        for s, e, k, _ in tagged.merged([x for x in have[vb._key(j)] if x[3] >= th], j):
+            for t, (a, u) in enumerate(zip(starts, c["users"])):
+                if s < a + len(u) and e > a:
+                    found.append((t, max(s, a) - a, min(e, a + len(u)) - a, FROM_TAGGER[k]))
+        out.append(found)
+    return out
 
 
 def markdown(rep):
