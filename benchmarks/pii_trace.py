@@ -22,7 +22,8 @@ Scores, every one over (conversation, turn, start, end) in user messages:
   character of every mention is covered; by number of mentions.
 * other words hidden: of the words no gold span touches, the share a system's spans touch (veilbench's cost measure).
 
---drop private_date,private_url scores only the labels veil sets out to hide: those gold spans are left out, and so are
+--split dev or test scores one half of the conversations (by a hash of their ID), so rules can be tuned on dev and
+read once on test.  --drop private_date,private_url scores only the labels veil sets out to hide: those gold spans are left out, and so are
 the spans a system labels as them (an untyped system's spans all stay).
 """
 import argparse
@@ -48,6 +49,12 @@ LABELS = ["private_person", "private_email", "account_number", "private_address"
 FROM_TAGGER = {"NAME": "private_person", "ADDRESS": "private_address", "EMAIL": "private_email", "PHONE": "private_phone",
                "ACCOUNT": "account_number", "DOB": "private_date", "SSN": "other_pii", "ID": "other_pii"}
 _WORD = re.compile(r"\w+")
+
+
+def half(cid):
+    """ "dev" or "test": a conversation's half, from a hash of its ID."""
+    import hashlib
+    return "dev" if hashlib.sha1(cid.encode()).digest()[0] % 2 == 0 else "test"
 
 
 def load():
@@ -85,12 +92,37 @@ def veil_spans(convs):
     """veil's rules, one Redactor per conversation; each hidden run of words is one span."""
     out = []
     for c in convs:
-        r, found = Redactor(FINANCE), []
+        r, found = watched(), []
         for t, u in enumerate(c["users"]):
-            for s, e in _runs(u, tagged.veil_hidden(u, r.redact_text(u))):
+            for s, e in hidden(u, r):
                 found.append((t, s, e, None))
         out.append(found)
     return out
+
+
+class Watched(Redactor):
+    """A Redactor that notes what it hides, as written, so a hidden run can take in the marks no word holds."""
+    def _placeholder(self, kind, key, written, dashed):
+        self.written.append(written)
+        return super()._placeholder(kind, key, written, dashed)
+
+
+def watched(**kw):
+    r = Watched(FINANCE, **kw)
+    r.written = []
+    return r
+
+
+def hidden(text, r):
+    """What Redactor ``r`` hides in ``text``, as runs: the words its output no longer has (tagged.veil_hidden), each
+    taking in the marks at the edges of the value it hid ("+" of "+1 202 555 0133", which no word holds)."""
+    r.written.clear()
+    words = tagged.veil_hidden(text, r.redact_text(text))
+    for w in r.written:
+        for m in re.finditer(re.escape(w), text):
+            if any(s < m.end() and m.start() < e for s, e in words):
+                words += [(m.start() + k, m.start() + k + 1) for k, c in enumerate(w) if not (c.isalnum() or c.isspace())]
+    return _runs(text, words)
 
 
 def _runs(text, words):
@@ -128,6 +160,22 @@ def tracer_conv_spans(convs):
             for t, (a, u) in enumerate(zip(starts, c["users"])):
                 if s < a + len(u) and e > a:
                     found.append((t, max(s, a) - a, min(e, a + len(u)) - a, k))
+        out.append(found)
+    return out
+
+
+def redactor_spans(convs):
+    """veil's Redactor with the tagger as its finder (TaggedRedactor().redactor()), one per conversation: what an app
+    gets from veil.tagged.  Each hidden run of words is one span."""
+    texts = [u for c in convs for u in c["users"]]
+    have = vb.system_spans("model", texts)
+    out = []
+    for c in convs:
+        def finder(u):
+            return [(s, e, k) for s, e, k, _ in tagged.merged([x for x in have[vb._key(u)] if x[3] >= tagged.THRESHOLD], u)]
+        r, found = watched(finder=finder), []
+        for t, u in enumerate(c["users"]):
+            found += [(t, s, e, None) for s, e in hidden(u, r)]
         out.append(found)
     return out
 
@@ -215,6 +263,7 @@ def score(convs, pred, typed):
 ABOUT = {"veil": "veil's rules alone (FINANCE profile), one Redactor per conversation",
          "model": f"veil's tagger alone ({vb.TAGGER}, 45M) at {tagged.THRESHOLD}",
          "union": "veil + its tagger: everything either marks",
+         "redactor": "veil's Redactor with its tagger as the finder (TaggedRedactor().redactor()), one per conversation",
          "pii-tracer": "perplexity-ai/PII-Tracer (596M), one message at a time",
          "pii-tracer-conv": "perplexity-ai/PII-Tracer (596M), a conversation's user messages in one pass"}
 
@@ -226,6 +275,8 @@ def run(name, convs):
         return tagger_spans("model", convs, tagged.THRESHOLD), True
     if name == "union":
         return union(tagger_spans("model", convs, tagged.THRESHOLD), veil_spans(convs)), False
+    if name == "redactor":
+        return redactor_spans(convs), False
     if name == "pii-tracer":
         return tracer_spans(convs), True
     if name == "pii-tracer-conv":
@@ -242,7 +293,7 @@ def run(name, convs):
 def markdown(rep):
     rows = list(rep["systems"].items())
     f = lambda x: f"{x:.3f}"   # noqa: E731
-    out = [f"PII-TRACE public subset: {rep['conversations']} conversations, {rep['gold']} labelled spans, user messages "
+    out = [f"PII-TRACE public subset{'' if rep['split'] == 'all' else ', ' + rep['split'] + ' half'}: {rep['conversations']} conversations, {rep['gold']} labelled spans, user messages "
            "only" + (f", leaving out {', '.join(rep['dropped'])}" if rep["dropped"] else "") + ".", "",
            "| System | Exact F1 (typed, micro) | Exact F1 (typed, macro) | Exact F1 (untyped) | Char P | Char R | Char F1 | "
            "Overlap F1 | Contained | Consistent (2+ mentions) | Other words hidden |",
@@ -270,14 +321,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--systems", default="veil,model,union,pii-tracer,pii-tracer-conv")
     ap.add_argument("--out", default="pii_trace_report")
+    ap.add_argument("--split", choices=("all", "dev", "test"), default="all")
     ap.add_argument("--drop", default="", help="labels to leave out of the gold spans and of typed predictions")
     a = ap.parse_args()
     drop = set(filter(None, a.drop.split(",")))
     LABELS[:] = [lab for lab in LABELS if lab not in drop]
-    convs = load()
+    convs = [c for c in load() if a.split in ("all", half(c["id"]))]
     for c in convs:
         c["gold"] = [g for g in c["gold"] if g[3] not in drop]
-    rep = {"dropped": sorted(drop), "conversations": len(convs), "gold": sum(len(c["gold"]) for c in convs), "systems": {}}
+    rep = {"split": a.split, "dropped": sorted(drop), "conversations": len(convs), "gold": sum(len(c["gold"]) for c in convs), "systems": {}}
     for name in a.systems.split(","):
         pred, typed = run(name, convs)
         pred = [[p for p in ps if p[3] not in drop] for ps in pred]

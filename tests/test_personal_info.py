@@ -1017,3 +1017,31 @@ def test_usernames_and_staff_numbers_where_only_they_can_be(text, hidden):
 def test_not_usernames(text):
     out = Redactor(FINANCE).redact_text(text)
     assert "ID_" not in out and "ADDRESS_" not in out and "EMAIL_" not in out, out
+
+
+@pytest.mark.parametrize("text, hidden", [
+    ("The initial entry for reference number is AC-2EA6-KY4B-G6FX.", ["AC-2EA6-KY4B-G6FX"]),
+    ("- Comparison reference number: PR/5SQ7/JA4Y/N4JU", ["PR/5SQ7/JA4Y/N4JU"]),
+    ("has a detached text whose identity is still open: MB 7XV4 PY6HJ4", ["MB 7XV4 PY6HJ4"]),
+    ("Phone number: +1 (202) 555-0151, extension 12551", ["+1 (202) 555-0151, extension 12551"]),
+])
+def test_grouped_codes_and_phone_extensions(text, hidden):
+    out = Redactor(FINANCE).redact_text(text)
+    assert not any(h in out for h in hidden) and not re.search(r"\d", re.sub(r"[A-Z]+_\d+", "", out)), out
+
+
+@pytest.mark.parametrize("text", [
+    "Use ISO-8859-1 on a W-2 for COVID-19 claims.",
+    "Paper sizes A4 B5 C6, part 3M-8210-A2, SKU 4K-HDR.",
+    "The RTX-4090-TI ships on 2024-01-15.",
+])
+def test_not_grouped_codes(text):
+    assert "ID_" not in Redactor(FINANCE).redact_text(text)
+
+
+def test_an_id_found_once_is_hidden_however_a_later_turn_spells_it():
+    r = Redactor(FINANCE)
+    first = r.redact_text("The reference number is AC-2EA6-KY4B-G6FX.")
+    later = r.redact_text("Is AC 2EA6 KY4B G6FX the same as ac2ea6ky4bg6fx?")
+    placeholder = re.search(r"ID_\d+", first).group()
+    assert later == f"Is {placeholder} the same as {placeholder}?", later

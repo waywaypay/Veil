@@ -308,7 +308,7 @@ _PHONE_LABEL = (rf"(?<![^\W\d_])(?i:(?:phone|tel(?:ephone)?|mobile|cell(?:ular)?
                 r"(?:[ \t]+is)?[ \t]*\**[ \t]*[:.#-]?|contact[ \t]*(?:number|no\b\.?|\#)?[ \t]*\**[ \t]*:|(?:direct|office|work|home|main)[ \t]*:"
                 r"|(?:call|text|phone|ring|fax|reach|reached|contact|contacting)(?:[ \t]+(?:us|me|him|her|them))?[ \t]+(?:at|on)"
                 r"|(?:by|via)[ \t]+(?:phone|telephone|fax)(?:[ \t]+(?:at|on))?)")
-_EXTENSION = r"(?:[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"
+_EXTENSION = r"(?:,?[ \t]*(?:x|ext\b\.?|extension)[ \t]*\d{1,6})?"   # "x104", ", extension 12551"
 _END = r"(?![\d]|[.,]\d)"
 # anything after "Phone:", "Tel", "Fax", "Work:", "call us at" ...
 # (0131) 4960506, (028) 9018 0669: a national number with its area code's trunk 0 in brackets
@@ -650,6 +650,9 @@ _COLUMN_BEFORE = re.compile(rf"(?:^|\t|[ ]{{2,}})[ \t]*{_COLUMN_VALUE}(?:\t|[ ]+
 # An ID by its shape alone: one to four capital letters and six to ten digits (EMP286818, G4830770), not an amount
 # in a currency (USD52482349) and not an ISIN (US1234567890).
 _SHAPED_ID = re.compile(r"(?<![\w$.\-])(?P<letters>[A-Z]{1,4})(?P<digits>\d{6,30})(?![\w-])")
+# A reference code in groups of letters and digits, one separator between them: "AC-2EA6-KY4B-G6FX", "PR/5SQ7/JA4Y/N4JU",
+# "MB 7XV4 PY6HJ4".  Kept only in capitals, with two groups or more that mix letters and digits (_grouped_code).
+_GROUPED_CODE = re.compile(r"(?<![\w/.-])[A-Z0-9]{2,6}(?P<sep>[-/ ])[A-Z0-9]{2,6}(?:(?P=sep)[A-Z0-9]{2,6}){1,4}(?![\w/-]|\.\w)")
 _CURRENCIES = frozenset("USD EUR GBP CAD AUD NZD CHF JPY CNY HKD SGD INR MXN BRL ZAR SEK NOK DKK PLN CZK HUF RUB TRY KRW "
                         "AED SAR ILS THB MYR IDR PHP TWD".split())
 # A field's value that starts with one of these is no one's name: "Agent Smith", "Support Team".
@@ -757,6 +760,16 @@ def _address_tail(copy: str, end: int) -> int:
             not any(w.casefold() in _common_words() for w in m.group(1).split()):
         end += m.end()
     return end
+
+
+def _grouped_code(m: re.Match) -> bool:
+    """Whether a _GROUPED_CODE match is a code: ten letters and digits or more, two groups or more that mix them (one
+    of four at least), three digits or more, and only its first group letters alone ("AC-2EA6-KY4B-G6FX"; not "A4 B5
+    C6", nor "ID MB 7XV4" from the "ID")."""
+    groups = m.group().split(m.group("sep"))
+    mixed = [g for g in groups if any(c.isalpha() for c in g) and any(c.isdigit() for c in g)]
+    return len(mixed) >= 2 and any(len(g) >= 4 for g in mixed) and sum(map(len, groups)) >= 10 and \
+        sum(c.isdigit() for c in m.group()) >= 3 and not any(g.isalpha() for g in groups[1:])
 
 
 def _luhn(digits: str) -> bool:
@@ -1365,6 +1378,8 @@ class Redactor(TaxIdRedactor):
             if _W2.search(fold):
                 scan(_W2_CONTROL, lambda m: len(m.group("value")) >= 4 and not re.fullmatch(r"[\d,]+\.\d\d", m.group("value")) and
                      take(m.start("value"), m.end("value"), "ID", "ID:" + m.group("value").replace(" ", "").upper()), fold)
+            scan(_GROUPED_CODE, lambda m: _grouped_code(m) and
+                 take(m.start(), m.end(), "ID", "ID:" + re.sub(r"[\W_]", "", m.group())))
             scan(_SHAPED_ID, lambda m: m.group("letters") not in _CURRENCIES and
                  not (m.group("letters") in _ISO_COUNTRIES and len(m.group("digits")) == 10) and
                  take(m.start(), m.end(), "ID", "ID:" + m.group()))
@@ -1480,6 +1495,8 @@ class Redactor(TaxIdRedactor):
                 for m in re.finditer(rf"(?<!{edge}){re.escape(value)}(?!{edge}|[.\-]\w)", copy):
                     if not any(covered[m.start():m.end()]):
                         take(m.start(), m.end(), "ID", key, real)
+        if "ID" in self._detect:
+            self._known_ids(copy, take)
         if not found:
             return text
         # Numbered in reading order, replaced from the end so the offsets hold.
@@ -1680,6 +1697,19 @@ class Redactor(TaxIdRedactor):
         if value.casefold().startswith(("svc_", "svc-", "srv_")):
             return False   # a service's account
         return take(start, start + len(value), "ID", "ID:" + value)
+
+    def _known_ids(self, copy: str, take) -> None:
+        """An ID or account number of letters and digits hidden before in this conversation, wherever this text has
+        it again, however its groups are joined: "AC 2EA6 KY4B G6FX" or "ac2ea6ky4bg6fx" after "AC-2EA6-KY4B-G6FX"."""
+        for key in list(self._by_digits):
+            kind, _, value = key.partition(":")
+            chars = re.sub(r"[\W_]", "", value)
+            if kind not in ("ID", "ACCOUNT") or len(chars) < 8 or sum(c.isdigit() for c in chars) < 3 or \
+                    not any(c.isalpha() for c in chars):
+                continue
+            spelled = r"[ /.-]?".join(map(re.escape, chars))
+            for m in re.finditer(rf"(?<![A-Za-z0-9])(?i:{spelled})(?![A-Za-z0-9])", copy):
+                take(m.start(), m.end(), kind, key)
 
     @staticmethod
     def _phone(m: re.Match, take) -> bool:
