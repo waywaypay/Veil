@@ -267,10 +267,12 @@ _MONTHS_MORE = (r"(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembr
                 r"|januar|februar|m[äa]rz|juni|juli|oktober|dezember|gennaio|febbraio|aprile|maggio|giugno|luglio"
                 r"|settembre|ottobre|dicembre|janeiro|fevereiro|mar[çc]o|maio|junho|julho|setembro|outubro|dezembro"
                 r"|januari|februari|maart|mei|augustus|december)")
+_MONTHS_STRICT = (r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?"
+                  r"|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?(?![a-z])")
 _DOB_DATE = (rf"{_DATE}"
-             rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t]+of[ \t]+{_MONTHS},?[ \t]+\d{{4}}"
-             rf"|{_MONTHS}[ \t]+\d{{1,2}}(?:[ \t]?(?:st|nd|rd|th))?(?![\w,]?[ \t]*\d)"
-             rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t]+(?:of[ \t]+)?{_MONTHS}(?![ \t,]*\d)"
+             rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t]+of[ \t]+{_MONTHS_STRICT},?[ \t]+\d{{4}}"
+             rf"|{_MONTHS_STRICT}[ \t]+\d{{1,2}}(?:[ \t]?(?:st|nd|rd|th))?(?![\w,]?[ \t]*\d)"
+             rf"|\d{{1,2}}(?:st|nd|rd|th)?[ \t]+(?:of[ \t]+)?{_MONTHS_STRICT}(?![ \t,]*\d)"
              r"|\d{1,2}/\d{1,2}(?![\d/])"
              rf"|\d{{1,2}}[ \t]+(?:de[ \t]+)?{_MONTHS_MORE}[ \t]+(?:de[ \t]+)?\d{{4}}"
              r"|\d{4}[年년][ \t]*\d{1,2}[月월][ \t]*\d{1,2}[日일]")
@@ -286,7 +288,7 @@ _LABELLED = re.compile(
     rf"|{_VALUE})))")
 # The first date after a birth date's label in the same sentence: "date of birth must be October 28, 1994",
 # "[Date of Birth]\n01/01/1999".
-_DOB_NEAR = re.compile(rf"(?<![^\W\d_])(?i:{_DOB_LABEL})(?P<gap>(?:(?!\.\s|\d)[^\n]|\n(?![ \t]*\n)){{0,45}}?)"
+_DOB_NEAR = re.compile(rf"(?<![^\W\d_])(?<!/)(?i:{_DOB_LABEL})(?P<gap>(?:(?!\.\s|\d)[^\n]|\n(?![ \t]*\n)){{0,45}}?)"
                        rf"(?<![\d/.-])(?P<value>(?i:{_DOB_DATE}))(?![\w/-])")
 # A UK National Insurance number: two letters, three pairs of digits, a letter.
 _NI_NUMBER = re.compile(r"(?<![A-Za-z0-9])[A-Z]{2}[ ]?\d{2}[ ]?\d{2}[ ]?\d{2}[ ]?[A-Z](?![A-Za-z0-9])")
@@ -1334,7 +1336,8 @@ class Redactor(TaxIdRedactor):
                 fold[max(0, m.start() - 14):m.start()]) and
                 take(m.start(), m.end(), "ID", "ID:" + re.sub(r"\D", "", m.group())))
         scan(_LABELLED, lambda m: self._labelled(m, take, fold))
-        scan(_DOB_NEAR, lambda m: take(m.start("value"), m.end("value"), "DOB"))
+        scan(_DOB_NEAR, lambda m: not (m.group("gap") and m.group("gap")[-1].isalpha()) and   # "DOB: V3.8.92" is no date
+             take(m.start("value"), m.end("value"), "DOB"))
         if "ID" in self._detect:
             scan(_USERNAME, lambda m: self._username(m, fold, take))
             for pattern in (_PATH_USER, _CODE_HOST, _GAME_TAG, _GIT_AUTHOR, _CHAT_SPEAKER):
