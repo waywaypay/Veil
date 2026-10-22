@@ -1045,3 +1045,34 @@ def test_an_id_found_once_is_hidden_however_a_later_turn_spells_it():
     later = r.redact_text("Is AC 2EA6 KY4B G6FX the same as ac2ea6ky4bg6fx?")
     placeholder = re.search(r"ID_\d+", first).group()
     assert later == f"Is {placeholder} the same as {placeholder}?", later
+
+
+@pytest.mark.parametrize("text, date", [
+    ("Kinder: Mila, geb. 14.05.2023 (Kindergeld)", "14.05.2023"),
+    ("Philippine, enfant, née le 07/03/2023", "07/03/2023"),
+    ("DATE DE NAISSANCE - 30/06/2007", "30/06/2007"),
+    ("la niña nació el 3 de febrero de 2022 y va", "3 de febrero de 2022"),
+    ("Nato/a a ROMA il 04/03/2021 cittadinanza", "04/03/2021"),
+    ("Data de nascimento09/12/2016Sexo F", "09/12/2016"),
+    ("생 년 월 일 : 1995년 07월 12일", "1995년 07월 12일"),
+    ("Date and place of birth: 03/11/1984, Bradford", "03/11/1984"),
+    ("our daughter was born 6/14 and I need to add her", "6/14"),          # no year: still a birth date
+    ("My birthday is April 30 th", "April 30 th"),
+    ("Jane turned 41 on March 14; we met on March 20.", "March 14"),      # an age gives the birthday away
+    ("her 80th birthday on the 24th of October, 1946", "24th of October, 1946"),
+])
+def test_birth_dates_by_their_cues(text, date):
+    out = Redactor(FINANCE).redact_text(text)
+    assert date not in out and "DOB_" in out, out
+
+
+@pytest.mark.parametrize("text", [
+    "NATO summit on 12/05/2024",
+    "birthday party on Saturday, pizza at 6",
+    "born in Leeds in 1985",
+    "Statement 03/14/2026 due 6/14",
+    "The 5th birthday of the company was 2019.",
+])
+def test_other_dates_stay(text):
+    assert "DOB_" not in Redactor(FINANCE).redact_text(text)
+    assert "March 20" in Redactor(FINANCE).redact_text("Jane turned 41 on March 14; we met on March 20.")   # the meeting's date stays
