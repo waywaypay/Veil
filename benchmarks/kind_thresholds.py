@@ -79,7 +79,8 @@ def windows(text, overlap=0):
 def model_spans(texts, overlap=0, model=VB.TAGGER, batch=VB.BATCH):
     """{key(text): [(start, end, kind, score)]} at the score floor, cached."""
     VB.CACHE.mkdir(parents=True, exist_ok=True)
-    path = VB.CACHE / f"kinds_{re.sub(r'[^\w.-]+', '_', model)}_ov{overlap}_f{FLOOR:g}.jsonl"
+    name = re.sub(r"[^\w.-]+", "_", model)
+    path = VB.CACHE / f"kinds_{name}_ov{overlap}_f{FLOOR:g}.jsonl"
     have = {}
     if path.exists():
         for line in open(path):
