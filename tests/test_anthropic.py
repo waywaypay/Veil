@@ -5,7 +5,7 @@ import json
 import pytest
 
 from veil import FINANCE, Redactor
-from veil.anthropic import TAX_ID_REMOVED, Findings, GuardrailError, Session, wrap
+from veil.anthropic import TAX_ID_REMOVED, BlockError, Findings, GuardrailError, Session, wrap
 
 anthropic = pytest.importorskip("anthropic")
 from anthropic.types import Message  # noqa: E402
@@ -89,6 +89,90 @@ def test_streaming_is_refused_rather_than_sent_unredacted():
     client = wrap(FakeClient([]))
     with pytest.raises(NotImplementedError):
         client.messages.create(model="m", max_tokens=1, stream=True, messages=[])
+
+
+@pytest.mark.parametrize("name", ["stream", "parse", "tool_runner"])
+def test_messages_methods_veil_doesnt_wrap_are_refused_rather_than_sent_unredacted(name):
+    fake = FakeClient([])
+    fake.stream = fake.parse = fake.tool_runner = fake.create
+    client = wrap(fake)
+    for messages in (client.messages, client.beta.messages):
+        with pytest.raises(NotImplementedError):
+            getattr(messages, name)(model="m", max_tokens=1, messages=[{"role": "user", "content": "jane@example.com"}])
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("name", ["batches", "with_raw_response", "with_streaming_response", "anything_else"])
+def test_messages_attributes_veil_doesnt_wrap_are_not_handed_out(name):
+    fake = FakeClient([])
+    setattr(fake, name, object())
+    client = wrap(fake)
+    with pytest.raises((NotImplementedError, AttributeError)):
+        getattr(client.messages, name)
+
+
+def test_the_real_sdk_has_nothing_on_messages_that_skips_veil():
+    client = wrap(anthropic.Anthropic(api_key="k"))
+    for name in ("stream", "parse", "tool_runner"):
+        with pytest.raises(NotImplementedError):
+            getattr(client.messages, name)(model="m", max_tokens=1, messages=[])
+    for name in ("batches", "with_raw_response", "with_streaming_response"):
+        with pytest.raises(NotImplementedError):
+            getattr(client.messages, name)
+
+
+def test_search_results_are_redacted_alone_and_inside_a_tool_result():
+    s = Session(Redactor(FINANCE))
+    found = {"type": "search_result", "source": "https://crm/jane@example.com", "title": "Avery Mockridge, LP",
+             "content": [{"type": "text", "text": "Avery Mockridge, SSN 123-45-6789"}]}
+    out = s.redact_request({"messages": [
+        {"role": "user", "content": [found]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t", "content": [found]}]}]})
+    sent = json.dumps(out)
+    for secret in ("Mockridge", "123-45-6789", "jane@"):
+        assert secret not in sent
+    assert out["messages"][1]["content"][0]["content"][0]["type"] == "search_result"
+
+
+def test_a_block_veil_doesnt_know_is_refused_rather_than_sent_as_it_is():
+    s = Session()
+    with pytest.raises(BlockError):
+        s.redact_request({"messages": [{"role": "user", "content": [{"type": "new_kind", "text": "SSN 123-45-6789"}]}]})
+    with pytest.raises(BlockError):
+        s.redact_request({"messages": [{"role": "user", "content": ["SSN 123-45-6789"]}]})
+
+
+def test_blocks_anthropics_own_tools_wrote_go_back_as_they_are():
+    s = Session()
+    block = {"type": "web_search_tool_result", "tool_use_id": "s", "content": [
+        {"type": "web_search_result", "url": "https://example.com", "title": "x", "encrypted_content": "abc"}]}
+    out = s.redact_request({"messages": [{"role": "assistant", "content": [block]}]})
+    assert out["messages"][0]["content"][0] == block
+
+
+def test_tool_descriptions_and_metadata_are_redacted():
+    fake = FakeClient([_message("ok")])
+    client = wrap(fake)
+    tool = {"name": "add_member", "description": "Adds members. Example: Avery Mockridge, SSN 123-45-6789.",
+            "input_schema": {"type": "object", "required": ["ssn"], "properties": {
+                "ssn": {"type": "string", "description": "e.g. 987-65-4321"},
+                "description": {"type": "string"}}}}
+    client.messages.create(model="m", max_tokens=1, tools=[tool], metadata={"user_id": "avery@example.com"},
+                           messages=[{"role": "user", "content": "hi"}])
+    sent = fake.requests[0]
+    for secret in ("Mockridge", "123-45-6789", "987-65-4321", "avery@"):
+        assert secret not in json.dumps(sent)
+    schema = sent["tools"][0]["input_schema"]
+    assert schema["required"] == ["ssn"] and set(schema["properties"]) == {"ssn", "description"}
+    assert sent["metadata"]["user_id"] == "EMAIL_001"
+
+
+def test_tool_descriptions_stay_as_written_without_redact_system():
+    fake = FakeClient([_message("ok")])
+    client = wrap(fake, redact_system=False)
+    tool = {"name": "f", "description": "Ask Avery Mockridge", "input_schema": {"type": "object"}}
+    client.messages.create(model="m", max_tokens=1, tools=[tool], messages=[{"role": "user", "content": "hi"}])
+    assert fake.requests[0]["tools"] == [tool]
 
 
 def test_other_attributes_pass_through():

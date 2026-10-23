@@ -13,7 +13,9 @@ Each request goes out as a copy with placeholders in place of the real values
 (what the user typed, tool results, the system prompt and the model's earlier
 turns), and the reply's text and tool-call inputs come back with the real
 values.  Use one redactor per conversation.  Thinking blocks go back exactly
-as they came.
+as they came.  The tools' descriptions and ``metadata`` are redacted too.  A
+content block veil doesn't know raises ``BlockError`` rather than being sent
+as it is.
 
 A request with an image, a PDF or a Word document in it is refused
 (``FileError``) unless you say otherwise: ``files="read"`` reads their text on
@@ -28,7 +30,9 @@ request is checked first: what it finds becomes a placeholder too, and
 anything else it objects to stops the request.  In a reply, a taxpayer ID it
 finds is taken out, and a reply it objects to is replaced with a note.
 
-Streaming isn't supported yet: ``stream=True`` raises.
+Streaming isn't supported yet: ``stream=True`` raises, and so do
+``messages.stream``, ``parse``, ``batches``, ``tool_runner`` and the raw
+response forms, which would otherwise send the request without placeholders.
 """
 
 from __future__ import annotations
@@ -56,6 +60,18 @@ class GuardrailError(Exception):
 class FileError(Exception):
     """An image or PDF in a request couldn't be sent without what's in it, so nothing was sent.  The message is
     for the user."""
+
+
+class BlockError(Exception):
+    """A content block of a kind veil doesn't know how to redact, so nothing was sent.  The message is for the
+    user."""
+
+
+# Blocks the model or Anthropic's own tools wrote, which hold only placeholders already: sent back as they are.
+_AS_THEY_ARE = {"thinking", "redacted_thinking", "web_search_tool_result", "web_fetch_tool_result",
+                "code_execution_tool_result", "bash_code_execution_tool_result",
+                "text_editor_code_execution_tool_result", "tool_search_tool_result", "mcp_tool_use",
+                "mcp_tool_result", "tool_reference"}
 
 
 @dataclass
@@ -112,7 +128,22 @@ class Session:
                 out["system"] = self.redactor.redact_text(system)
             elif isinstance(system, list):
                 out["system"] = [self._block(b, "system") for b in system]
+        if self.redact_system and isinstance(request.get("tools"), list):
+            out["tools"] = [self._tool(t) for t in request["tools"]]
+        if isinstance(request.get("metadata"), dict):
+            out["metadata"] = self.redactor.redact(request["metadata"])
         return out
+
+    def _tool(self, tool: Any) -> Any:
+        """A tool with its description, and each description in its input schema, redacted."""
+        def walk(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {k: self.redactor.redact_text(v) if k == "description" and isinstance(v, str) else walk(v)
+                        for k, v in value.items()}
+            if isinstance(value, list):
+                return [walk(v) for v in value]
+            return value
+        return walk(_as_dict(tool))
 
     def _message(self, message: dict) -> dict:
         role = message.get("role")
@@ -124,7 +155,7 @@ class Session:
     def _block(self, block: Any, role: str | None) -> Any:
         b = _as_dict(block)
         if not isinstance(b, dict):
-            return block
+            raise BlockError(f"veil can't redact a content block given as {type(block).__name__}. Nothing was sent.")
         kind = b.get("type")
         r = self.redactor
         if kind == "text":
@@ -150,7 +181,13 @@ class Session:
             return self._file(b, role)
         if kind == "image":
             return self._file(b, role)
-        return b   # thinking and the like: as they are
+        if kind == "search_result":   # its content first, so a name it gives is hidden in the title too
+            b = {**b, "content": [self._block(c, None) for c in b.get("content") or []]}
+            return {**b, **{k: r.redact_text(b[k]) for k in ("source", "title") if isinstance(b.get(k), str)}}
+        if kind in _AS_THEY_ARE:
+            return b
+        raise BlockError(f"veil doesn't know how to redact a {kind!r} block, so it would have reached the model "
+                         "as it is. Nothing was sent.")
 
     def _file(self, b: dict, role: str | None) -> dict:
         """An image or PDF block, as ``files`` says: as it is, or its text redacted in its place."""
@@ -214,6 +251,19 @@ class Session:
         walk(request.get("messages"))
         if self.redact_system:
             walk(request.get("system"))
+
+            def descriptions(value: Any) -> None:
+                if isinstance(value, dict):
+                    for key, v in value.items():
+                        if key == "description" and isinstance(v, str):
+                            texts.append(v)
+                        else:
+                            descriptions(v)
+                elif isinstance(value, list):
+                    for v in value:
+                        descriptions(v)
+            descriptions(request.get("tools"))
+        walk(request.get("metadata"))
         return [t for t in texts if t.strip()]
 
     def _guard(self, original: dict, redacted: dict) -> dict:
@@ -294,7 +344,15 @@ class Session:
             setattr(block, key, value)
 
 
+def _unwrapped(name: str) -> NotImplementedError:
+    return NotImplementedError(f"veil doesn't redact messages.{name} yet, so it would send the request without "
+                               "placeholders; call messages.create instead.")
+
+
 class _Messages:
+    """``create`` and ``count_tokens`` through placeholders.  Everything else the SDK's messages have would send
+    the request as it is, so it raises."""
+
     def __init__(self, messages, session: Session):
         self._messages = messages
         self._session = session
@@ -308,8 +366,30 @@ class _Messages:
     def count_tokens(self, **request):
         return self._messages.count_tokens(**self._session.redact_request(request))
 
+    def stream(self, *args, **kwargs):
+        raise _unwrapped("stream")
+
+    def parse(self, *args, **kwargs):
+        raise _unwrapped("parse")
+
+    def tool_runner(self, *args, **kwargs):
+        raise _unwrapped("tool_runner")
+
+    @property
+    def batches(self):
+        raise _unwrapped("batches")
+
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response")
+
     def __getattr__(self, name):
-        return getattr(self._messages, name)
+        raise AttributeError(f"veil doesn't wrap messages.{name}, so it isn't offered: it would send the request "
+                             "without placeholders.")
 
 
 class _Beta:
