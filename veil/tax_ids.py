@@ -48,7 +48,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import Any, Callable, Collection
 
 from veil.profiles import GENERIC, Profile
 
@@ -70,6 +70,23 @@ _SEGMENT = re.compile(r"\d(?:[\d" + "".join(_LOOKALIKES) + r"]*\d)?")
 KINDS = ("SSN", "EIN", "TIN", "NAME", "ADDRESS", "EMAIL", "PHONE", "ACCOUNT", "DOB", "ID")
 TAX_ID_KINDS = ("SSN", "EIN", "TIN")
 _KIND_NAME = re.compile(r"[A-Z][A-Z0-9]*")
+# Where text names a web address, a link's or picture's target, or another URL: a scheme's ("https:", "mailto:"),
+# "www." or "//", a Markdown target ("](...)"), an HTML attribute that loads or links, or a host with a path.
+# The rarer schemes only in lower case, so a label ("Tel:PHONE_001") isn't taken for one.
+_URL = re.compile(
+    r"(?:(?i:\b(?:https?|ftps?|wss?|mailto):|\bwww\.)|\b(?:tel|sms|data|javascript|file):|//)[^\s\"'<>`]*"
+    r"|\]\(\s*<?[^\s)>]*"
+    r"|(?i:\b(?:href|src|srcset|action|formaction|poster|background))\s*=\s*[\"']?[^\s\"'<>]*"
+    r"|\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?::\d+)?[/?#][^\s\"'<>`]*")
+
+
+def _outside_urls(text: str, fix: Callable[[str], str]) -> str:
+    """``text`` with ``fix`` applied to everything but its URLs, which stay as written."""
+    out, at = [], 0
+    for m in _URL.finditer(text):
+        out += [fix(text[at:m.start()]) if m.start() > at else "", m.group()]
+        at = m.end()
+    return "".join(out) + (fix(text[at:]) if at < len(text) else "") if out else fix(text)
 
 
 @lru_cache(maxsize=64)
@@ -535,10 +552,19 @@ class TaxIdRedactor:
             text = text[:source_start] + placeholder + text[source_end:]
         return text
 
-    def restore_text(self, text: str) -> str:
+    def restore_text(self, text: str, kinds: Collection[str] | None = None, urls: bool = True) -> str:
+        """``text`` with this conversation's placeholders turned back into the real values.  ``kinds``: only
+        placeholders of these kinds ("NAME", "SSN" ...); the rest stay as they are.  ``urls=False``: a
+        placeholder inside a URL or a link's target stays as it is, so text a model wrote can't carry a real
+        value off to a web address."""
+        if not urls:
+            return _outside_urls(text, lambda part: self.restore_text(part, kinds))
+
         def back(m: re.Match) -> str:
             ours = self._resolve(m.group())
-            return self._real[ours[0]] + ours[1] if ours else m.group()
+            if not ours or (kinds is not None and ours[0].rsplit("_", 1)[0] not in kinds):
+                return m.group()
+            return self._real[ours[0]] + ours[1]
         return self._placeholder_re.sub(back, text)
 
     # -- structures ---------------------------------------------------------------
@@ -549,9 +575,10 @@ class TaxIdRedactor:
         self._walk(value, self.redact_text)
         return self._walk(value, self.redact_text)
 
-    def restore(self, value: Any) -> Any:
-        """``value`` with this conversation's placeholders turned back into the real numbers."""
-        return self._walk(value, self.restore_text)
+    def restore(self, value: Any, kinds: Collection[str] | None = None, urls: bool = True) -> Any:
+        """``value`` with this conversation's placeholders turned back into the real numbers; dicts and lists
+        are walked.  ``kinds`` and ``urls`` as for ``restore_text``."""
+        return self._walk(value, lambda text: self.restore_text(text, kinds, urls))
 
     def _walk(self, value: Any, fix) -> Any:
         if isinstance(value, str):
