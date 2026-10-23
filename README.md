@@ -63,9 +63,13 @@ reply = client.messages.create(model="claude-opus-5-5", max_tokens=1024, tools=T
 You keep the conversation with the real values in it, as you would without
 veil. Each request goes out as a copy with placeholders in place of the real
 values. That covers what the user typed, tool results, the system prompt and
-the model's earlier turns. In the reply, text and tool-call inputs come back
-with the real values. Thinking blocks go back unchanged. Streaming isn't
-supported yet: `stream=True` raises an error.
+the model's earlier turns, and also the tools' descriptions and `metadata`.
+In the reply, text and tool-call inputs come back with the real values.
+Thinking blocks, and the results of Anthropic's own tools, go back unchanged.
+A content block of a kind veil doesn't know raises `BlockError`, and nothing
+is sent. Streaming isn't supported yet: `stream=True` raises an error, and so
+do `messages.stream`, `parse`, `batches`, `tool_runner` and the raw response
+forms, which would otherwise send the request without placeholders.
 
 ## Images and PDFs
 
