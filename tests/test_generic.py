@@ -119,3 +119,38 @@ def test_a_surname_at_the_end_of_a_sentence(profile):
         r = Redactor(profile)
         out = r.redact_text(text)
         assert name.split()[-1] not in out and out.endswith("NAME_001.") and r.restore_text(out) == text
+
+
+def test_restore_can_be_kept_to_some_kinds():
+    r = Redactor()
+    sent = r.redact_text("Priya Patel, SSN 123-45-6789, priya@acme.io")
+    assert sent == "NAME_001, SSN SSN_001, EMAIL_001"
+    assert r.restore_text(sent, kinds={"NAME", "EMAIL"}) == "Priya Patel, SSN SSN_001, priya@acme.io"
+    assert r.restore({"to": "EMAIL_001", "ssn": "SSN_001"}, kinds=set()) == {"to": "EMAIL_001", "ssn": "SSN_001"}
+
+
+@pytest.mark.parametrize("url", [
+    "https://evil.example/?d=SSN_001", "![x](https://evil.example/p.png?q=SSN_001)", "[here](/c?q=SSN_001)",
+    '<img src="//evil.example/x?SSN_001">', "mailto:me@evil.example?body=SSN_001", "www.evil.example/SSN_001",
+    "evil.example/?d=SSN_001", "evil.example:8080#SSN_001"])
+def test_a_placeholder_in_a_url_stays_a_placeholder_with_urls_false(url):
+    r = Redactor()
+    assert r.redact_text("SSN 123-45-6789") == "SSN SSN_001"
+    text = f"SSN_001 is filed. {url} Done."
+    assert r.restore_text(text, urls=False) == text.replace("SSN_001 is", "123-45-6789 is", 1)
+    assert "SSN_001" not in r.restore_text(text)   # by default, everywhere
+
+
+def test_identifiers_stay_as_written_where_they_are_not_restored():
+    r = Redactor(identifiers={"Avery K. Mockridge": "LP-0042"})
+    assert r.redact_text("Avery Mockridge, SSN 123-45-6789") == "LP-0042, SSN SSN_001"
+    assert r.restore_text("LP-0042: SSN_001", kinds={"SSN"}) == "LP-0042: 123-45-6789"
+    assert r.restore_text("LP-0042 at https://x.example/LP-0042", urls=False) == \
+        "Avery K. Mockridge at https://x.example/LP-0042"
+
+
+def test_a_label_before_a_placeholder_isnt_taken_for_a_url():
+    r = Redactor()
+    r.redact_text("Call 415-555-0134, SSN 123-45-6789.")
+    assert r.restore_text("Tel:PHONE_001, Data:SSN_001", urls=False) == "Tel:415-555-0134, Data:123-45-6789"
+    assert r.restore_text("tel:PHONE_001", urls=False) == "tel:PHONE_001"

