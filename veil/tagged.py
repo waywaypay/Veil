@@ -6,16 +6,24 @@ either one marks is hidden.  The model only adds to what veil hides.
     text, spans = r.redact("Call Maria Lopez on 0412 555 019.")
     rr = r.redactor(reveal={"DOB": "month"})   # numbered placeholders that restore, as veil's own
 
-Needs the ``tagger`` extra (gliner, torch).  ``system`` picks what hides: "union" (veil and the model), "model" or "veil"."""
+Needs the ``tagger`` extra (gliner, torch).  ``system`` picks what hides: "union" (veil and the model), "model" or "veil".
+
+Or, with the ``tagger-onnx`` extra (onnxruntime, tokenizers; no gliner, no PyTorch), the model's ONNX copy, named as
+"folder or Hugging Face repo::file in it" (veil.onnx_tagger):
+
+    r = TaggedRedactor(model=ONNX_MODEL)       # Deerpark/pii-tagger-edge::onnx/model_f16.onnx"""
 from __future__ import annotations
 
+import contextlib
 import difflib
+import os
 import re
 from dataclasses import dataclass
 
 from . import FINANCE, Redactor, hangul
 
 MODEL = "Deerpark/veil-tagger-edge"
+ONNX_MODEL = MODEL + "::onnx/model_f16.onnx"   # its weights in 16 bits, cast to 32 as ONNX Runtime loads them
 THRESHOLD = 0.35   # chosen on the dev sets for round 7's model
 
 # what the model is asked to find -> veil's kind of placeholder
@@ -123,19 +131,27 @@ class TaggedRedactor:
 
     def _load(self):
         if self._model is None:
-            from gliner import GLiNER
-            self._model = GLiNER.from_pretrained(self.model_name)
-            self._model.eval()
+            if "::" in self.model_name:   # an ONNX file in a model's folder or repo: veil.onnx_tagger
+                from .onnx_tagger import OnnxTagger
+                folder, onnx_file = self.model_name.split("::", 1)
+                if not os.path.isdir(folder):
+                    from huggingface_hub import snapshot_download
+                    folder = snapshot_download(folder, allow_patterns=["gliner_config.json", "tokenizer.json",
+                                                                       "tokenizer_config.json", onnx_file])
+                self._model = OnnxTagger(folder, onnx_file)
+            else:
+                from gliner import GLiNER
+                self._model = GLiNER.from_pretrained(self.model_name)
+                self._model.eval()
         return self._model
 
     def model_spans(self, texts: list[str], threshold: float | None = None) -> list[list[tuple[int, int, str, float]]]:
         """What the model marks in each text: [(start, end, kind, score)], at ``threshold`` (default: the redactor's)."""
-        import torch
         th = self.threshold if threshold is None else threshold
         m = self._load()
         pieces = [(i, off, p) for i, t in enumerate(texts) for off, p in chunks(t)]
         found: list[list[tuple[int, int, str, float]]] = [[] for _ in texts]
-        with torch.inference_mode():
+        with _inference_mode(m):
             for b in range(0, len(pieces), self.batch_size):
                 batch = pieces[b:b + self.batch_size]
                 ents = m.batch_predict_entities([p for _, _, p in batch], list(LABELS), threshold=th)
@@ -175,6 +191,14 @@ class TaggedRedactor:
         for s in reversed(spans):
             out = out[:s.start] + f"[{s.kind}]" + out[s.end:]
         return out, spans
+
+
+def _inference_mode(model):
+    """torch.inference_mode for a gliner model; nothing for the ONNX one, which runs without PyTorch."""
+    if getattr(model, "without_torch", False):
+        return contextlib.nullcontext()
+    import torch
+    return torch.inference_mode()
 
 
 def _join(spans: list[Span]) -> list[Span]:
