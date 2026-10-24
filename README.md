@@ -351,6 +351,23 @@ text, spans = r.redact("Call Maria Lopez on 0412 555 019.")
 
 `threshold` (0.35 by default) trades what the tagger finds against the other words it hides.
 
+### Without PyTorch: the tagger's ONNX copy
+
+gliner imports PyTorch even to run an ONNX model, and PyTorch is most of what an app that ships the tagger carries.
+`veil.onnx_tagger` runs the tagger's ONNX copy (`onnx/model_f16.onnx` in its repo: weights stored in 16 bits, cast to
+32 as they load) with ONNX Runtime and `tokenizers` alone, and marks the same spans with the same scores gliner does
+from that file. Name the model as "folder or repo::file":
+
+```python
+pip install -e ".[tagger-onnx]"                # onnxruntime, tokenizers, numpy: no gliner, no torch
+
+from veil.tagged import ONNX_MODEL, TaggedRedactor
+r = TaggedRedactor(model=ONNX_MODEL)           # Deerpark/pii-tagger-edge::onnx/model_f16.onnx
+r = TaggedRedactor(model="path/to/pii-tagger-edge::onnx/model_f16.onnx")   # a local copy
+```
+
+`VEIL_TAGGER` takes the same form, so `veilbench.py score` measures what the ONNX copy hides.
+
 The tagger was never trained on Korean, and in Hangul it takes ordinary words for names; `veil.hangul` drops a
 Korean "name" made of everyday words, using `wordfreq` (in the tagger extra). `benchmarks/korean_names.md` has
 what that changes.
