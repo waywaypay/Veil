@@ -12,12 +12,14 @@ is the kinder test. This one says whether the gains hold on conversations nobody
   `../docgen/RULES.md`, a theme, a count, a locale mix and a path (`locked3/W01.jsonl` to `W10.jsonl`), and nothing
   else: not PII-TRACE, not `round7/chatgen.py` or its output, not round 10's source B brief or chats, not another
   writer's file. None of them writes any round 10 training data.
-* **300 WildChat conversations** from WildChat-1M's shards 8 and 9, drawn once by `../../locked3_draw.py`, English
-  only, as every earlier locked chat set was. A candidate has 1 to 20 user turns, none empty, and at most 3,000 words
-  of user text. It is left out if its conversation hash is in the second locked test's chats or any other set's
-  manifest, or if a user turn of 40 characters or more repeats a text in them or in an earlier candidate. 150 are
-  drawn from the conversations WildChat marks `redacted` that hold one of Presidio's markers in a user turn, and 150
-  from those it found nothing in, with `random.Random(103)`. Each marker is filled with a made-up detail (a name, an
+* **300 WildChat conversations**, drawn once by `../../locked3_draw.py`, English only, as every earlier locked chat
+  set was. A candidate has 1 to 20 user turns, none empty, at most 3,000 words of user text and at most 20 of
+  Presidio's markers. It is left out if its conversation hash is in the second locked test's chats, round 7's chats
+  or any other set's manifest, or if a user turn of 40 characters or more repeats a text in them or in an earlier
+  candidate. 150 are drawn from the conversations WildChat marks `redacted` that hold one of Presidio's markers in a
+  user turn, from WildChat-4.8M's shards 83 to 85 (June and July 2025, which no set has used): after the second
+  locked test, WildChat-1M's shards 8 and 9 hold too few. 150 are drawn from those it found nothing in, from
+  WildChat-1M's shards 8 and 9. The draw uses `random.Random(103)`. Each marker is filled with a made-up detail (a name, an
   email, a phone or a card number), which counts as a detail as a writer's mark does. `draw.json` here holds the draw
   without WildChat's text, so it can be rebuilt and checked. Only user turns are read and scored.
 

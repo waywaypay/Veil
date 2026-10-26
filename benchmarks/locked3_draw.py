@@ -1,26 +1,33 @@
-"""The third locked test's WildChat half (judged/locked3/README.md): 300 English conversations from WildChat-1M's shards
-8 and 9, none of them in the second locked test or any earlier set, drawn once, before any round 10 training data.
+"""The third locked test's WildChat half (judged/locked3/README.md): 300 English conversations, none of them in the second
+locked test or any earlier set, drawn once, before any round 10 training data.  The 150 that Presidio found something
+in come from WildChat-4.8M's shards 83 to 85 (June and July 2025; no set has used them, round 7's chats came from
+40 to 48): shards 8 and 9 of WildChat-1M, after the second locked test, hold too few.  The 150 it found nothing in come
+from WildChat-1M's shards 8 and 9.
 
-    python benchmarks/locked3_draw.py fetch                          WildChat-1M's shards 8 and 9, to $VEIL_BENCH_DATA
+    python benchmarks/locked3_draw.py fetch                          the five shards, to $VEIL_BENCH_DATA (2 GB)
     python benchmarks/locked3_draw.py draw --exclude <file> ...      the draw: judged/locked3/draw.json, and the texts
     python benchmarks/locked3_draw.py build                          the texts again, from the shards and draw.json
 
 The rule, the same for every conversation, fixed before the draw:
 
-* a candidate is an English conversation of shard 8 or 9 (in that order, rows in the dataset's order) with 1 to 20
-  user turns, every one non-empty, and at most 3,000 words of user text in all;
+* a candidate is an English conversation with 1 to 20 user turns, every one non-empty, and at most 3,000 words of
+  user text in all, and at most 20 of Presidio's markers (a pasted mailing list would otherwise decide the emails'
+  score), read in this order: WildChat-1M's shards 8 and 9, then WildChat-4.8M's 83, 84 and 85, rows in
+  each shard's order;
 * it isn't excluded: its conversation hash isn't in any --exclude file, and no user turn of 40 characters or more
   (its spaces collapsed, lower case) is a text in one or a user turn of a candidate before it;
-* "redacted" candidates: WildChat says Presidio found something, and a user turn holds one of its markers
-  (<PRESIDIO_ANONYMIZED_...>); "plain" candidates: WildChat says it found nothing, and no user turn holds a marker;
+* "redacted" candidates, from WildChat-4.8M's shards only: WildChat says Presidio found something, and a user turn
+  holds one of its markers (<PRESIDIO_ANONYMIZED_...>); "plain" candidates, from WildChat-1M's shards only: WildChat
+  says it found nothing, and no user turn holds a marker;
 * random.Random(103) draws 150 of each: rng.sample(redacted, 150), then rng.sample(plain, 150).
 
 A marker is filled with a made-up detail (Faker, en_US, from the same generator): a person's name (full, first or
 last; now and then one put in earlier in the conversation, as people come back), an email, a phone number or a card
 number, each a detail of its label; any other marker with a made-up value marked "outside" (counted neither way).
 
---exclude takes JSON or JSONL files: the second locked test's chats, judged/locked.json, judged/chats.json, and any
-other set's manifest.  Every 32-character hex string in them is taken as a conversation hash to leave out, and every
+--exclude takes JSON or JSONL files: the second locked test's chats, round 7's chats (from WildChat-4.8M's shards
+40 to 48; the same conversation can appear in both datasets, with the same hash), judged/locked.json,
+judged/chats.json, and any other set's manifest.  Every 32-character hex string in them is taken as a conversation hash to leave out, and every
 string of 40 characters or more as a text no drawn turn may be.  Pass the second locked test's chats: the draw refuses
 to run without at least one file.
 
@@ -41,10 +48,12 @@ HERE = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("VEIL_BENCH_DATA", HERE / "data"))
 DRAW = HERE / "judged" / "locked3" / "draw.json"
 OUT = DATA / "locked3_wildchat.jsonl"
-SHARDS = {f"wildchat{i}.parquet": f"https://huggingface.co/api/datasets/allenai/WildChat-1M/parquet/default/train/{i}.parquet"
-          for i in (8, 9)}
+HF = "https://huggingface.co/api/datasets/allenai"
+PLAIN = {f"wildchat{i}.parquet": f"{HF}/WildChat-1M/parquet/default/train/{i}.parquet" for i in (8, 9)}
+REDACTED = {f"wc48_{i}.parquet": f"{HF}/WildChat-4.8M/parquet/default/train/{i}.parquet" for i in (83, 84, 85)}
+SHARDS = {**PLAIN, **REDACTED}
 SEED, N = 103, 150
-MAX_TURNS, MAX_WORDS = 20, 3000
+MAX_TURNS, MAX_WORDS, MAX_MARKERS = 20, 3000, 20
 MARKER = re.compile(r"<PRESIDIO_ANONYMIZED_([A-Z_]+)>")
 LABEL = {"PERSON": "name", "EMAIL_ADDRESS": "email address", "PHONE_NUMBER": "phone number",
          "CREDIT_CARD": "credit card number"}
@@ -89,29 +98,31 @@ def excluded(paths):
 
 
 def conversations():
-    """(hash, redacted, [user turns]) of the English conversations of shards 8 and 9, in the dataset's order."""
-    import pandas as pd
-    for name in SHARDS:
-        d = pd.read_parquet(DATA / name, columns=["conversation_hash", "conversation", "language", "redacted"])
-        for h, conv, lang, red in zip(d.conversation_hash, d.conversation, d.language, d.redacted):
-            if lang == "English":
-                yield h, bool(red), [u["content"] or "" for u in conv if u["role"] == "user"]
+    """(shard, hash, redacted, [user turns]) of the English conversations of the five shards, in order."""
+    import pyarrow.parquet as pq
+    for name in SHARDS:   # in batches: a WildChat-4.8M shard is half a gigabyte
+        for batch in pq.ParquetFile(DATA / name).iter_batches(
+                batch_size=2000, columns=["conversation_hash", "conversation", "language", "redacted"]):
+            for r in batch.to_pylist():
+                if r["language"] == "English":
+                    yield name, r["conversation_hash"], bool(r["redacted"]), \
+                        [u["content"] or "" for u in r["conversation"] if u["role"] == "user"]
 
 
 def candidates(hashes, texts):
     redacted, plain, seen = [], [], set(texts)
-    for h, red, users in conversations():
+    for shard, h, red, users in conversations():
         if h in hashes or not 1 <= len(users) <= MAX_TURNS or not all(u.strip() for u in users) or \
-                sum(len(u.split()) for u in users) > MAX_WORDS:
+                sum(len(u.split()) for u in users) > MAX_WORDS or sum(len(MARKER.findall(u)) for u in users) > MAX_MARKERS:
             continue
         turns = {norm(u) for u in users if len(norm(u)) >= 40}
         if turns & seen:
             continue
         marked = any(MARKER.search(u) for u in users)
-        if red and marked:
-            redacted.append((h, users))
-        elif not red and not marked:
-            plain.append((h, users))
+        if red and marked and shard in REDACTED:
+            redacted.append((shard, h, users))
+        elif not red and not marked and shard in PLAIN:
+            plain.append((shard, h, users))
         else:
             continue
         seen |= turns
@@ -168,7 +179,7 @@ def draw(paths):
     picked = [(c, True) for c in rng.sample(redacted, N)] + [(c, False) for c in rng.sample(plain, N)]
     filler = Filler(rng)
     manifest, rows = [], []
-    for (h, users), red in picked:
+    for (shard, h, users), red in picked:
         people, turns, msgs, spans = [], [], [], []
         for u in users:
             values = [filler.value(m.group(1), people) for m in MARKER.finditer(u)]
@@ -176,7 +187,7 @@ def draw(paths):
             turns.append([values, sha(text)])
             msgs.append(text)
             spans.append(sp)
-        manifest.append({"hash": h, "redacted": red, "turns": turns})
+        manifest.append({"shard": shard, "hash": h, "redacted": red, "turns": turns})
         rows.append({"id": h, "redacted": red, "messages": msgs, "spans": spans})
     DRAW.parent.mkdir(parents=True, exist_ok=True)
     json.dump({"seed": SEED, "shards": sorted(SHARDS), "exclude": [Path(p).name for p in paths],
@@ -187,12 +198,12 @@ def draw(paths):
 
 def build():
     m = json.load(open(DRAW))
-    want = {c["hash"]: c for c in m["conversations"]}
-    users = {h: u for h, _, u in conversations() if h in want}
+    want = {(c["shard"], c["hash"]) for c in m["conversations"]}
+    users = {(s, h): u for s, h, _, u in conversations() if (s, h) in want}
     rows = []
     for c in m["conversations"]:
         msgs, spans = [], []
-        for u, (values, digest) in zip(users[c["hash"]], c["turns"]):
+        for u, (values, digest) in zip(users[(c["shard"], c["hash"])], c["turns"]):
             text, sp = fill(u, values)
             if sha(text) != digest:
                 raise ValueError(f"conversation {c['hash']}: a turn isn't as it was drawn")
