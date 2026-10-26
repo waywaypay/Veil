@@ -24,11 +24,24 @@ import gzip
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from importlib import resources
+from math import floor, log10
+from typing import Collection
 
 from veil.profiles import Profile, word_file
-from veil.tax_ids import KINDS, TAX_ID_KINDS, TaxIdRedactor, _shadow, _whole
+from veil.tax_ids import (
+    _DATE_TIME,
+    _IPV4,
+    _MONEY,
+    KINDS,
+    TAX_ID_KINDS,
+    TaxIdRedactor,
+    _outside_urls,
+    _shadow,
+    _whole,
+)
 
 
 def _words(text: str) -> frozenset[str]:
@@ -1008,6 +1021,62 @@ def _born(value: str, level: str) -> str | None:
     return f"{_MONTH_NAMES[month - 1]} {year.group()}" if month and 1 <= month <= 12 else year.group()
 
 
+# -- money amounts (``amounts``) ----------------------------------------------------------------------------------
+
+AMOUNT_LEVELS = ("show", "personal", "all")
+# A few words before an amount, these say it's someone's own money: "Base salary: $142,000", "commitment of $5,000,000".
+_PERSONAL_MONEY = ("salary", "salaries", "wage", "wages", "pay", "gross", "net pay", "bonus", "bonuses", "compensation",
+                   "commission", "commissions", "balance", "balances", "net worth", "income", "commitment",
+                   "commitments", "capital account", "contribution", "contributions", "distribution", "distributions",
+                   "payout", "payouts", "settlement", "settlements", "award", "awards", "owed", "debt", "debts")
+# And these that it's money at all, for a number with no currency sign or code: "Total 6,250.00".
+_MONEY_WORDS = _words("amount amounts total totals subtotal price prices cost costs fee fees paid payment payments due "
+                      "revenue revenues value sum charge charges rent invoice invoiced tax taxes withheld deposit "
+                      "deposits withdrawal withdrawals credit debit proceeds premium principal expense expenses "
+                      "budget refund spend")
+# What a number counts, when it isn't money: "1,200 shares", "2,400 employees".
+_QUANTITY_WORDS = _words("share shares unit units employee employees people persons users customers members items pcs "
+                         "pieces hours hrs days weeks months years miles mi km kg kgs lbs lb tons sq ft acres votes "
+                         "words pages rows records copies")
+# up to four words between a label and its amount, and no sentence's end: "Net income (loss) ...... (1,495)"
+_GAP = r"(?:[^\w\n.!?;]|\.{2,})"
+_LABEL_WORDS = rf"(?:{_GAP}++[\w'-]++){{0,4}}+{_GAP}*+\Z"
+_PERSONAL_MONEY_BEFORE = re.compile(r"(?i)(?<![^\W\d_])(?:" + "|".join(w.replace(" ", r"[ \t]+") for w in _PERSONAL_MONEY) +
+                                    r")(?![^\W\d_])" + _LABEL_WORDS)
+_MONEY_WORD_BEFORE = re.compile(rf"(?i)(?<![^\W\d_])(?:{'|'.join(sorted(_MONEY_WORDS))})(?![^\W\d_]){_LABEL_WORDS}")
+_CURRENCY_SIGN = "[" + re.escape("".join(sorted(_MONEY - {"%"}))) + "]"
+_CURRENCY_CODE = rf"(?-i:{'|'.join(sorted(_CURRENCIES))})"
+# What may come before an amount's digits: "(", "-", a sign ("$", "US$", "€"), a code ("USD "), in that order or with
+# the minus after the sign ("$-12.00").
+_BEFORE_AMOUNT = re.compile(
+    rf"(?P<open>\([ \t]?)?(?P<minus>-[ \t]?)?(?P<cur>(?:US|C|A|NZ|HK|S|R)?\$|{_CURRENCY_SIGN}|(?<![^\W\d_])Rs\.?"
+    rf"|(?<![^\W\d_])(?<!/){_CURRENCY_CODE})?(?P<space>[ \t ]?)(?P<minus2>-)?\Z")
+_AFTER_AMOUNT = re.compile(
+    rf"(?P<scale>[ \t]?(?i:thousand|million|billion|trillion|bn|mn|mm|k|m|b)(?![^\W\d_]))?"
+    rf"(?P<code>[ \t ]?{_CURRENCY_CODE}(?![^\W\d_]))?(?P<close>[ \t]?\))?")
+_EURO_AFTER = re.compile(r"[ \t\u00a0]?(?:€|EUR\b)")
+_CURRENCY_WORD_AFTER = re.compile(r"(?i)[ \t]+(?:dollars?|euros?|pounds?|yen|rupees?|francs?|yuan)\b")
+_PERCENT_AFTER = re.compile(r"(?i)[ \t]?%|[ \t]+(?:percent|per[ \t]+cent|pct|bps|basis[ \t]+points)\b")
+_NUMBER_LABEL_BEFORE = re.compile(r"(?i)(?:#|\bno\.?|\bnumber|\bbox|\bline|\bitem|\bpage|\bstep)[ \t]*\Z")
+_LINE_CURRENCY = re.compile(rf"{_CURRENCY_SIGN}|(?<![^\W\d_]){_CURRENCY_CODE}(?![^\W\d_])")
+# The people a placeholder stands for: an amount on their line is theirs.
+_PERSON_KINDS = frozenset({"NAME", "SSN", "TIN", "ACCOUNT", "ID", "EMAIL", "PHONE", "DOB"})
+_AMOUNT_PLACEHOLDER = re.compile(r"\bAMOUNT_\d{3,}\b(?! \(about )")
+_ABOUT_NOTE = re.compile(r"\b(AMOUNT_\d{3,}) \(about [^()\n]{1,24}\)")
+
+
+def _about(value: float) -> str:
+    """``value`` to two significant figures, with K, M or B: 1339032.49 -> "1.3M", 250000 -> "250K"."""
+    if not value:
+        return "0"
+    value = float(Decimal(repr(value)).quantize(Decimal(f"1e{floor(log10(value)) - 1}"), ROUND_HALF_UP))
+    for size, unit in ((1e9, "B"), (1e6, "M"), (1e3, "K"), (1, "")):
+        if value >= size:
+            n = value / size
+            return (f"{n:,.0f}" if n >= 10 else f"{n:.1f}".removesuffix(".0")) + unit
+    return f"{value:.2g}"
+
+
 class Redactor(TaxIdRedactor):
     """One conversation's placeholders for taxpayer IDs and personal information.
 
@@ -1031,19 +1100,38 @@ class Redactor(TaxIdRedactor):
     see a placeholder (``add_identifier``), so only whoever holds this table can tell who it is.
     ``reveal``: what the model may still see of a hidden value, as {kind: how much}.  {"DOB": "year"} sends
     a birth date as "DOB_001 (born 1990)", {"DOB": "month"} as "DOB_001 (born March 1990)", so the model can
-    tell who is older or roughly how old someone is.  The note is taken off again when the reply is restored.
+    tell who is older or roughly how old someone is.  {"AMOUNT": "round"} sends a hidden amount as
+    "AMOUNT_001 (about $1.3M)": two significant figures, with its currency.  The note is taken off again when the
+    reply is restored.
+    ``amounts``: whether money amounts are hidden.  "show" (the default) leaves every amount visible, since the
+    model usually needs them.  "personal" hides an amount tied to a person: on the same line or table row as a
+    name, account, SSN, ID, email, phone or birth date that's hidden ("Yusuf Adebayo, 6,250.00"), or a few words
+    after a word such as salary, bonus, balance, commitment or distribution ("Base salary: $142,000"); "The capital
+    call of $250,000 is due" stays.  Once hidden, an amount is hidden wherever it's written the same way again.
+    "all" hides every amount written as money: a currency sign or code beside a number ("$250,000", "EUR 1.2M",
+    "($12,400.00)"), or a number with thousands commas or cents among money ("Total 6,250.00").  Percentages,
+    dates, years, quantities ("1,200 shares"), box numbers and IDs stay.  Each amount gets an AMOUNT placeholder
+    and comes back exactly as written.
     """
 
     def __init__(self, profile: Profile | None = None, detect=None, patterns=None, name_finder=None, reveal=None,
-                 finder=None, identifiers=None):
+                 finder=None, identifiers=None, amounts: str = "show"):
         super().__init__(profile)
         self._identifier_of: dict[tuple[str, str], str] = {}   # (kind group, real value's key) -> identifier
         self._identified: dict[str, tuple[str, str]] = {}      # identifier -> (kind, real value)
         self._finder = finder
+        if amounts not in AMOUNT_LEVELS:
+            raise ValueError(f"amounts={amounts!r} isn't a setting: use one of {', '.join(map(repr, AMOUNT_LEVELS))}.")
+        self._amounts = amounts
+        self._about: dict[str, str] = {}   # "AMOUNT_001" -> "$1.3M", what reveal shows of it
         self._reveal = dict(reveal or {})
         for kind, level in self._reveal.items():
-            if kind != "DOB" or level not in ("year", "month"):
-                raise ValueError(f"Can't reveal {kind!r} as {level!r}: use {{'DOB': 'year'}} or {{'DOB': 'month'}}.")
+            if (kind, level) not in (("DOB", "year"), ("DOB", "month"), ("AMOUNT", "round")):
+                raise ValueError(f"Can't reveal {kind!r} as {level!r}: use {{'DOB': 'year'}}, {{'DOB': 'month'}} or "
+                                 f"{{'AMOUNT': 'round'}}.")
+        if "AMOUNT" in self._reveal and amounts == "show":
+            raise ValueError("reveal={'AMOUNT': 'round'} needs amounts='personal' or amounts='all': with "
+                             "amounts='show' no amount is hidden.")
         self._name_finder = name_finder
         self._detect = frozenset(KINDS if detect is None else detect)
         unknown = self._detect - set(KINDS)
@@ -1053,6 +1141,8 @@ class Redactor(TaxIdRedactor):
         for kind, pattern in (patterns or {}).items():
             self.register_kind(kind)
             self._custom.append((kind, pattern if isinstance(pattern, re.Pattern) else re.compile(pattern)))
+        if amounts != "show":
+            self.register_kind("AMOUNT")
         self._people: dict[str, _Person] = {}
         self._patterns: list[tuple[re.Pattern, _Person | None, str, bool]] | None = None
         self._guessing = False   # what add_person is given comes from the name finder
@@ -1284,14 +1374,7 @@ class Redactor(TaxIdRedactor):
         for identifier in sorted(self._identified, key=len, reverse=True):
             if identifier in text:
                 text = re.sub(_whole(identifier), lambda m, i=identifier: self._placeholder_for(i), text)
-        text = self._redact_core(text, typed)
-
-        def swap(m: re.Match) -> str:
-            real = self._real.get(m.group())
-            if real is None:
-                return m.group()
-            return self._identifier_of.get(self._identity(m.group().rsplit("_", 1)[0], real), m.group())
-        return self._placeholder_re.sub(swap, text)
+        return self._shown(self._redact_core(text, typed))
 
     def _redact_core(self, text: str, typed: bool = False) -> str:
         text = self._prepare(text)
@@ -1316,20 +1399,165 @@ class Redactor(TaxIdRedactor):
                 self._guessing = False
         text = self._redact_personal(text, typed, marked)
         text = self._redact_ids(text) if self._detect & set(TAX_ID_KINDS) else text
+        text = self._redact_amounts(text) if self._amounts != "show" else text
         return self._noted(text) if self._reveal else text
 
     def _noted(self, text: str) -> str:
-        """Each birth date's placeholder followed by the part of it ``reveal`` lets through."""
+        """Each birth date's and amount's placeholder followed by the part of it ``reveal`` lets through."""
         def note(m: re.Match) -> str:
             born = _born(self._real.get(m.group(), ""), self._reveal["DOB"])
             return f"{m.group()} (born {born})" if born else m.group()
-        return _DOB_PLACEHOLDER.sub(note, text)
 
-    def restore_text(self, text: str) -> str:
+        def about(m: re.Match) -> str:
+            rounded = self._about.get(m.group())
+            return f"{m.group()} (about {rounded})" if rounded else m.group()
+        if "DOB" in self._reveal:
+            text = _DOB_PLACEHOLDER.sub(note, text)
+        return _AMOUNT_PLACEHOLDER.sub(about, text) if "AMOUNT" in self._reveal else text
+
+    def _redact_amounts(self, text: str) -> str:
+        """``text`` with its money amounts replaced: every one (amounts="all"), or those tied to a person
+        ("personal").  Read after the rest is hidden, so a person's placeholder on a line ties its amounts."""
+        if not any(c.isdigit() for c in text):
+            return text
+        copy, starts, ends = _shadow(text)
+        breaks = [i for i, c in enumerate(copy) if c == "\n"]
+        people = {bisect.bisect_left(breaks, start) for start, end in self._placeholder_spans(copy)
+                  if copy[start:end].rsplit("_", 1)[0] in _PERSON_KINDS}   # the lines a person is on
+        # Placeholders' digits, and what reveal shows of an amount ("(about $1.3M)"), are no amount.
+        for start, end in self._placeholder_spans(copy) + [m.span() for m in _ABOUT_NOTE.finditer(copy)]:
+            copy = copy[:start] + "k" * (end - start) + copy[end:]
+        dates = [m.span() for pattern in (_DATE_TIME, _IPV4) for m in pattern.finditer(copy)]
+
+        def plain(group) -> bool:   # read as digits, and no part of a date, a time or an IP address
+            return not group.lookalikes and not any(s <= group.start and group.end <= e for s, e in dates)
+
+        found = []   # start, end, tied to a person, what reveal shows of it
+        for groups, joins in self._clusters(copy):
+            i = 0
+            while i < len(groups):
+                if not plain(groups[i]):
+                    i += 1
+                    continue
+                # The digits: thousands groups after a lead of one to three ("1,339,032", "1.234.567"), then
+                # decimals after a point, or after a comma when dots group the thousands ("1.234,56").
+                j, sep = i, None
+                while len(groups[i].digits) <= 3 and groups[i].digits != "0" and j + 1 < len(groups) and joins[j] in (",", ".", "'") and \
+                        joins[j] == (sep or joins[j]) and len(groups[j + 1].digits) in (2, 3) and plain(groups[j + 1]):
+                    sep, j = joins[j], j + 1
+                # groups of three ("1,339,032"), or of two before the last three as India writes them ("2,50,000")
+                while j > i and not ([len(g.digits) for g in groups[i + 1:j + 1]] == [3] * (j - i) or
+                                     sep == "," and len(groups[i].digits) <= 2 and len(groups[j].digits) == 3 and
+                                     all(len(g.digits) == 2 for g in groups[i + 1:j])):
+                    j -= 1
+                sep = sep if j > i else None
+                cur = _BEFORE_AMOUNT.search(copy, max(0, groups[i].start - 12), groups[i].start).group("cur")
+                if sep == "." and j == i + 1 and not (j + 1 < len(groups) and joins[j] == ",") and \
+                        cur not in ("€", "EUR") and not _EURO_AFTER.match(copy, groups[j].end):
+                    j, sep = i, None   # one dot is a decimal point: "2.500", but "€ 9.344"
+                decimals = ""
+                if j + 1 < len(groups) and plain(groups[j + 1]) and (
+                        joins[j] == "." and sep != "." and len(groups[j + 1].digits) <= 6 or
+                        # a decimal comma: after dots ("1.234,56"), or beside a currency ("240,00 PLN")
+                        joins[j] == "," and sep != "," and len(groups[j + 1].digits) == 2 and
+                        (sep == "." or cur or _AFTER_AMOUNT.match(copy, groups[j + 1].end).group("code"))):
+                    j, decimals = j + 1, groups[j + 1].digits
+                whole = "".join(g.digits for g in groups[i:j + (0 if decimals else 1)])
+                amount = self._amount(copy, groups[i], groups[j].end, whole, decimals, sep, breaks, people)
+                if amount:
+                    found.append(amount)
+                i = j + 1
+        if not found:
+            return text
+        if self._amounts == "personal":
+            # what's tied to a person, and the same amount written the same way wherever else it is
+            keys = {text[starts[a]:ends[b - 1]] for a, b, tied, _ in found if tied}
+            found = [f for f in found if f[2] or text[starts[f[0]]:ends[f[1] - 1]] in keys or
+                     f"AMOUNT:{text[starts[f[0]]:ends[f[1] - 1]]}" in self._by_digits]
+        placed = []
+        for start, end, _, rounded in sorted(found):   # numbered in reading order
+            source_start, source_end = starts[start], ends[end - 1]
+            written = text[source_start:source_end]
+            placeholder = self._placeholder("AMOUNT", f"AMOUNT:{written}", written, False)
+            self._about.setdefault(placeholder, rounded)
+            placed.append((source_start, source_end, placeholder))
+        for source_start, source_end, placeholder in reversed(placed):
+            text = text[:source_start] + placeholder + text[source_end:]
+        return text
+
+    def _amount(self, copy: str, first, end: int, whole: str, decimals: str, sep: str | None, breaks: list[int],
+                people: set[int]) -> tuple[int, int, bool, str] | None:
+        """The amount whose digits run from group ``first`` to ``end``, with what's written around them (its
+        currency, a minus or brackets): (start, end, tied to a person, rounded), or None when it's no money."""
+        start = first.start
+        line = bisect.bisect_left(breaks, start)
+        line_start, line_end = (breaks[line - 1] + 1 if line else 0), (breaks[line] if line < len(breaks) else len(copy))
+        before = _BEFORE_AMOUNT.search(copy, max(line_start, start - 12), start)
+        after = _AFTER_AMOUNT.match(copy, end, line_end)
+        cur, code = before.group("cur"), after.group("code")
+        if _PERCENT_AFTER.match(copy, end) or (not cur and not code and not first.money):
+            return None
+        a, b = (before.start() if cur else start), end
+        if not cur and (before.group("open") or before.group("minus")):
+            a = before.start()   # "(6,250.00)", "-6,250.00"
+        if a > 0 and (copy[a - 1].isalnum() or copy[a - 1] in "_#") or \
+                re.match(r"[^\W_]|[.,]\d", copy[(after.end("scale") if (cur or code) and after.group("scale") else end):][:2]):
+            return None   # inside a word or a longer number: "E10,442", "v2.10", "1.2.3"
+        if cur or code:
+            b = max(b, after.end("code") if code else after.end("scale") if after.group("scale") else b)
+        if before.group("open"):
+            if after.group("close") and (cur or code or not after.group("scale")):
+                b = after.end("close")
+            else:
+                a = before.start("open") + len(before.group("open")) if a == before.start() else a
+        label = max(line_start, a - 80)
+        if not cur and not code and not _CURRENCY_WORD_AFTER.match(copy, b):
+            # no currency: thousands commas and/or cents, among money
+            if (not sep and len(decimals) != 2) or (decimals and len(decimals) != 2) or \
+                    _NUMBER_LABEL_BEFORE.search(copy, label, a) or \
+                    ((w := re.match(r"[ \t]+([^\W\d_]+)", copy[b:b + 30])) and w.group(1).casefold() in _QUANTITY_WORDS):
+                return None
+            if not (sep and decimals) and not _MONEY_WORD_BEFORE.search(copy, label, a) and \
+                    not _PERSONAL_MONEY_BEFORE.search(copy, label, a) and \
+                    not _LINE_CURRENCY.search(copy, line_start, line_end):
+                return None
+        value = float(whole + "." + decimals) if decimals else float(whole)
+        scale = (after.group("scale") or "").strip().casefold() if cur or code else ""
+        value *= {"k": 1e3, "thousand": 1e3, "m": 1e6, "mm": 1e6, "mn": 1e6, "million": 1e6, "b": 1e9, "bn": 1e9,
+                  "billion": 1e9, "trillion": 1e12}.get(scale, 1)
+        rounded = _about(value)
+        if cur:
+            rounded = cur + ("" if cur.endswith("$") or len(cur) == 1 else " ") + rounded
+        if code:
+            rounded += " " + code.strip()
+        if before.group("minus") or before.group("minus2") or (before.group("open") and copy[b - 1:b] == ")"):
+            rounded = "-" + rounded
+        tied = line in people or _PERSONAL_MONEY_BEFORE.search(copy, label, a) is not None
+        return a, b, tied, rounded
+
+    def restore_text(self, text: str, kinds: Collection[str] | None = None, urls: bool = True) -> str:
+        if not urls:
+            return _outside_urls(text, lambda part: self.restore_text(part, kinds))
+        held = False
         for identifier in sorted(self._identified, key=len, reverse=True):
             if identifier in text:
                 text = re.sub(_whole(identifier), lambda m, i=identifier: self._placeholder_for(i), text)
-        return super().restore_text(_BORN_NOTE.sub(r"\1", text) if self._reveal else text)
+                held = True
+        if "DOB" in self._reveal:
+            text = _BORN_NOTE.sub(r"\1", text)
+        if "AMOUNT" in self._reveal:
+            text = _ABOUT_NOTE.sub(r"\1", text)
+        text = super().restore_text(text, kinds)
+        return self._shown(text) if held and kinds is not None else text
+
+    def _shown(self, text: str) -> str:
+        """``text`` with each placeholder of a value you gave an identifier for shown as that identifier."""
+        def swap(m: re.Match) -> str:
+            real = self._real.get(m.group())
+            if real is None:
+                return m.group()
+            return self._identifier_of.get(self._identity(m.group().rsplit("_", 1)[0], real), m.group())
+        return self._placeholder_re.sub(swap, text)
 
     def redact(self, value, typed: bool = False):
         if not typed:

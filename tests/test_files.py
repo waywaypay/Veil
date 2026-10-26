@@ -373,6 +373,60 @@ def test_a_file_that_isnt_a_docx_says_so(data, media_type, message):
         read_text(data, media_type)
 
 
+def _bomb(size):
+    """A small .docx whose one other part unpacks to ``size`` bytes of zeros."""
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("word/document.xml", f"<w:document {_NS}><w:body>{_p('Hi')}</w:body></w:document>")
+        z.writestr("word/media/fill.bin", b"\0" * size)
+    return buf.getvalue()
+
+
+def test_a_word_document_that_would_unpack_too_far_is_refused_before_it_is_read(monkeypatch):
+    from veil import Redactor
+    from veil.files import read_text, redact_docx, restore_docx
+
+    monkeypatch.setattr("veil.files.DOCX_MAX_UNPACKED", 1_000_000)
+    bomb = _bomb(2_000_000)
+    assert len(bomb) < 20_000
+    for read in (lambda: read_text(bomb, DOCX), lambda: redact_docx(bomb), lambda: restore_docx(bomb, Redactor())):
+        with pytest.raises(ValueError, match="would unpack to 2,000,"):
+            read()
+    assert read_text(_bomb(100_000), DOCX) == "Hi"
+
+
+def test_a_word_document_with_too_many_parts_is_refused(monkeypatch):
+    from veil.files import read_text
+
+    monkeypatch.setattr("veil.files.DOCX_MAX_PARTS", 3)
+    many = _docx(_p("Hi"), more={f"word/part{n}.xml": "<x/>" for n in range(3)})
+    with pytest.raises(ValueError, match="in 5 files"):
+        read_text(many, DOCX)
+
+
+def test_a_word_document_that_lies_about_its_size_isnt_read_past_it():
+    """The limit is on the sizes the zip states; reading a part stops at its stated size, so a part that
+    unpacks to more than it says fails its checksum rather than filling memory."""
+    import struct
+    import zipfile
+
+    from veil.files import read_text
+
+    data = bytearray(_bomb(5_000_000))
+    for signature, at, name_at, start in ((b"PK\x03\x04", 22, 26, 30), (b"PK\x01\x02", 24, 28, 46)):
+        i = data.find(signature)
+        while i != -1:
+            length = struct.unpack_from("<H", data, i + name_at)[0]
+            if data[i + start:i + start + length] == b"word/media/fill.bin":
+                struct.pack_into("<I", data, i + at, 10)   # "unpacks to 10 bytes"
+            i = data.find(signature, i + 4)
+    with zipfile.ZipFile(io.BytesIO(bytes(data))) as z, pytest.raises(zipfile.BadZipFile):
+        z.read("word/media/fill.bin")
+    assert read_text(bytes(data), DOCX) == "Hi"   # the size check passes; the part is never read for text
+
+
 def test_files_read_sends_a_word_document_as_its_text_with_placeholders():
     fake = FakeClient([_message("ok")])
     client = wrap(fake, Redactor(FINANCE), files="read")

