@@ -1047,6 +1047,16 @@ def test_an_id_found_once_is_hidden_however_a_later_turn_spells_it():
     assert later == f"Is {placeholder} the same as {placeholder}?", later
 
 
+@pytest.mark.parametrize("text", [
+    "The reference number is AC-2EA6-KY4B-G6FX.\n\nIs AC 2EA6 KY4B G6FX the same as ac2ea6ky4bg6fx?",
+    "Is ac2ea6ky4bg6fx right? The reference number is AC-2EA6-KY4B-G6FX.",   # the run-together one first
+])
+def test_an_id_is_hidden_however_the_same_text_spells_it_again(text):
+    # a conversation sent as one text: its turns joined, as the earlier turns are sent again with each request
+    out = Redactor(FINANCE).redact_text(text)
+    assert "2EA6" not in out.upper() and len(set(re.findall(r"ID_\d+", out))) == 1, out
+
+
 @pytest.mark.parametrize("text, date", [
     ("Kinder: Mila, geb. 14.05.2023 (Kindergeld)", "14.05.2023"),
     ("Philippine, enfant, née le 07/03/2023", "07/03/2023"),
