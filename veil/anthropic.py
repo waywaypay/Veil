@@ -52,6 +52,11 @@ placeholder: ``restore={"add_member": "all", "notify": {"EMAIL"}}``, with
 ``"*"`` for any other tool, or ``restore="all"`` for every tool.  A tool it
 doesn't name gets placeholders, and a warning says so.
 
+A redactor belongs to one conversation, known by its first message: a request
+that starts with another raises ``ConversationError``, so one user's real
+values can't come back in another's conversation (``one_conversation=False``
+for an app that trims or rewrites the start of a conversation).
+
 Streaming isn't supported yet: ``stream=True`` raises, and so do
 ``messages.stream``, ``parse``, ``batches``, ``tool_runner`` and the raw
 response forms, which would otherwise send the request without placeholders.
@@ -62,7 +67,9 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import json
 import warnings
+import weakref
 from dataclasses import dataclass, field
 from typing import Any, Callable, Collection, Mapping
 
@@ -83,6 +90,15 @@ class GuardrailError(Exception):
 class FileError(Exception):
     """An image or PDF in a request couldn't be sent without what's in it, so nothing was sent.  The message is
     for the user."""
+
+
+class ConversationError(Exception):
+    """A request for another conversation reached a redactor that holds this one's values, so nothing was sent.
+    The message is for the developer."""
+
+
+# Each redactor's conversation, by a digest of its first message, however many sessions share the redactor.
+_CONVERSATIONS: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
 
 class McpError(Exception):
@@ -133,8 +149,10 @@ class Session:
                  files: str | Callable[[bytes, str], str] = "refuse",
                  restore: Mapping[str, Collection[str] | str | None] | str | None = None,
                  restore_urls: bool = False,
-                 user_location: str = "country", mcp_servers: str = "refuse", domains: str = "check"):
+                 user_location: str = "country", mcp_servers: str = "refuse", domains: str = "check",
+                 one_conversation: bool = True):
         self.redactor = redactor if redactor is not None else Redactor()
+        self.one_conversation = one_conversation
         if domains not in ("check", "send"):
             raise ValueError('domains must be "check" or "send"')
         self.domains = domains
@@ -169,6 +187,7 @@ class Session:
     def redact_request(self, request: dict) -> dict:
         """A copy of a Messages API request (``messages``, ``system`` ...) with placeholders in it, checked by
         the guardrail if there is one."""
+        first = self._check_conversation(request) if self.one_conversation else None
         if request.get("mcp_servers") and self.mcp_servers == "refuse":
             names = ", ".join(str(s.get("name") or s.get("url")) for s in request["mcp_servers"] if isinstance(s, dict))
             raise McpError(f"This request names MCP servers ({names}). Anthropic would call them itself, so what "
@@ -177,7 +196,27 @@ class Session:
         out = self._redact(request)
         if self.domains == "check":
             self._check_domains(request)
-        return self._guard(request, out) if self.guardrail is not None else out
+        out = self._guard(request, out) if self.guardrail is not None else out
+        if first is not None:   # a request that's sent: its first message is the redactor's conversation's now
+            _CONVERSATIONS.setdefault(self.redactor, first)
+        return out
+
+    def _check_conversation(self, request: dict) -> str | None:
+        """The digest of ``request``'s first message.  Raise ConversationError if it isn't the one the
+        redactor's conversation started with, which the first request it sent set."""
+        messages = request.get("messages") or []
+        if not messages:
+            return None
+        first = self._digest(json.dumps(_as_dict(messages[0]), sort_keys=True, default=lambda o: _as_dict(o)
+                                        if hasattr(o, "model_dump") else str(o)))
+        held = _CONVERSATIONS.get(self.redactor)
+        if held is not None and held != first:
+            raise ConversationError(
+                "This request starts with another first message than the conversation its redactor holds, so it "
+                "looks like another conversation, and that one's real values could come back in it. Nothing was "
+                "sent. Wrap a new client (or pass a new Redactor) for each conversation; if this is the same one "
+                "with its start trimmed or rewritten, pass one_conversation=False.")
+        return first
 
     def _check_domains(self, request: dict) -> None:
         """Raise DomainError if a tool's allowed or blocked domains name someone.  They can't be replaced with
@@ -638,7 +677,7 @@ def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system
          files: str | Callable[[bytes, str], str] = "refuse",
          restore: Mapping[str, Collection[str] | str | None] | str | None = None,
          restore_urls: bool = False, user_location: str = "country", mcp_servers: str = "refuse",
-         domains: str = "check") -> VeiledClient:
+         domains: str = "check", one_conversation: bool = True) -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
@@ -656,6 +695,10 @@ def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system
     what they return reaches the model as it is, or "send" it.
 
     ``domains``: "check" a web search or fetch tool's allowed and blocked domains (the default), refusing a
-    request whose domains name someone, or "send" them as they are."""
+    request whose domains name someone, or "send" them as they are.
+
+    ``one_conversation``: refuse a request that starts with another first message than the redactor's
+    conversation (the default), so one conversation's values can't come back in another; False for an app
+    that trims or rewrites the start of a conversation."""
     return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls,
-                                        user_location, mcp_servers, domains))
+                                        user_location, mcp_servers, domains, one_conversation))

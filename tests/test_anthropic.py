@@ -7,7 +7,17 @@ import warnings
 import pytest
 
 from veil import FINANCE, Redactor
-from veil.anthropic import TAX_ID_REMOVED, BlockError, DomainError, Findings, GuardrailError, McpError, Session, wrap
+from veil.anthropic import (
+    TAX_ID_REMOVED,
+    BlockError,
+    ConversationError,
+    DomainError,
+    Findings,
+    GuardrailError,
+    McpError,
+    Session,
+    wrap,
+)
 
 anthropic = pytest.importorskip("anthropic")
 from anthropic.types import Message  # noqa: E402
@@ -384,6 +394,47 @@ def test_all_and_none_mean_every_kind_and_a_tool_restore_doesnt_name_gets_none()
         wrap(FakeClient([]), restore="some")
     client = wrap(FakeClient([]), restore={"*": set()}, restore_urls=True)
     assert client.session.restore == {"*": set()} and client.session.restore_urls
+
+
+def _ask(text):
+    return [{"role": "user", "content": text}]
+
+
+def test_a_second_conversation_through_one_client_is_refused_and_nothing_is_sent():
+    fake = FakeClient([_message("ok"), _message("ok")])
+    client = wrap(fake)
+    first = _ask("Add Avery Mockridge, SSN 123-45-6789")
+    client.messages.create(model="m", max_tokens=1, messages=first)
+    client.messages.create(model="m", max_tokens=1, messages=first + [
+        {"role": "assistant", "content": "ok"}, {"role": "user", "content": "And her email?"}])   # the same one
+    with pytest.raises(ConversationError):
+        client.messages.create(model="m", max_tokens=1, messages=_ask("Hi, I'm Priya Patel"))
+    with pytest.raises(ConversationError):
+        client.beta.messages.create(model="m", max_tokens=1, messages=_ask("Hi, I'm Priya Patel"))
+    assert len(fake.requests) == 2
+
+
+def test_a_redactor_passed_to_another_client_keeps_to_its_conversation():
+    redactor = Redactor()
+    first = _ask("Add Avery Mockridge")
+    wrap(FakeClient([_message("ok")]), redactor).messages.create(model="m", max_tokens=1, messages=first)
+    later = FakeClient([_message("ok")])
+    wrap(later, redactor).messages.create(model="m", max_tokens=1, messages=first + [
+        {"role": "assistant", "content": "ok"}, {"role": "user", "content": "Thanks"}])
+    assert "NAME_001" in _sent(later)
+    with pytest.raises(ConversationError):
+        wrap(FakeClient([]), redactor).messages.create(model="m", max_tokens=1, messages=_ask("Someone else"))
+
+
+def test_a_refused_request_doesnt_claim_the_redactor_and_the_check_can_be_turned_off():
+    fake = FakeClient([_message("ok"), _message("ok")])
+    client = wrap(fake)
+    with pytest.raises(BlockError):
+        client.messages.create(model="m", max_tokens=1, messages=[{"role": "user", "content": [{"type": "new"}]}])
+    client.messages.create(model="m", max_tokens=1, messages=_ask("Add Avery Mockridge"))
+    trimmed = wrap(fake, client.redactor, one_conversation=False)
+    trimmed.messages.create(model="m", max_tokens=1, messages=_ask("(earlier turns trimmed) And her SSN?"))
+    assert len(fake.requests) == 2
 
 
 def test_other_attributes_pass_through():

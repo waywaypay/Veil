@@ -94,6 +94,16 @@ placeholders (`files`, `skills`, `beta.sessions`, `post` ...) raises
 `AttributeError`: call it on the client you wrapped if you mean to, knowing
 nothing sent through it is redacted.
 
+A redactor holds one conversation's real values, so it belongs to that
+conversation alone. The wrapper knows the conversation by its first message:
+a request that starts with a different one, through the same client or
+another client given the same redactor, raises `ConversationError` and
+nothing is sent, since one user's values could otherwise come back in
+another's conversation. Wrap a new client, or pass a new `Redactor`, for each
+conversation. An app that trims or rewrites the start of a conversation can
+pass `one_conversation=False`. Outside the wrapper, keeping one `Redactor` to
+one conversation is yours to do.
+
 ## Images and PDFs
 
 veil redacts text, and an image or PDF would reach the model with whatever
