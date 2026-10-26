@@ -156,6 +156,12 @@ embedded in the document, such as a spreadsheet or a PDF, makes
 `redact_docx` raise `ValueError`, since veil can't redact inside it. The one
 exception is a chart's own data: that is left out, and the chart stays.
 
+A Word document is a zip, and a small zip can unpack to gigabytes. One that
+would unpack to more than 256 MB, or that holds more than 10,000 files, is
+refused with `ValueError` before anything in it is read, by `read_text`,
+`redact_docx` and `restore_docx` alike. The limits are
+`veil.files.DOCX_MAX_UNPACKED` and `DOCX_MAX_PARTS`, if you need to raise them.
+
 ## Use it with anything else
 
 ```python
