@@ -1,6 +1,19 @@
+import json
+
 import pytest
 
-from veil.tagged import Span, TaggedRedactor, _join, chunks, extend_name, merged, veil_hidden
+from veil.tagged import (
+    LABELS,
+    SECRET_LABELS,
+    Span,
+    TaggedRedactor,
+    _join,
+    chunks,
+    extend_name,
+    merged,
+    model_labels,
+    veil_hidden,
+)
 
 
 def test_chunks_keep_offsets():
@@ -87,3 +100,34 @@ def test_one_piece_per_model_call_by_default():
     r._model = Model()
     r.model_spans(["word " * 450, "Maria Lopez called"])
     assert Model.calls and set(Model.calls) == {1}   # a batch pads every piece to its longest: slower on a CPU
+
+
+def test_secret_labels_only_for_a_model_trained_on_them():
+    assert model_labels({}) == LABELS   # round 7's model: asked for what it was trained on, and nothing more
+    assert model_labels({"veil_labels": ["api key", "not a label"]}) == {**LABELS, "api key": "ID"}
+    assert model_labels({"veil_labels": list(SECRET_LABELS)}) == {**LABELS, **SECRET_LABELS}
+
+
+@pytest.mark.parametrize("trained", [[], ["password or access code", "api key"]])
+def test_a_model_is_asked_for_the_labels_its_config_lists(tmp_path, monkeypatch, trained):
+    import veil.onnx_tagger
+
+    asked = []
+
+    class Model:
+        without_torch = True
+
+        def __init__(self, folder, onnx_file):
+            pass
+
+        def batch_predict_entities(self, pieces, labels, threshold):
+            asked.append(labels)
+            return [[{"start": p.index("sk-"), "end": len(p) - 1, "label": "api key", "score": 0.9}]
+                    if "sk-" in p and "api key" in labels else [] for p in pieces]
+
+    (tmp_path / "gliner_config.json").write_text(json.dumps({"span_mode": "token_level", "veil_labels": trained}))
+    monkeypatch.setattr(veil.onnx_tagger, "OnnxTagger", Model)
+    r = TaggedRedactor(model=f"{tmp_path}::onnx/model_f16.onnx")
+    found = r.model_spans(["My key is sk-abc123def456."])
+    assert set(asked[0]) == set(LABELS) | set(trained)
+    assert found == ([[(10, 25, "ID", 0.9)]] if trained else [[]])

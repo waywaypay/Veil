@@ -8,7 +8,8 @@ context (`text[start:end]`, Python offsets) and give one verdict.
 
 * `personal:<label>`: a private person's detail, which a redactor should hide. Labels: `name`, `username`,
   `email address`, `phone number`, `street address`, `date of birth`, `account number`, `credit card number`,
-  `customer id`, `employee id`, `tax id`, `ssn`, `passport number`, `driver license number`, `iban`.
+  `customer id`, `employee id`, `tax id`, `ssn`, `passport number`, `driver license number`, `iban`, and from round
+  10 on `password or access code` and `api key` (as `docgen/RULES.md` defines them).
   * A private person: the poster's friends, family, classmates, colleagues, a local shopkeeper, a person the poster
     talks to or about who isn't known to the public.
   * An `@handle` of a private person's account is `personal:username` (cover the whole handle, `@` included).
@@ -67,7 +68,9 @@ family, friends, colleagues, a landlord, a teacher; their contact details and nu
 `public` for a public figure, an author cited in a reference list or a fictional character (including characters in
 a story or role-play the user is writing), `ordinary` for anything else (words, places, companies, products, code
 identifiers, placeholder names like John Doe), `business` for an organisation's own contact details, `unsure` when you
-can't tell.
+can't tell. A user's own password, PIN, access code or API key is `personal:password or access code` or
+`personal:api key`; an example key in documentation, a placeholder (`sk-...`, `YOUR_API_KEY`) or a code that belongs
+to no one (an order, ticket, booking or tracking number, a version, a hash) is `ordinary`.
 
 ## Locked sets
 
