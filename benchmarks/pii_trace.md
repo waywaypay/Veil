@@ -13,16 +13,20 @@ python benchmarks/pii_trace.py --split test                                  # a
 python benchmarks/pii_trace.py --split test --drop private_date,private_url  # the labels veil sets out to hide
 ```
 
-The scoring is described at the top of the script. "Exact" is the dataset card's metric. "Char" is the blog's
-headline metric. "Contained" and "consistent" are closest to what veil is for: a detail is hidden only if all of it
+The scoring is described at the top of the script. "Exact" is the dataset card's metric. "Char" is the report's
+primary metric. "Contained" and "consistent" are closest to what veil is for: a detail is hidden only if all of it
 is hidden.
 
 ## Read this first
 
-* **The subset is not a clean test for PII-Tracer.** The dataset card says the subset "may be used for training"
-  and doesn't say whether PII-Tracer was trained on it. On its own 1,922-conversation test split, the blog gives
-  PII-Tracer a character F1 of 0.629. Here it scores about 0.98. Its numbers below are best read as an upper bound.
-  veil's tagger has never seen these conversations.
+* **The subset may not be a clean test for PII-Tracer.** The dataset card says the subset "may be used for
+  training" and doesn't say whether PII-Tracer was trained on it. veil's tagger has never seen these conversations.
+* **The 0.629 in the report is a harder test, not evidence either way.** The report gives PII-Tracer a character F1
+  of 0.629 (precision 0.507, recall 0.830; Table 3) on the full benchmark's test split: 1,922 conversations in 13
+  languages, 463 of them over 10,000 characters, each read in one 4,096-token window. With overlapping windows it
+  gets 0.653. On that split's conversations under 1,000 characters its recall is 0.975, close to what it gets here,
+  and most of the gap to the 0.98 below is precision. The public subset is English and every conversation is under
+  2,500 characters, so the difference in scores doesn't show whether PII-Tracer was trained on it.
 * **veil's rules were tuned on half of it.** After the first run, three rules were added from what veil missed: codes
   in groups of letters and digits, phone extensions after a comma, and an ID found in one turn hidden however a later
   turn spells it. They were tuned on the dev half (237 conversations; `--split dev`, by a hash of each ID). The test
