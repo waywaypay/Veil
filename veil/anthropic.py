@@ -16,6 +16,10 @@ values.  Use one redactor per conversation.  Thinking blocks go back exactly
 as they came.  The tools' descriptions and ``metadata`` are redacted too, and
 web search's ``user_location`` goes with its country and timezone only, not
 its city or region (``user_location="send"`` sends it all, ``"drop"`` none).
+A web search or fetch tool's ``allowed_domains`` and ``blocked_domains`` are
+checked, since a placeholder would break them: one that names a person or an
+email domain of this conversation's, or holds anything veil would hide, raises
+``DomainError`` unless ``domains="send"``.
 A request with ``mcp_servers`` raises ``McpError`` unless ``mcp_servers="send"``:
 Anthropic calls those servers itself, so what they return reaches the model
 without placeholders.  A
@@ -83,6 +87,10 @@ class McpError(Exception):
     sent.  The message is for the user."""
 
 
+class DomainError(Exception):
+    """A tool's allowed or blocked domains name someone, so nothing was sent.  The message is for the user."""
+
+
 class BlockError(Exception):
     """A content block of a kind veil doesn't know how to redact, so nothing was sent.  The message is for the
     user."""
@@ -121,8 +129,11 @@ class Session:
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
                  files: str | Callable[[bytes, str], str] = "refuse",
                  restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False,
-                 user_location: str = "country", mcp_servers: str = "refuse"):
+                 user_location: str = "country", mcp_servers: str = "refuse", domains: str = "check"):
         self.redactor = redactor if redactor is not None else Redactor()
+        if domains not in ("check", "send"):
+            raise ValueError('domains must be "check" or "send"')
+        self.domains = domains
         if mcp_servers not in ("refuse", "send"):
             raise ValueError('mcp_servers must be "refuse" or "send"')
         self.mcp_servers = mcp_servers
@@ -155,7 +166,45 @@ class Session:
                            "they return would reach the model without placeholders. Nothing was sent. Pass "
                            'mcp_servers="send" to let them, or call those tools yourself as your own tools.')
         out = self._redact(request)
+        if self.domains == "check":
+            self._check_domains(request)
         return self._guard(request, out) if self.guardrail is not None else out
+
+    def _check_domains(self, request: dict) -> None:
+        """Raise DomainError if a tool's allowed or blocked domains name someone.  They can't be replaced with
+        placeholders, which would break the filter, so a request with one isn't sent."""
+        named = []
+        for tool in request.get("tools") or []:
+            t = _as_dict(tool)
+            for key in ("allowed_domains", "blocked_domains"):
+                for domain in (t.get(key) if isinstance(t, dict) else None) or []:
+                    if isinstance(domain, str) and self._personal_domain(domain):
+                        named.append(domain)
+        if named:
+            raise DomainError(f"A tool's allowed or blocked domains ({', '.join(dict.fromkeys(named))}) name someone "
+                              "in this conversation or hold personal information, and a placeholder there would "
+                              'break the filter. Nothing was sent. Pass domains="send" to send them as they are.')
+
+    def _personal_domain(self, domain: str) -> bool:
+        """Whether ``domain`` holds what veil would hide, an email domain of this conversation's (other than a
+        common mail service's), or a known person's surname or whole name run together."""
+        if self.redactor.redact_text(domain) != domain:
+            return True
+        host = domain.casefold().strip().lstrip("*.")
+        letters = "".join(c for c in host if c.isalpha())
+        for placeholder, real in self.redactor.mapping.items():
+            kind = placeholder.rsplit("_", 1)[0]
+            if kind == "EMAIL" and "@" in real:
+                mail = real.rsplit("@", 1)[1].casefold()
+                if mail not in _MAIL_SERVICES and (host == mail or host.endswith("." + mail)):
+                    return True
+            elif kind == "NAME":
+                words = ["".join(c for c in w if c.isalpha()) for w in real.casefold().replace(",", " ").split()]
+                words = [w for w in words if len(w) > 1]
+                whole = "".join(words)
+                if (len(whole) >= 6 and whole in letters) or any(len(w) >= 5 and w in letters for w in words[-1:]):
+                    return True
+        return False
 
     def _redact(self, request: dict) -> dict:
         out = dict(request)
@@ -483,6 +532,12 @@ class _Messages:
                              "without placeholders.")
 
 
+# Mail services whose domain says nothing about whose address it is.
+_MAIL_SERVICES = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com",
+                  "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com", "gmx.com", "gmx.de",
+                  "mail.com", "zoho.com", "yandex.com", "fastmail.com", "hey.com"}
+
+
 # What a wrapped client hands out as it is: its settings, and the models list, which sends nothing of yours.
 # Everything else (files, skills, managed agents, raw post and request ...) would send requests without
 # placeholders, so it isn't offered; call it on the client you wrapped, knowing nothing sent through it is
@@ -566,7 +621,8 @@ class VeiledClient:
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
          files: str | Callable[[bytes, str], str] = "refuse",
          restore: Mapping[str, Collection[str] | str | None] | None = None,
-         restore_urls: bool = False, user_location: str = "country", mcp_servers: str = "refuse") -> VeiledClient:
+         restore_urls: bool = False, user_location: str = "country", mcp_servers: str = "refuse",
+         domains: str = "check") -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
@@ -581,6 +637,9 @@ def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system
     default), "send" (all of it, city and region too) or "drop" (none).
 
     ``mcp_servers``: "refuse" a request that names MCP servers (the default), since Anthropic calls them and
-    what they return reaches the model as it is, or "send" it."""
+    what they return reaches the model as it is, or "send" it.
+
+    ``domains``: "check" a web search or fetch tool's allowed and blocked domains (the default), refusing a
+    request whose domains name someone, or "send" them as they are."""
     return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls,
-                                        user_location, mcp_servers))
+                                        user_location, mcp_servers, domains))

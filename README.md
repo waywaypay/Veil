@@ -66,7 +66,14 @@ values. That covers what the user typed, tool results, the system prompt and
 the model's earlier turns, and also the tools' descriptions and `metadata`.
 Web search's `user_location` goes with only its country and timezone, so
 neither Anthropic nor the search provider learns the user's city or region
-(`user_location="send"` sends it all, `"drop"` sends none of it). A request
+(`user_location="send"` sends it all, `"drop"` sends none of it). A web
+search or fetch tool's `allowed_domains` and `blocked_domains` can't take
+placeholders, which would break the filter, so they are checked instead: a
+domain that holds anything veil would hide, an email domain from the
+conversation (not a mail service's, like gmail.com), or a known person's
+surname or whole name (`mockridge-law.com`, `averymockridge.com`) raises
+`DomainError` and nothing is sent. Pass `domains="send"` to send them as
+they are. A request
 that names `mcp_servers` raises `McpError` and nothing is sent: Anthropic calls
 those servers itself, so what they return would reach the model without
 placeholders. Pass `mcp_servers="send"` to let them, or call those tools

@@ -1,11 +1,12 @@
 """Claude through placeholders: what's sent holds none of it, and what comes back has it again."""
 
 import json
+import re
 
 import pytest
 
 from veil import FINANCE, Redactor
-from veil.anthropic import TAX_ID_REMOVED, BlockError, Findings, GuardrailError, McpError, Session, wrap
+from veil.anthropic import TAX_ID_REMOVED, BlockError, DomainError, Findings, GuardrailError, McpError, Session, wrap
 
 anthropic = pytest.importorskip("anthropic")
 from anthropic.types import Message  # noqa: E402
@@ -250,6 +251,35 @@ def test_web_search_sends_only_as_much_of_the_users_location_as_it_is_told(optio
     assert _SEARCH["user_location"]["city"] == "Springfield"   # the caller's tool is left as it was
 
 
+_ABOUT_AVERY = [{"role": "user", "content": "Research Avery Mockridge (avery@mockridgefamily.com, jo@gmail.com)."}]
+
+
+@pytest.mark.parametrize("key", ["allowed_domains", "blocked_domains"])
+@pytest.mark.parametrize("domain", ["mockridgefamily.com", "*.mockridgefamily.com", "averymockridge.com",
+                                    "avery-mockridge.com", "mockridge-law.com", "123-45-6789.example.com"])
+def test_domains_that_name_someone_are_refused_and_nothing_is_sent(key, domain):
+    fake = FakeClient([])
+    tool = {"type": "web_fetch_20250910", "name": "web_fetch", key: ["sec.gov", domain]}
+    with pytest.raises(DomainError, match=re.escape(domain)):
+        wrap(fake).messages.create(model="m", max_tokens=1, tools=[tool], messages=_ABOUT_AVERY)
+    assert fake.requests == []
+
+
+def test_ordinary_domains_go_as_they_are():
+    fake = FakeClient([_message("ok")])
+    tool = {**_SEARCH, "allowed_domains": ["sec.gov", "gmail.com", "nytimes.com", "avery.com"]}
+    wrap(fake).messages.create(model="m", max_tokens=1, tools=[tool], messages=_ABOUT_AVERY)
+    assert fake.requests[0]["tools"][0]["allowed_domains"] == tool["allowed_domains"]
+
+
+def test_domains_go_as_they_are_when_told():
+    fake = FakeClient([_message("ok")])
+    tool = {**_SEARCH, "allowed_domains": ["mockridgefamily.com"]}
+    wrap(fake, domains="send").messages.create(model="m", max_tokens=1, tools=[tool], messages=_ABOUT_AVERY)
+    assert fake.requests[0]["tools"][0]["allowed_domains"] == ["mockridgefamily.com"]
+    assert "Mockridge" not in json.dumps(fake.requests[0]["messages"])
+
+
 _MCP = [{"type": "url", "url": "https://crm.example/mcp", "name": "crm", "authorization_token": "tok"}]
 
 
@@ -284,6 +314,8 @@ def test_user_location_must_be_a_known_choice():
         wrap(FakeClient([]), user_location="city")
     with pytest.raises(ValueError, match="mcp_servers"):
         wrap(FakeClient([]), mcp_servers="read")
+    with pytest.raises(ValueError, match="domains"):
+        wrap(FakeClient([]), domains="drop")
 
 
 def test_tool_descriptions_stay_as_written_without_redact_system():
