@@ -71,8 +71,13 @@ A content block of a kind veil doesn't know raises `BlockError`, and nothing
 is sent. Streaming isn't supported yet: `stream=True` raises an error, and so
 do `messages.stream`, `parse`, `batches`, `tool_runner`, the raw response
 forms and the legacy `completions`, which would otherwise send the request
-without placeholders. `client.with_options(...)` and `client.copy(...)` give a
-wrapped client for the same conversation.
+without placeholders. `client.with_options(...)`, `client.copy(...)` and
+`client.with_middleware(...)` give a wrapped client for the same conversation.
+Besides `messages`, the wrapped client offers only its settings (`api_key`,
+`timeout`, `aws_region` ...) and `models`. Anything else it would send without
+placeholders (`files`, `skills`, `beta.sessions`, `post` ...) raises
+`AttributeError`: call it on the client you wrapped if you mean to, knowing
+nothing sent through it is redacted.
 
 ## Images and PDFs
 

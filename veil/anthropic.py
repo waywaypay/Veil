@@ -450,6 +450,21 @@ class _Messages:
                              "without placeholders.")
 
 
+# What a wrapped client hands out as it is: its settings, and the models list, which sends nothing of yours.
+# Everything else (files, skills, managed agents, raw post and request ...) would send requests without
+# placeholders, so it isn't offered; call it on the client you wrapped, knowing nothing sent through it is
+# redacted.
+_SETTINGS = {"api_key", "auth_token", "access_token", "auth_headers", "custom_auth", "credentials", "base_url",
+             "timeout", "max_retries", "default_headers", "default_query", "platform_headers", "user_agent", "qs",
+             "middleware", "open_telemetry", "webhook_key", "aws_region", "aws_access_key", "aws_secret_key",
+             "aws_session_token", "aws_profile", "region", "project_id", "close", "is_closed", "models"}
+
+
+def _not_offered(name: str) -> AttributeError:
+    return AttributeError(f"veil doesn't wrap {name}, so it isn't offered: it would send requests without "
+                          "placeholders. Call it on the client you wrapped if you mean it to.")
+
+
 class _Beta:
     def __init__(self, beta, session: Session):
         self._beta = beta
@@ -464,13 +479,17 @@ class _Beta:
         raise _unwrapped("with_streaming_response", "beta.")
 
     def __getattr__(self, name):
+        if name != "models":
+            raise _not_offered(f"beta.{name}")
         return getattr(self._beta, name)
 
 
 class VeiledClient:
     """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders.
-    ``with_options`` and ``copy`` give another one, with the same conversation; the legacy ``completions`` and
-    the raw response forms, which would send the request without placeholders, raise."""
+    ``with_options``, ``copy`` and ``with_middleware`` give another one, with the same conversation.  Its
+    settings and ``models`` are the wrapped client's; nothing else is offered (``files``, ``post`` ...), and the
+    legacy ``completions`` and the raw response forms raise, since they would send requests without
+    placeholders."""
 
     def __init__(self, client, session: Session):
         self._client = client
@@ -489,6 +508,9 @@ class VeiledClient:
     def copy(self, *args, **kwargs) -> VeiledClient:
         return VeiledClient(self._client.copy(*args, **kwargs), self.session)
 
+    def with_middleware(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.with_middleware(*args, **kwargs), self.session)
+
     @property
     def completions(self):
         raise NotImplementedError("veil doesn't redact the legacy Text Completions API (completions), so it would "
@@ -503,6 +525,8 @@ class VeiledClient:
         raise _unwrapped("with_streaming_response", "")
 
     def __getattr__(self, name):
+        if name not in _SETTINGS:
+            raise _not_offered(f"client.{name}")
         return getattr(self._client, name)
 
 

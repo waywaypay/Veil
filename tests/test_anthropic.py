@@ -149,6 +149,40 @@ def test_a_client_with_other_options_still_goes_through_placeholders(make):
         other.messages.stream(model="m", max_tokens=1, messages=[])
 
 
+@pytest.mark.parametrize("path", ["files", "skills", "post", "request", "get_api_list", "organization",
+                                  "beta.files", "beta.sessions", "beta.agents", "beta.vaults", "no_such_thing"])
+def test_what_veil_doesnt_wrap_isnt_offered(path):
+    client = wrap(anthropic.Anthropic(api_key="k"))
+    owner = client.beta if path.startswith("beta.") else client
+    with pytest.raises(AttributeError, match="isn't offered"):
+        getattr(owner, path.removeprefix("beta."))
+    assert not hasattr(owner, path.removeprefix("beta."))
+
+
+def test_settings_and_the_models_list_are_the_wrapped_clients():
+    raw = anthropic.Anthropic(api_key="k", base_url="https://example.test", max_retries=7)
+    client = wrap(raw)
+    assert (client.api_key, client.base_url, client.max_retries) == ("k", raw.base_url, 7)
+    assert client.models is raw.models and client.beta.models is raw.beta.models
+    assert not client.is_closed()
+
+
+def test_bedrock_and_vertex_settings_are_offered():
+    bedrock = wrap(anthropic.AnthropicBedrock(aws_region="us-east-1", aws_access_key="a", aws_secret_key="b"))
+    assert bedrock.aws_region == "us-east-1"
+    vertex = wrap(anthropic.AnthropicVertex(region="us-east5", project_id="p", access_token="t"))
+    assert (vertex.region, vertex.project_id) == ("us-east5", "p")
+
+
+def test_a_client_with_middleware_still_goes_through_placeholders():
+    raw = anthropic.Anthropic(api_key="k")
+    if not hasattr(raw, "with_middleware"):
+        pytest.skip("this SDK has no middleware")
+    client = wrap(raw)
+    other = client.with_middleware()
+    assert isinstance(other, type(client)) and other.session is client.session
+
+
 def test_search_results_are_redacted_alone_and_inside_a_tool_result():
     s = Session(Redactor(FINANCE))
     found = {"type": "search_result", "source": "https://crm/jane@example.com", "title": "Avery Mockridge, LP",
