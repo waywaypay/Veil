@@ -174,7 +174,7 @@ def test_read_text_reads_a_pdf():
 
 @needs_ocr
 def test_read_text_reads_an_image_and_a_scanned_pdf():
-    pytest.importorskip("pytesseract")
+    pytest.importorskip("PIL")
     pytest.importorskip("pypdf")
     from veil.files import read_text
     picture = _picture_of("SSN 123-45-6789")
@@ -187,7 +187,7 @@ def test_read_text_reads_an_image_and_a_scanned_pdf():
 
 @needs_ocr
 def test_files_read_sends_no_taxpayer_id_from_a_scan():
-    pytest.importorskip("pytesseract")
+    pytest.importorskip("PIL")
     png = io.BytesIO()
     _picture_of("SSN 123-45-6789").save(png, format="PNG")
     fake = FakeClient([_message("ok")])

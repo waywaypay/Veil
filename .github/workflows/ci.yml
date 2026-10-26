@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,11 +15,23 @@ jobs:
       matrix:
         python: ["3.10", "3.12", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: ${{ matrix.python }}
       - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
-      - run: pip install -e ".[dev]"
+      - run: pip install --require-hashes -r requirements/dev.txt
+      - run: pip install --no-deps -e .
       - run: ruff check .
       - run: pytest -q
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install --require-hashes -r requirements/audit.txt
+      - run: pip-audit --strict --require-hashes --disable-pip -r requirements/dev.txt
+      - run: pip-audit --strict --require-hashes --disable-pip -r requirements/audit.txt
