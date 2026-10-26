@@ -471,7 +471,11 @@ sent:
   `GuardrailError`, the call raises `GuardrailError` and nothing is sent.
 
 Replies are checked too. A taxpayer ID in a reply is taken out, because the
-model only ever saw placeholders and shouldn't have written one.
+model only ever saw placeholders and shouldn't have written one. So are the
+inputs of the tool calls in a reply, as the model wrote them (with
+placeholders), before the real values go back: a taxpayer ID in one is taken
+out, and if the guardrail objects to a call or can't check it, `create` raises
+`GuardrailError` so that no tool runs on it.
 
 ## Development
 
