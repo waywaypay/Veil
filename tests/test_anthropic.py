@@ -1,5 +1,6 @@
 """Claude through placeholders: what's sent holds none of it, and what comes back has it again."""
 
+import inspect
 import json
 import re
 import warnings
@@ -435,6 +436,74 @@ def test_a_refused_request_doesnt_claim_the_redactor_and_the_check_can_be_turned
     trimmed = wrap(fake, client.redactor, one_conversation=False)
     trimmed.messages.create(model="m", max_tokens=1, messages=_ask("(earlier turns trimmed) And her SSN?"))
     assert len(fake.requests) == 2
+
+
+class FakeAsyncClient(FakeClient):
+    async def create(self, **kwargs):
+        return FakeClient.create(self, **kwargs)
+
+    async def count_tokens(self, **kwargs):
+        return FakeClient.create(self, **kwargs)
+
+
+def test_an_async_client_goes_through_placeholders_and_tools_get_real_values_back():
+    import asyncio
+
+    fake = FakeAsyncClient([_message("Adding NAME_001.", ("t1", "add_member", {"name": "NAME_001", "ssn": "SSN_001"})),
+                            _message("ok")])
+    client = wrap(fake, Redactor(FINANCE), restore={"add_member": "all"})
+    messages = [{"role": "user", "content": "Add Avery Mockridge (SSN 123-45-6789) as an LP"}]
+
+    async def run():
+        reply = await client.messages.create(model="m", max_tokens=10, messages=messages)
+        await client.beta.messages.count_tokens(model="m", messages=messages)
+        with pytest.raises(NotImplementedError):
+            await client.messages.create(model="m", max_tokens=1, stream=True, messages=messages)
+        with pytest.raises(ConversationError):
+            await client.messages.create(model="m", max_tokens=1, messages=_ask("Someone else"))
+        return reply
+
+    reply = asyncio.run(run())
+    assert reply.content[0].text == "Adding Avery Mockridge."
+    assert reply.content[1].input == {"name": "Avery Mockridge", "ssn": "123-45-6789"}
+    assert len(fake.requests) == 2 and "Mockridge" not in _sent(fake) and "123-45-6789" not in _sent(fake)
+
+
+def test_the_real_async_sdk_client_sends_only_placeholders_and_gets_real_values_back():
+    import asyncio
+
+    httpx = pytest.importorskip("httpx2")   # the HTTP client the SDK is built on
+    sent = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json={
+            "id": "msg", "type": "message", "role": "assistant", "model": "m", "stop_reason": "end_turn",
+            "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 1},
+            "content": [{"type": "text", "text": "Done for NAME_001."}]})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            client = wrap(anthropic.AsyncAnthropic(api_key="k", http_client=http))
+            return await client.messages.create(model="m", max_tokens=10,
+                                                messages=[{"role": "user", "content": "File it for Avery Mockridge"}])
+
+    reply = asyncio.run(run())
+    assert sent[0]["messages"][0]["content"] == "File it for NAME_001"
+    assert reply.content[0].text == "Done for Avery Mockridge."
+
+
+@pytest.mark.parametrize("make", [
+    lambda: anthropic.AsyncAnthropic(api_key="k"),
+    lambda: anthropic.AsyncAnthropicBedrock(aws_region="us-east-1", aws_access_key="a", aws_secret_key="b"),
+    lambda: anthropic.AsyncAnthropicVertex(region="us-east5", project_id="p", access_token="t")])
+def test_async_clients_are_awaited_and_keep_what_they_refuse(make):
+    client = wrap(make())
+    for messages in (client.messages, client.beta.messages, client.with_options(timeout=5).messages):
+        assert inspect.iscoroutinefunction(messages.create)
+        with pytest.raises(NotImplementedError):
+            messages.stream(model="m", max_tokens=1, messages=[])
+    assert not inspect.iscoroutinefunction(wrap(anthropic.Anthropic(api_key="k")).messages.create)
 
 
 def test_other_attributes_pass_through():

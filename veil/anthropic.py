@@ -57,6 +57,10 @@ that starts with another raises ``ConversationError``, so one user's real
 values can't come back in another's conversation (``one_conversation=False``
 for an app that trims or rewrites the start of a conversation).
 
+An async client (``anthropic.AsyncAnthropic`` ...) is wrapped the same way, and
+its ``messages.create`` is awaited as usual.  The redacting itself, and any
+reading of files or guardrail check, runs in the event loop's thread.
+
 Streaming isn't supported yet: ``stream=True`` raises, and so do
 ``messages.stream``, ``parse``, ``batches``, ``tool_runner`` and the raw
 response forms, which would otherwise send the request without placeholders.
@@ -67,6 +71,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import inspect
 import json
 import warnings
 import weakref
@@ -608,10 +613,32 @@ def _not_offered(name: str) -> AttributeError:
                           "placeholders. Call it on the client you wrapped if you mean it to.")
 
 
+class _AsyncMessages(_Messages):
+    """``_Messages`` for an async client: ``create`` and ``count_tokens`` are awaited."""
+
+    async def create(self, **request):
+        if request.get("stream"):
+            raise NotImplementedError("veil doesn't redact streamed replies yet; call without stream=True.")
+        create = self._messages.create
+        response = await create(**self._session.redact_request(request))
+        return self._session.restore_response(response)
+
+    async def count_tokens(self, **request):
+        count_tokens = self._messages.count_tokens
+        return await count_tokens(**self._session.redact_request(request))
+
+
+def _messages(messages, session: Session) -> _Messages:
+    """The SDK's ``messages`` through placeholders, awaited if it's an async client's."""
+    create = getattr(messages, "create", None)   # the SDK's own is behind a decorator that hides it's async
+    is_async = create is not None and inspect.iscoroutinefunction(inspect.unwrap(create))
+    return (_AsyncMessages if is_async else _Messages)(messages, session)
+
+
 class _Beta:
     def __init__(self, beta, session: Session):
         self._beta = beta
-        self.messages = _Messages(beta.messages, session)
+        self.messages = _messages(beta.messages, session)
 
     @property
     def with_raw_response(self):
@@ -637,7 +664,7 @@ class VeiledClient:
     def __init__(self, client, session: Session):
         self._client = client
         self.session = session
-        self.messages = _Messages(client.messages, session)
+        self.messages = _messages(client.messages, session)
         if hasattr(client, "beta"):
             self.beta = _Beta(client.beta, session)
 

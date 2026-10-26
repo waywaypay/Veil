@@ -104,6 +104,11 @@ conversation. An app that trims or rewrites the start of a conversation can
 pass `one_conversation=False`. Outside the wrapper, keeping one `Redactor` to
 one conversation is yours to do.
 
+An async client (`anthropic.AsyncAnthropic`, `AsyncAnthropicBedrock`,
+`AsyncAnthropicVertex`) is wrapped the same way, and `await
+client.messages.create(...)` works as usual. The redacting, and any file
+reading or guardrail check, runs in the event loop's thread.
+
 ## Images and PDFs
 
 veil redacts text, and an image or PDF would reach the model with whatever
