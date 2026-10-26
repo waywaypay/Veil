@@ -116,7 +116,7 @@ def test_a_tool_call_through_the_wrapper_gets_the_exact_amount_back():
 
     from veil.anthropic import wrap
     fake = FakeClient([_message("Paying AMOUNT_001.", ("t1", "pay", {"amount": "AMOUNT_001"}))])
-    client = wrap(fake, Redactor(FINANCE, amounts="all", reveal={"AMOUNT": "round"}))
+    client = wrap(fake, Redactor(FINANCE, amounts="all", reveal={"AMOUNT": "round"}), restore="all")
     reply = client.messages.create(model="m", max_tokens=100,
                                    messages=[{"role": "user", "content": "Pay invoice 7 for $1,339,032.49"}])
     assert "1,339,032" not in str(fake.requests) and "AMOUNT_001 (about $1.3M)" in str(fake.requests)
