@@ -12,7 +12,7 @@ Write each detail as `⟦label|text⟧`, the text exactly as it appears in the d
 |---|---|
 | `name` | a private person's name: full name, first name alone, surname alone, initials with a surname, a nickname, written any way (all caps, "Last, First", with a middle initial) |
 | `email address` | a person's email address, also obfuscated ("jane at example dot com") |
-| `phone number` | a person's phone or fax number, any format, any country |
+| `phone number` | a person's phone or fax number, any format, any country, with its extension in the span ("+1 202 555 0137 ext 204") |
 | `street address` | a person's street address: the street line, and the town, region, postcode and country written with it, as one span (span lines if it's written over lines) |
 | `ssn` | a US Social Security number, also masked ("XXX-XX-1234") |
 | `tax id` | an EIN, ITIN, or another country's tax or national identity number (UK National Insurance number, Canadian SIN, Indian Aadhaar or PAN, German Steuer-ID, Italian codice fiscale, Spanish DNI/NIE...) |
@@ -26,11 +26,16 @@ Write each detail as `⟦label|text⟧`, the text exactly as it appears in the d
 | `username` | a person's username, login, handle (@handle), or a username inside a file path or URL |
 | `passport number` | a passport number |
 | `driver license number` | a driver's licence number |
+| `password or access code` | a person's password, PIN, passcode, door or alarm code, verification or one-time code, recovery or backup code, Wi-Fi password, or answer to a security question (from round 10 on) |
+| `api key` | an API key, access token or private key, the secret value only: not the setting's name, the host or the username beside it (from round 10 on) |
 
 Never mark: companies, shops, banks, hospitals, schools, government bodies, products, brands; a town, region or
 country named alone; public figures (politicians, celebrities, authors, historical people); fictional characters;
 job titles and roles ("the tenant", "Dr."); dates that aren't a birth date; amounts, prices, percentages, order or
-invoice numbers, case numbers, form and line numbers, tracking numbers, version numbers, IP addresses. A title or
+invoice numbers, case and ticket numbers, booking references and reservation codes, form and line numbers, tracking
+numbers, SKUs, version and build numbers, commit hashes, request and error IDs, IP addresses; a company's own phone
+number, email or address. A code of letters and digits is marked by what it is in context, not by how it looks: a
+member number is marked, an order number written the same way isn't. A title or
 honorific before a name (Mr., Dr., Herr, Mme) stays outside the span: `Dr. ⟦name|Okafor⟧`.
 
 ## What to write
