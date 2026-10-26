@@ -121,6 +121,34 @@ def test_the_real_sdk_has_nothing_on_messages_that_skips_veil():
             getattr(client.messages, name)
 
 
+def test_the_legacy_completions_api_is_refused_rather_than_sent_unredacted():
+    fake = FakeClient([])
+    fake.completions = fake
+    client = wrap(fake)
+    with pytest.raises(NotImplementedError, match="completions"):
+        client.completions.create(model="m", max_tokens_to_sample=1, prompt="\n\nHuman: jane@example.com")
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("path", ["with_raw_response", "with_streaming_response",
+                                  "beta.with_raw_response", "beta.with_streaming_response"])
+def test_raw_response_forms_of_the_client_are_refused(path):
+    client = wrap(anthropic.Anthropic(api_key="k"))
+    owner = client.beta if path.startswith("beta.") else client
+    with pytest.raises(NotImplementedError):
+        getattr(owner, path.removeprefix("beta."))
+
+
+@pytest.mark.parametrize("make", [lambda c: c.with_options(timeout=5, max_retries=1), lambda c: c.copy(timeout=5)])
+def test_a_client_with_other_options_still_goes_through_placeholders(make):
+    client = wrap(anthropic.Anthropic(api_key="k"), Redactor(FINANCE))
+    other = make(client)
+    assert isinstance(other, type(client)) and other.session is client.session
+    assert other.timeout == 5 and other.messages._session is client.session
+    with pytest.raises(NotImplementedError):
+        other.messages.stream(model="m", max_tokens=1, messages=[])
+
+
 def test_search_results_are_redacted_alone_and_inside_a_tool_result():
     s = Session(Redactor(FINANCE))
     found = {"type": "search_result", "source": "https://crm/jane@example.com", "title": "Avery Mockridge, LP",

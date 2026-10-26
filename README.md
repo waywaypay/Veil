@@ -69,8 +69,10 @@ In the reply, text and tool-call inputs come back with the real values
 Thinking blocks, and the results of Anthropic's own tools, go back unchanged.
 A content block of a kind veil doesn't know raises `BlockError`, and nothing
 is sent. Streaming isn't supported yet: `stream=True` raises an error, and so
-do `messages.stream`, `parse`, `batches`, `tool_runner` and the raw response
-forms, which would otherwise send the request without placeholders.
+do `messages.stream`, `parse`, `batches`, `tool_runner`, the raw response
+forms and the legacy `completions`, which would otherwise send the request
+without placeholders. `client.with_options(...)` and `client.copy(...)` give a
+wrapped client for the same conversation.
 
 ## Images and PDFs
 

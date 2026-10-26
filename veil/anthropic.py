@@ -402,8 +402,8 @@ def _strings(value: Any, fix: Callable[[str], str]) -> Any:
     return value
 
 
-def _unwrapped(name: str) -> NotImplementedError:
-    return NotImplementedError(f"veil doesn't redact messages.{name} yet, so it would send the request without "
+def _unwrapped(name: str, where: str = "messages.") -> NotImplementedError:
+    return NotImplementedError(f"veil doesn't redact {where}{name} yet, so it would send the request without "
                                "placeholders; call messages.create instead.")
 
 
@@ -455,12 +455,22 @@ class _Beta:
         self._beta = beta
         self.messages = _Messages(beta.messages, session)
 
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response", "beta.")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response", "beta.")
+
     def __getattr__(self, name):
         return getattr(self._beta, name)
 
 
 class VeiledClient:
-    """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders."""
+    """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders.
+    ``with_options`` and ``copy`` give another one, with the same conversation; the legacy ``completions`` and
+    the raw response forms, which would send the request without placeholders, raise."""
 
     def __init__(self, client, session: Session):
         self._client = client
@@ -472,6 +482,25 @@ class VeiledClient:
     @property
     def redactor(self) -> Redactor:
         return self.session.redactor
+
+    def with_options(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.with_options(*args, **kwargs), self.session)
+
+    def copy(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.copy(*args, **kwargs), self.session)
+
+    @property
+    def completions(self):
+        raise NotImplementedError("veil doesn't redact the legacy Text Completions API (completions), so it would "
+                                  "send the prompt without placeholders; call messages.create instead.")
+
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response", "")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response", "")
 
     def __getattr__(self, name):
         return getattr(self._client, name)
