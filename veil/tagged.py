@@ -31,7 +31,9 @@ LABELS = {"name": "NAME", "street address": "ADDRESS", "city": "ADDRESS", "postc
           "email address": "EMAIL", "phone number": "PHONE", "ssn": "SSN", "account number": "ACCOUNT",
           "credit card number": "ACCOUNT", "iban": "ACCOUNT", "swift code": "ACCOUNT", "date of birth": "DOB",
           "customer id": "ID", "employee id": "ID", "username": "ID", "passport number": "ID",
-          "driver license number": "ID", "tax id": "ID"}
+          "driver license number": "ID", "tax id": "ID",
+          # from round 10 on (benchmarks/judged/PROTOCOL.md): secrets, under veil's ID placeholder
+          "password or access code": "ID", "api key": "ID"}
 _WORD = re.compile(r"\w+")   # the words the benchmarks score by
 
 
