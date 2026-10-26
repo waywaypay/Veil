@@ -229,6 +229,32 @@ def test_tool_descriptions_and_metadata_are_redacted():
     assert sent["metadata"]["user_id"] == "EMAIL_001"
 
 
+_SEARCH = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3, "allowed_domains": ["sec.gov"],
+           "user_location": {"type": "approximate", "city": "Springfield", "region": "Illinois", "country": "US",
+                             "timezone": "America/Chicago"}}
+
+
+@pytest.mark.parametrize("option, want", [
+    ({}, {"type": "approximate", "country": "US", "timezone": "America/Chicago"}),
+    ({"user_location": "send"}, _SEARCH["user_location"]),
+    ({"user_location": "drop"}, None),
+    ({"redact_system": False}, {"type": "approximate", "country": "US", "timezone": "America/Chicago"})])
+def test_web_search_sends_only_as_much_of_the_users_location_as_it_is_told(option, want):
+    fake = FakeClient([_message("ok")])
+    client = wrap(fake, **option)
+    client.messages.create(model="m", max_tokens=1, tools=[_SEARCH], messages=[{"role": "user", "content": "hi"}])
+    sent = fake.requests[0]["tools"][0]
+    assert sent.get("user_location") == want
+    assert {k: v for k, v in sent.items() if k != "user_location"} == \
+        {k: v for k, v in _SEARCH.items() if k != "user_location"}
+    assert _SEARCH["user_location"]["city"] == "Springfield"   # the caller's tool is left as it was
+
+
+def test_user_location_must_be_a_known_choice():
+    with pytest.raises(ValueError, match="user_location"):
+        wrap(FakeClient([]), user_location="city")
+
+
 def test_tool_descriptions_stay_as_written_without_redact_system():
     fake = FakeClient([_message("ok")])
     client = wrap(fake, redact_system=False)

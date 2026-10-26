@@ -64,6 +64,9 @@ You keep the conversation with the real values in it, as you would without
 veil. Each request goes out as a copy with placeholders in place of the real
 values. That covers what the user typed, tool results, the system prompt and
 the model's earlier turns, and also the tools' descriptions and `metadata`.
+Web search's `user_location` goes with only its country and timezone, so
+neither Anthropic nor the search provider learns the user's city or region
+(`user_location="send"` sends it all, `"drop"` sends none of it).
 In the reply, text and tool-call inputs come back with the real values
 (outside URLs: see [When text tells the model to leak](#when-text-tells-the-model-to-leak)).
 Thinking blocks, and the results of Anthropic's own tools, go back unchanged.

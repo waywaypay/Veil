@@ -13,7 +13,9 @@ Each request goes out as a copy with placeholders in place of the real values
 (what the user typed, tool results, the system prompt and the model's earlier
 turns), and the reply's text and tool-call inputs come back with the real
 values.  Use one redactor per conversation.  Thinking blocks go back exactly
-as they came.  The tools' descriptions and ``metadata`` are redacted too.  A
+as they came.  The tools' descriptions and ``metadata`` are redacted too, and
+web search's ``user_location`` goes with its country and timezone only, not
+its city or region (``user_location="send"`` sends it all, ``"drop"`` none).  A
 content block veil doesn't know raises ``BlockError`` rather than being sent
 as it is.
 
@@ -110,8 +112,12 @@ class Session:
 
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
                  files: str | Callable[[bytes, str], str] = "refuse",
-                 restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False):
+                 restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False,
+                 user_location: str = "country"):
         self.redactor = redactor if redactor is not None else Redactor()
+        if user_location not in ("country", "send", "drop"):
+            raise ValueError('user_location must be "country", "send" or "drop"')
+        self.user_location = user_location
         # The kinds each tool's calls get back, by tool name ("*": any other tool); None: every kind.
         self.restore = {name: {kinds} if isinstance(kinds, str) else None if kinds is None else set(kinds)
                         for name, kinds in (restore or {}).items()}
@@ -144,8 +150,8 @@ class Session:
                 out["system"] = self.redactor.redact_text(system)
             elif isinstance(system, list):
                 out["system"] = [self._block(b, "system") for b in system]
-        if self.redact_system and isinstance(request.get("tools"), list):
-            out["tools"] = [self._tool(t) for t in request["tools"]]
+        if isinstance(request.get("tools"), list):
+            out["tools"] = [self._located(self._tool(t) if self.redact_system else t) for t in request["tools"]]
         if isinstance(request.get("metadata"), dict):
             out["metadata"] = self.redactor.redact(request["metadata"])
         return out
@@ -160,6 +166,17 @@ class Session:
                 return [walk(v) for v in value]
             return value
         return walk(_as_dict(tool))
+
+    def _located(self, tool: Any) -> Any:
+        """A server tool (web search) with its ``user_location`` as ``user_location`` says: the country and
+        timezone only, all of it, or none."""
+        t = _as_dict(tool)
+        if not isinstance(t, dict) or not isinstance(t.get("user_location"), dict) or self.user_location == "send":
+            return tool
+        if self.user_location == "drop":
+            return {k: v for k, v in t.items() if k != "user_location"}
+        return {**t, "user_location": {k: v for k, v in t["user_location"].items()
+                                       if k in ("type", "country", "timezone")}}
 
     def _message(self, message: dict) -> dict:
         role = message.get("role")
@@ -533,7 +550,7 @@ class VeiledClient:
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
          files: str | Callable[[bytes, str], str] = "refuse",
          restore: Mapping[str, Collection[str] | str | None] | None = None,
-         restore_urls: bool = False) -> VeiledClient:
+         restore_urls: bool = False, user_location: str = "country") -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
@@ -542,5 +559,9 @@ def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system
 
     ``restore`` says which placeholder kinds each tool's calls get back as real values, by tool name, with
     ``"*"`` for any tool not named (``{"add_member": {"NAME", "SSN"}, "*": set()}``); a tool it doesn't cover
-    gets every kind.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders)."""
-    return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls))
+    gets every kind.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders).
+
+    ``user_location``: what web search's ``user_location`` sends, "country" (its country and timezone, the
+    default), "send" (all of it, city and region too) or "drop" (none)."""
+    return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls,
+                                        user_location))
