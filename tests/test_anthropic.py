@@ -5,7 +5,7 @@ import json
 import pytest
 
 from veil import FINANCE, Redactor
-from veil.anthropic import TAX_ID_REMOVED, BlockError, Findings, GuardrailError, Session, wrap
+from veil.anthropic import TAX_ID_REMOVED, BlockError, Findings, GuardrailError, McpError, Session, wrap
 
 anthropic = pytest.importorskip("anthropic")
 from anthropic.types import Message  # noqa: E402
@@ -250,9 +250,40 @@ def test_web_search_sends_only_as_much_of_the_users_location_as_it_is_told(optio
     assert _SEARCH["user_location"]["city"] == "Springfield"   # the caller's tool is left as it was
 
 
+_MCP = [{"type": "url", "url": "https://crm.example/mcp", "name": "crm", "authorization_token": "tok"}]
+
+
+def test_a_request_naming_mcp_servers_is_refused_and_nothing_is_sent():
+    fake = FakeClient([])
+    fake.count_tokens = fake.create
+    client = wrap(fake)
+    for messages in (client.messages, client.beta.messages):
+        with pytest.raises(McpError, match="crm"):
+            messages.create(model="m", max_tokens=1, mcp_servers=_MCP, messages=[{"role": "user", "content": "hi"}])
+    with pytest.raises(McpError):
+        client.messages.count_tokens(model="m", mcp_servers=_MCP, messages=[{"role": "user", "content": "hi"}])
+    assert fake.requests == []
+
+
+def test_mcp_servers_go_when_allowed_and_the_request_is_still_redacted():
+    fake = FakeClient([_message("ok")])
+    client = wrap(fake, mcp_servers="send")
+    client.messages.create(model="m", max_tokens=1, mcp_servers=_MCP,
+                           messages=[{"role": "user", "content": "Look up jane@example.com"}])
+    assert fake.requests[0]["mcp_servers"] == _MCP and "jane@" not in _sent(fake)
+
+
+def test_an_empty_mcp_servers_list_isnt_refused():
+    fake = FakeClient([_message("ok")])
+    wrap(fake).messages.create(model="m", max_tokens=1, mcp_servers=[], messages=[{"role": "user", "content": "hi"}])
+    assert len(fake.requests) == 1
+
+
 def test_user_location_must_be_a_known_choice():
     with pytest.raises(ValueError, match="user_location"):
         wrap(FakeClient([]), user_location="city")
+    with pytest.raises(ValueError, match="mcp_servers"):
+        wrap(FakeClient([]), mcp_servers="read")
 
 
 def test_tool_descriptions_stay_as_written_without_redact_system():

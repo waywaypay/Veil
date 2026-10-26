@@ -66,7 +66,11 @@ values. That covers what the user typed, tool results, the system prompt and
 the model's earlier turns, and also the tools' descriptions and `metadata`.
 Web search's `user_location` goes with only its country and timezone, so
 neither Anthropic nor the search provider learns the user's city or region
-(`user_location="send"` sends it all, `"drop"` sends none of it).
+(`user_location="send"` sends it all, `"drop"` sends none of it). A request
+that names `mcp_servers` raises `McpError` and nothing is sent: Anthropic calls
+those servers itself, so what they return would reach the model without
+placeholders. Pass `mcp_servers="send"` to let them, or call those tools
+yourself as your own tools, whose results veil redacts.
 In the reply, text and tool-call inputs come back with the real values
 (outside URLs: see [When text tells the model to leak](#when-text-tells-the-model-to-leak)).
 Thinking blocks, and the results of Anthropic's own tools, go back unchanged.

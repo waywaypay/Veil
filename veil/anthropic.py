@@ -15,7 +15,10 @@ turns), and the reply's text and tool-call inputs come back with the real
 values.  Use one redactor per conversation.  Thinking blocks go back exactly
 as they came.  The tools' descriptions and ``metadata`` are redacted too, and
 web search's ``user_location`` goes with its country and timezone only, not
-its city or region (``user_location="send"`` sends it all, ``"drop"`` none).  A
+its city or region (``user_location="send"`` sends it all, ``"drop"`` none).
+A request with ``mcp_servers`` raises ``McpError`` unless ``mcp_servers="send"``:
+Anthropic calls those servers itself, so what they return reaches the model
+without placeholders.  A
 content block veil doesn't know raises ``BlockError`` rather than being sent
 as it is.
 
@@ -75,6 +78,11 @@ class FileError(Exception):
     for the user."""
 
 
+class McpError(Exception):
+    """A request named MCP servers, whose replies would reach the model without placeholders, so nothing was
+    sent.  The message is for the user."""
+
+
 class BlockError(Exception):
     """A content block of a kind veil doesn't know how to redact, so nothing was sent.  The message is for the
     user."""
@@ -113,8 +121,11 @@ class Session:
     def __init__(self, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
                  files: str | Callable[[bytes, str], str] = "refuse",
                  restore: Mapping[str, Collection[str] | str | None] | None = None, restore_urls: bool = False,
-                 user_location: str = "country"):
+                 user_location: str = "country", mcp_servers: str = "refuse"):
         self.redactor = redactor if redactor is not None else Redactor()
+        if mcp_servers not in ("refuse", "send"):
+            raise ValueError('mcp_servers must be "refuse" or "send"')
+        self.mcp_servers = mcp_servers
         if user_location not in ("country", "send", "drop"):
             raise ValueError('user_location must be "country", "send" or "drop"')
         self.user_location = user_location
@@ -138,6 +149,11 @@ class Session:
     def redact_request(self, request: dict) -> dict:
         """A copy of a Messages API request (``messages``, ``system`` ...) with placeholders in it, checked by
         the guardrail if there is one."""
+        if request.get("mcp_servers") and self.mcp_servers == "refuse":
+            names = ", ".join(str(s.get("name") or s.get("url")) for s in request["mcp_servers"] if isinstance(s, dict))
+            raise McpError(f"This request names MCP servers ({names}). Anthropic would call them itself, so what "
+                           "they return would reach the model without placeholders. Nothing was sent. Pass "
+                           'mcp_servers="send" to let them, or call those tools yourself as your own tools.')
         out = self._redact(request)
         return self._guard(request, out) if self.guardrail is not None else out
 
@@ -550,7 +566,7 @@ class VeiledClient:
 def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system: bool = True,
          files: str | Callable[[bytes, str], str] = "refuse",
          restore: Mapping[str, Collection[str] | str | None] | None = None,
-         restore_urls: bool = False, user_location: str = "country") -> VeiledClient:
+         restore_urls: bool = False, user_location: str = "country", mcp_servers: str = "refuse") -> VeiledClient:
     """``client`` (anthropic.Anthropic, AnthropicBedrock ...) with placeholders on the way out and real values
     on the way back.  Use one per conversation, or pass the conversation's ``redactor``.
 
@@ -562,6 +578,9 @@ def wrap(client, redactor: Redactor | None = None, guardrail=None, redact_system
     gets every kind.  ``restore_urls``: put real values back inside URLs too (by default they stay placeholders).
 
     ``user_location``: what web search's ``user_location`` sends, "country" (its country and timezone, the
-    default), "send" (all of it, city and region too) or "drop" (none)."""
+    default), "send" (all of it, city and region too) or "drop" (none).
+
+    ``mcp_servers``: "refuse" a request that names MCP servers (the default), since Anthropic calls them and
+    what they return reaches the model as it is, or "send" it."""
     return VeiledClient(client, Session(redactor, guardrail, redact_system, files, restore, restore_urls,
-                                        user_location))
+                                        user_location, mcp_servers))
