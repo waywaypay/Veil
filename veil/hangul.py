@@ -20,13 +20,14 @@ What this costs: a name wordfreq lists (a public figure's, "노무현"; or a giv
 surname alone ("김"), and a town the tagger took for a name ("여수시", which veil leaves visible anyway) are no longer
 hidden.  benchmarks/korean_names.md has the figures.
 
-wordfreq (the tagger extra) has the frequencies; without it only the verb forms, honorifics and length are judged.
-Its Korean words are mecab's pieces of words, which is why compounds are split."""
+The frequencies are wordfreq's, packaged in veil/data/korean_words.txt.gz (scripts/build_korean_words.py rebuilds
+it).  Its Korean words are mecab's pieces of words, which is why compounds are split."""
 from __future__ import annotations
 
-import math
+import gzip
 import re
 from functools import lru_cache
+from importlib import resources
 
 ZIPF = 3.5          # a word this common is an everyday one
 ZIPF_PREFIX = 4.5   # how common the first two syllables of a surname-shaped word must be to make it a word and a suffix
@@ -64,16 +65,14 @@ _SURNAMES = frozenset("""김 이 박 최 정 강 조 윤 장 임 한 오 서 신
 
 @lru_cache(maxsize=1)
 def _frequencies() -> dict[str, float]:
-    try:
-        import wordfreq
-    except ImportError:
-        return {}
-    return wordfreq.get_frequency_dict("ko")
+    """The everyday Korean words (Zipf 3.5 and up), each with its Zipf frequency."""
+    with resources.files("veil").joinpath("data/korean_words.txt.gz").open("rb") as raw, \
+            gzip.open(raw, "rt", encoding="utf-8") as f:
+        return {w: float(z) for w, z in (line.rstrip("\n").split("\t") for line in f if not line.startswith("#"))}
 
 
 def _zipf(word: str) -> float:
-    f = _frequencies().get(word)
-    return math.log10(f) + 9 if f else 0.0
+    return _frequencies().get(word, 0.0)
 
 
 def _closed(syllable: str) -> bool:

@@ -8,15 +8,16 @@
 
     safe_docx = redact_docx(docx_bytes, redactor)    # the Word document itself, its personal details replaced
 
-PDFs need ``pypdf``; images and scanned pages need ``pytesseract``, ``Pillow`` and the Tesseract program
+PDFs need ``pypdf``; images and scanned pages need ``Pillow`` and the Tesseract program
 (``pip install "veil[files]"``, and ``apt install tesseract-ocr`` or ``brew install tesseract``).  Nothing
-is sent anywhere: both run in this process.
+is sent anywhere: both run on this machine, and an image goes to Tesseract through a pipe, never a file.
 """
 
 from __future__ import annotations
 
 import io
 import re
+import subprocess
 import unicodedata
 
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/gif", "image/webp")
@@ -622,7 +623,7 @@ def _open_image(data: bytes):
     try:
         from PIL import Image
     except ImportError as exc:
-        raise ImportError('Reading images needs Pillow and pytesseract: pip install "veil[files]"') from exc
+        raise ImportError('Reading images needs Pillow: pip install "veil[files]"') from exc
     return Image.open(io.BytesIO(data))
 
 
@@ -636,14 +637,10 @@ def ocr_data(image) -> dict:
     resolution or small print has them, is read enlarged: Tesseract reads letters best some 25 pixels high.
     And it's read both as it is and with a scan's speckle taken out (a median filter, which would wear away
     small clean letters), and an enlarged page smoothed too, keeping whichever Tesseract is surest of."""
-    try:
-        import pytesseract
-        from PIL import Image, ImageFilter
-    except ImportError as exc:
-        raise ImportError('Reading images needs pytesseract: pip install "veil[files]"') from exc
+    from PIL import Image, ImageFilter
 
     def read(img) -> dict:
-        return pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+        return _tsv(_tesseract(img, "tsv"))
 
     def sure(data: dict) -> float:   # how much Tesseract is sure it read: its confident words' confidence
         return sum(float(c) - 50 for t, c in zip(data["text"], data["conf"]) if t.strip() and float(c) > 50)
@@ -653,7 +650,7 @@ def ocr_data(image) -> dict:
     words = sum(1 for t in first["text"] if t.strip())
     if words and sure(first) < 15 * words:   # hardly a word read with confidence: maybe the page is turned
         try:
-            angle = int(re.search(r"Rotate: (\d+)", pytesseract.image_to_osd(gray)).group(1))
+            angle = int(re.search(r"Rotate: (\d+)", _tesseract(gray, "-l", "osd", "--psm", "0")).group(1))
         except Exception:   # too little text for Tesseract to tell
             angle = 0
         if angle:
@@ -673,6 +670,46 @@ def ocr_data(image) -> dict:
     if scale > 1:   # enlarged, a fax's or a low resolution's jagged edges read better smoothed
         candidates.append(read(gray.filter(ImageFilter.GaussianBlur(scale / 2))))
     return max(candidates, key=sure)
+
+
+def _tesseract(image, *args: str) -> str:
+    """What the Tesseract program writes for an image, handed to it as a PNG on its standard input, so the
+    picture is never written to disk.  No Tesseract is an ImportError, as no Pillow is: there's no OCR here."""
+    png = io.BytesIO()
+    image.save(png, format="PNG")
+    try:
+        done = subprocess.run(["tesseract", "stdin", "stdout", *args], input=png.getvalue(), capture_output=True)
+    except FileNotFoundError as exc:
+        raise ImportError("Reading images needs the Tesseract program: apt install tesseract-ocr, "
+                          "or brew install tesseract") from exc
+    if done.returncode:
+        raise RuntimeError(f"Tesseract failed: {done.stderr.decode('utf-8', 'replace').strip()}")
+    return done.stdout.decode("utf-8")
+
+
+def _tsv(tsv: str) -> dict:
+    """Tesseract's TSV as columns: {"text": [...], "conf": [...], "left": [...], ...}, the numbers whole (a
+    confidence of 92.24 is 92), as pytesseract's ``image_to_data`` gave them."""
+    rows = [row.split("\t") for row in tsv.strip().split("\n")]
+    if len(rows) < 2:
+        return {}
+    header, rows = rows[0], rows[1:]
+    if len(rows[-1]) < len(header):   # the last word empty, and its cell left off
+        rows[-1].append("")
+    data: dict[str, list] = {}
+    for i, head in enumerate(header):
+        column = data[head] = []
+        for row in rows:
+            if len(row) <= i:
+                continue
+            if i == len(header) - 1:
+                column.append(row[i])
+                continue
+            try:
+                column.append(int(float(row[i])))
+            except ValueError:
+                column.append(row[i])
+    return data
 
 
 def reflow(data: dict) -> str:

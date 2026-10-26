@@ -426,7 +426,7 @@ r = TaggedRedactor(model="path/to/pii-tagger-edge::onnx/model_f16.onnx")   # a l
 `VEIL_TAGGER` takes the same form, so `veilbench.py score` measures what the ONNX copy hides.
 
 The tagger was never trained on Korean, and in Hangul it takes ordinary words for names; `veil.hangul` drops a
-Korean "name" made of everyday words, using `wordfreq` (in the tagger extra). `benchmarks/korean_names.md` has
+Korean "name" made of everyday words, using `wordfreq`'s Korean frequencies, packaged with veil. `benchmarks/korean_names.md` has
 what that changes.
 
 `redact` marks spans as `[NAME]`, which can't be put back. For numbered placeholders that restore, as veil's
@@ -488,10 +488,16 @@ out, and if the guardrail objects to a call or can't check it, `create` raises
 ## Development
 
 ```
-pip install -e ".[dev]"
+pip install --require-hashes -r requirements/dev.txt   # the pinned, hash-checked tools CI uses
+pip install --no-deps -e .
 pytest
 ruff check .
 ```
+
+The redactor itself needs nothing outside the standard library; every package is behind an extra.
+`requirements/dev.txt` and `requirements/audit.txt` pin the development tools by version and hash, and CI
+installs only from them and checks both with `pip-audit`. To change a pin, rerun the `uv pip compile` command at
+the top of the file (add `-P <package>` to upgrade one). Dependabot proposes updates a week after a release.
 
 The tests include Snowman's original suite, run under the `US_TAX_K1`
 profile. Among them are ten fictional K-1 specimens (their text is stored in
