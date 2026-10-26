@@ -32,8 +32,9 @@ what it finds:
 
 ## Starting point
 
-Round 9's chosen model, if round 9 has been trained by then; otherwise round 7's published model. If round 9 hasn't
-started, its protocol may instead take these sources in, as round 9 took round 8's. Four 500-step segments at most.
+Round 7's published model, whether or not round 9 is trained by then. Round 10 is not folded into round 9, and it
+doesn't take in round 9's data. Each round is measured against round 7 on its own, and either can be merged later.
+Four 500-step segments at most.
 
 ## New labels
 
@@ -42,7 +43,7 @@ The tagger has no kind for a secret. Add these labels to `veil.tagged.LABELS`:
 * `password or access code`: passwords, PINs, passcodes, access, security, recovery and one-time codes, Wi-Fi keys;
 * `api key`: API keys, tokens and private keys (`sk-…`, `ghp_…`, `AKIA…`, `xoxb-…`, `-----BEGIN … KEY-----`).
 
-Both map to veil's `ID` placeholder for now. A `SECRET` kind of its own in veil is a separate change. In
+Both map to veil's `ID` placeholder. veil gets no `SECRET` kind of its own. In
 `pii_trace.py`, they map to `secret`. The labelling rules (`judged/docgen/RULES.md`) gain both rows, and a line saying
 that a phone number's extension is part of its span.
 
@@ -53,12 +54,13 @@ an "ID" whatever it refers to. Round 10 keeps veil's line, and teaches it by the
 
 * **marked**: a value that is a person's account, membership, policy, patient, customer or loan number, or their
   credential, by its label or sentence ("my member ID is…", "policy no.", "the access code for my account");
-* **left unmarked**: the same shapes as order, invoice, ticket, tracking, case, booking, SKU, build and version numbers,
-  commit hashes, UUIDs in code, hex colours, timestamps and amounts.
+* **left unmarked**: the same shapes as order, invoice, ticket, tracking, case, SKU, build and version numbers,
+  commit hashes, UUIDs in code, hex colours, timestamps and amounts. Booking references and reservation codes stay
+  visible too, like an order number: they point to a trip, not to a person's account.
 
 Every source below writes both, so the model can't learn "letters and digits in groups" as a detail. A PII-TRACE
-"reference number" that names no account is scored as a miss on its test half, and the report says how many such
-spans there are.
+"reference number" that names no account, or a booking reference, is scored as a miss on its test half, and the
+report says how many such spans there are.
 
 ## Data
 
@@ -91,7 +93,7 @@ pasting config, logs or `.env` files (keys among harmless settings), help fillin
 personal in them. These agents never see PII-TRACE or `chatgen.py`'s output. This source exists so the round isn't
 learning one generator's templates.
 
-**C. Replayed, so nothing learned is lost:** 6,000 chunks of round 9's mix (round 7's, if round 9 wasn't trained), and
+**C. Replayed, so nothing learned is lost:** 6,000 chunks of round 7's mix (`round7_examples_seg3.json`, as rounds 8 and 9 replay it), and
 round 2's judged WildChat turns.
 
 **D. Whole conversations.** Half of A's and B's conversations are trained with their user messages joined by blank
@@ -109,13 +111,14 @@ readout but is not in the choosing mean, so its test half stays a readout of a m
 ## Choosing
 
 `PROTOCOL.md`'s rule, on dev only: the segment and threshold with the highest mean found over the dev slices, with a
-mean share of other words hidden no higher than the starting model's at its threshold on the same slices. Dev is
-round 9's dev slices, plus A's and B's fifths. A's dev fifth counts its look-alikes as other words, so a model that
+mean share of other words hidden no higher than round 7's model's at 0.35 on the same slices. Dev is round 9's dev
+slices (round 7's, the public-record fifth and `r9gen.py`'s fifth, none of them trained on here), plus A's and B's
+fifths. A's dev fifth counts its look-alikes as other words, so a model that
 hides order numbers pays for it.
 
 ## Testing, once, after the choice
 
-* PII-TRACE's test half: the chosen model beside the starting model and PII-Tracer, alone and with veil's rules, one
+* PII-TRACE's test half: the chosen model beside round 7's model and PII-Tracer, alone and with veil's rules, one
   message at a time and whole conversation, all nine labels and without dates and URLs.
 * A locked chat test, built before any round 10 training data and kept from those who make it: 150 conversations by
   new agents, judged blind, and 300 WildChat conversations from shards 8 and 9 that the second locked test didn't use.
@@ -141,11 +144,12 @@ The result is reported whichever way it falls.
 * `benchmarks/round7/chatgen.py` and `round10.py` (build, train and dev, as `round9.py`), the B agents' brief, and the
   locked chat test's brief;
 * the two labels in `veil/tagged.py`, `pii_trace.py`'s mapping, and their rows in `RULES.md`;
-* `pii_trace_errors.py` run on the starting model first, and its numbers added under "Why".
+* `pii_trace_errors.py` run on round 7's model first, and its numbers added under "Why".
 
-## To decide
+## Decided
 
-1. Whether the new labels map to `ID` or to a new `SECRET` kind in veil.
-2. Whether round 10 starts from round 9 or from round 7, or is folded into round 9.
-3. Whether "booking reference" is marked (a person's trip) or left visible (like an order number). This draft leaves
-   it visible.
+On 26 October 2026, before any round 10 data:
+
+1. The new labels map to veil's `ID` placeholder. veil gets no `SECRET` kind.
+2. Round 10 starts from round 7's published model. It is not folded into round 9.
+3. Booking references and reservation codes are left visible, like order numbers.
