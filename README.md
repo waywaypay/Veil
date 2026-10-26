@@ -69,8 +69,10 @@ In the reply, text and tool-call inputs come back with the real values
 Thinking blocks, and the results of Anthropic's own tools, go back unchanged.
 A content block of a kind veil doesn't know raises `BlockError`, and nothing
 is sent. Streaming isn't supported yet: `stream=True` raises an error, and so
-do `messages.stream`, `parse`, `batches`, `tool_runner` and the raw response
-forms, which would otherwise send the request without placeholders.
+do `messages.stream`, `parse`, `batches`, `tool_runner`, the raw response
+forms and the legacy `completions`, which would otherwise send the request
+without placeholders. `client.with_options(...)` and `client.copy(...)` give a
+wrapped client for the same conversation.
 
 ## Images and PDFs
 
@@ -155,6 +157,12 @@ picture shows; pass `pictures="keep"` to leave them as they are. A file
 embedded in the document, such as a spreadsheet or a PDF, makes
 `redact_docx` raise `ValueError`, since veil can't redact inside it. The one
 exception is a chart's own data: that is left out, and the chart stays.
+
+A Word document is a zip, and a small zip can unpack to gigabytes. One that
+would unpack to more than 256 MB, or that holds more than 10,000 files, is
+refused with `ValueError` before anything in it is read, by `read_text`,
+`redact_docx` and `restore_docx` alike. The limits are
+`veil.files.DOCX_MAX_UNPACKED` and `DOCX_MAX_PARTS`, if you need to raise them.
 
 ## Use it with anything else
 
@@ -471,7 +479,11 @@ sent:
   `GuardrailError`, the call raises `GuardrailError` and nothing is sent.
 
 Replies are checked too. A taxpayer ID in a reply is taken out, because the
-model only ever saw placeholders and shouldn't have written one.
+model only ever saw placeholders and shouldn't have written one. So are the
+inputs of the tool calls in a reply, as the model wrote them (with
+placeholders), before the real values go back: a taxpayer ID in one is taken
+out, and if the guardrail objects to a call or can't check it, `create` raises
+`GuardrailError` so that no tool runs on it.
 
 ## Development
 

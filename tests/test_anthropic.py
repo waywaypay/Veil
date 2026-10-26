@@ -121,6 +121,34 @@ def test_the_real_sdk_has_nothing_on_messages_that_skips_veil():
             getattr(client.messages, name)
 
 
+def test_the_legacy_completions_api_is_refused_rather_than_sent_unredacted():
+    fake = FakeClient([])
+    fake.completions = fake
+    client = wrap(fake)
+    with pytest.raises(NotImplementedError, match="completions"):
+        client.completions.create(model="m", max_tokens_to_sample=1, prompt="\n\nHuman: jane@example.com")
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("path", ["with_raw_response", "with_streaming_response",
+                                  "beta.with_raw_response", "beta.with_streaming_response"])
+def test_raw_response_forms_of_the_client_are_refused(path):
+    client = wrap(anthropic.Anthropic(api_key="k"))
+    owner = client.beta if path.startswith("beta.") else client
+    with pytest.raises(NotImplementedError):
+        getattr(owner, path.removeprefix("beta."))
+
+
+@pytest.mark.parametrize("make", [lambda c: c.with_options(timeout=5, max_retries=1), lambda c: c.copy(timeout=5)])
+def test_a_client_with_other_options_still_goes_through_placeholders(make):
+    client = wrap(anthropic.Anthropic(api_key="k"), Redactor(FINANCE))
+    other = make(client)
+    assert isinstance(other, type(client)) and other.session is client.session
+    assert other.timeout == 5 and other.messages._session is client.session
+    with pytest.raises(NotImplementedError):
+        other.messages.stream(model="m", max_tokens=1, messages=[])
+
+
 def test_search_results_are_redacted_alone_and_inside_a_tool_result():
     s = Session(Redactor(FINANCE))
     found = {"type": "search_result", "source": "https://crm/jane@example.com", "title": "Avery Mockridge, LP",
@@ -306,6 +334,44 @@ def test_a_number_in_a_reply_is_taken_out_and_a_reply_it_objects_to_is_replaced(
     answers["OUTPUT"] = GuardrailError("The guardrail couldn't run (boom).")
     assert client.messages.create(model="m", max_tokens=10, messages=ask).content[0].text.startswith(
         "(This reply isn't shown, because the guardrail couldn't check it.")
+
+
+def test_a_number_in_a_tool_call_is_taken_out_before_the_tool_gets_it():
+    seen = []
+
+    def answer(source, texts):
+        seen.append((source, texts))
+        return pii("987654321") if source == "OUTPUT" else NONE
+
+    client, fake, api = _guarded(answer, [
+        _message(("t1", "file_return", {"ein": "987654321", "note": "for NAME_001", "rows": [{"id": "987654321"}]}))])
+    reply = client.messages.create(model="m", max_tokens=10,
+                                   messages=[{"role": "user", "content": "File it for Avery Mockridge."}])
+    assert reply.content[0].input == {"ein": TAX_ID_REMOVED, "note": "for Avery Mockridge",
+                                      "rows": [{"id": TAX_ID_REMOVED}]}
+    # The guardrail saw the call as the model wrote it, with placeholders, not the real values.
+    assert ("OUTPUT", ["987654321", "for NAME_001", "987654321"]) in seen
+    assert "7654321" not in client.redactor.redact_text("EIN 98-7654321")   # hidden in later requests too
+
+
+@pytest.mark.parametrize("answer", [Findings(other=["an outside address"]), GuardrailError("It couldn't run.")])
+def test_a_tool_call_it_objects_to_or_cant_check_is_never_handed_back(answer):
+    client, fake, api = _guarded(lambda source, texts: answer if source == "OUTPUT" else NONE,
+                                 [_message("Sending.", ("t1", "send_email", {"to": "x@evil.example", "body": "SSN_001"}))])
+    with pytest.raises(GuardrailError, match="tool calls"):
+        client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": "SSN 123-45-6789"}])
+
+
+def test_a_tool_call_it_passed_isnt_checked_again_when_it_goes_back():
+    client, fake, api = _guarded(lambda source, texts: NONE,
+                                 [_message(("t1", "lookup", {"q": "NAME_001"})), _message("ok")])
+    messages = [{"role": "user", "content": "Look up Avery Mockridge"}]
+    reply = client.messages.create(model="m", max_tokens=10, messages=messages)
+    messages += [{"role": "assistant", "content": reply.content},
+                 {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "none"}]}]
+    client.messages.create(model="m", max_tokens=10, messages=messages)
+    assert {"source": "OUTPUT", "texts": ["NAME_001"]} in api.calls
+    assert all("NAME_001" not in c["texts"] for c in api.calls if c["source"] == "INPUT")
 
 
 def test_a_name_the_placeholders_miss_is_hidden_and_comes_back_by_name():

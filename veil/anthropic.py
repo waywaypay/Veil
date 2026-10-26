@@ -28,7 +28,10 @@ With a ``guardrail`` (any object with a ``check(texts, source) -> Findings``
 method, raising GuardrailError when it can't check), each new text in a
 request is checked first: what it finds becomes a placeholder too, and
 anything else it objects to stops the request.  In a reply, a taxpayer ID it
-finds is taken out, and a reply it objects to is replaced with a note.
+finds is taken out, and a reply it objects to is replaced with a note.  Each
+tool call's input is checked too: a taxpayer ID in one is taken out, and a
+call it objects to, or can't check, raises GuardrailError, so no tool runs on
+it.
 
 A placeholder in a reply's text or a tool call comes back as its real value,
 except inside a URL or a link's target, where it stays a placeholder: text
@@ -313,6 +316,7 @@ class Session:
         response = response.model_copy(deep=True) if hasattr(response, "model_copy") else copy.deepcopy(response)
         content = response["content"] if isinstance(response, dict) else response.content
         if self.guardrail is not None:
+            self._guard_calls(content)
             self._guard_reply(content)
         for i, block in enumerate(content):
             kind = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
@@ -348,6 +352,33 @@ class Session:
                 for i in indices:
                     self._set(content, i, content[i], "text", self._get(content[i], "text").replace(match, TAX_ID_REMOVED))
 
+    def _guard_calls(self, content: list) -> None:
+        """Have the guardrail check each tool call's input before it's put back.  A call it objects to, or can't
+        check, raises GuardrailError, so no tool runs on it; a taxpayer ID in one is taken out."""
+        indices = [i for i, b in enumerate(content) if self._get(b, "type") == "tool_use"]
+        texts: list[str] = []
+        for i in indices:
+            _strings(self._get(content[i], "input"), lambda t: texts.append(t) or t)
+        texts = [t for t in texts if t.strip()]
+        if not texts:
+            return
+        try:
+            found = self.guardrail.check(texts, "OUTPUT")
+        except GuardrailError as exc:
+            raise GuardrailError(f"The guardrail couldn't check this reply's tool calls, so none should run. {exc}") \
+                from exc
+        if found.other:
+            raise GuardrailError("The guardrail held back this reply's tool calls: it flagged "
+                                 f"{', '.join(dict.fromkeys(found.other))}.")
+        if not found.hidden:   # sent back next time as they are: no need to check them again
+            self._checked.update(self._digest(t) for t in texts)
+        for kind, match in found.hidden:
+            self.redactor.add(match, kind)   # so it's a placeholder in every later request
+            if kind in TAX_ID_KINDS:
+                for i in indices:
+                    self._set(content, i, content[i], "input", _strings(
+                        self._get(content[i], "input"), lambda t, m=match: t.replace(m, TAX_ID_REMOVED)))
+
     @staticmethod
     def _get(block: Any, key: str) -> Any:
         return block.get(key) if isinstance(block, dict) else getattr(block, key, None)
@@ -360,8 +391,19 @@ class Session:
             setattr(block, key, value)
 
 
-def _unwrapped(name: str) -> NotImplementedError:
-    return NotImplementedError(f"veil doesn't redact messages.{name} yet, so it would send the request without "
+def _strings(value: Any, fix: Callable[[str], str]) -> Any:
+    """``value`` with ``fix`` applied to each string in it (not dict keys); dicts and lists are walked."""
+    if isinstance(value, str):
+        return fix(value)
+    if isinstance(value, dict):
+        return {k: _strings(v, fix) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_strings(v, fix) for v in value]
+    return value
+
+
+def _unwrapped(name: str, where: str = "messages.") -> NotImplementedError:
+    return NotImplementedError(f"veil doesn't redact {where}{name} yet, so it would send the request without "
                                "placeholders; call messages.create instead.")
 
 
@@ -413,12 +455,22 @@ class _Beta:
         self._beta = beta
         self.messages = _Messages(beta.messages, session)
 
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response", "beta.")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response", "beta.")
+
     def __getattr__(self, name):
         return getattr(self._beta, name)
 
 
 class VeiledClient:
-    """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders."""
+    """An Anthropic client whose ``messages.create`` (and ``beta.messages.create``) go through placeholders.
+    ``with_options`` and ``copy`` give another one, with the same conversation; the legacy ``completions`` and
+    the raw response forms, which would send the request without placeholders, raise."""
 
     def __init__(self, client, session: Session):
         self._client = client
@@ -430,6 +482,25 @@ class VeiledClient:
     @property
     def redactor(self) -> Redactor:
         return self.session.redactor
+
+    def with_options(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.with_options(*args, **kwargs), self.session)
+
+    def copy(self, *args, **kwargs) -> VeiledClient:
+        return VeiledClient(self._client.copy(*args, **kwargs), self.session)
+
+    @property
+    def completions(self):
+        raise NotImplementedError("veil doesn't redact the legacy Text Completions API (completions), so it would "
+                                  "send the prompt without placeholders; call messages.create instead.")
+
+    @property
+    def with_raw_response(self):
+        raise _unwrapped("with_raw_response", "")
+
+    @property
+    def with_streaming_response(self):
+        raise _unwrapped("with_streaming_response", "")
 
     def __getattr__(self, name):
         return getattr(self._client, name)
