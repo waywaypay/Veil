@@ -1822,7 +1822,7 @@ class Redactor(TaxIdRedactor):
                     if not any(covered[m.start():m.end()]):
                         take(m.start(), m.end(), "ID", key, real)
         if "ID" in self._detect:
-            self._known_ids(copy, take, [f[3] for f in found if f[3]])
+            self._known_ids(copy, take)
         if not found:
             return text
         # Numbered in reading order, replaced from the end so the offsets hold.
@@ -2024,11 +2024,10 @@ class Redactor(TaxIdRedactor):
             return False   # a service's account
         return take(start, start + len(value), "ID", "ID:" + value)
 
-    def _known_ids(self, copy: str, take, here: list[str]) -> None:
-        """An ID or account number of letters and digits hidden before in this conversation, or found already in this
-        text (``here``, their keys: a conversation sent as one text), wherever this text has it again, however its
-        groups are joined: "AC 2EA6 KY4B G6FX" or "ac2ea6ky4bg6fx" after "AC-2EA6-KY4B-G6FX"."""
-        for key in dict.fromkeys([*self._by_digits, *here]):
+    def _known_ids(self, copy: str, take) -> None:
+        """An ID or account number of letters and digits hidden before in this conversation, wherever this text has
+        it again, however its groups are joined: "AC 2EA6 KY4B G6FX" or "ac2ea6ky4bg6fx" after "AC-2EA6-KY4B-G6FX"."""
+        for key in list(self._by_digits):
             kind, _, value = key.partition(":")
             chars = re.sub(r"[\W_]", "", value)
             if kind not in ("ID", "ACCOUNT") or len(chars) < 8 or sum(c.isdigit() for c in chars) < 3 or \
