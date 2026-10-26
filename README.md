@@ -183,6 +183,7 @@ name, and so are a lower-case first name and surname ("add jane smith").
 | `EMAIL`, `PHONE` | Including obfuscated forms like `jane at example dot com`, international numbers, and national ones with a trunk 0 (`0800 123 4567`). |
 | `ACCOUNT` | Bank, routing, card (checked with the Luhn algorithm), IBAN (checksum-validated), BBAN and SWIFT numbers, the last also without a label when shaped like one (ISO 9362, with a valid country); a card or account number a few words after its label ("the card number on file is ..."). |
 | `ID`, `DOB` | Passport, driver's license, customer, employee, user and member ID numbers, usernames and @handles, and birth dates, when a label, a field's key or a table's column says what they are (`driver_license_number`, `DateOfBirth`, `date of birth must be ...` count), or the words before them in the sentence ("the employee ID for Jo is Nq-92647"). Also UK National Insurance numbers, one to four capitals and six or more digits (`EMP286818`), and any other run of 11 to 24 digits. |
+| `AMOUNT` | Money amounts, only with `amounts="personal"` or `"all"` (see [Money amounts](#money-amounts)). By default they stay visible. |
 
 Business names stay visible, because the model usually needs them. A name
 followed by Fund, Capital, Partners, LLC, L.P. and similar is treated as a
@@ -238,6 +239,54 @@ r.restore_text("Born DOB_001 (born March 1990).")   # "Born 14/03/1990."
 
 A numeric date whose day and month could be either way round ("04/05/1990")
 shows only its year. The note is taken off again when the reply is restored.
+
+## Money amounts
+
+Amounts stay visible by default, because hiding them cuts what the model can
+answer. Some deployments need them hidden: a salary beside a job title can
+tell who someone is, and an investor's commitment can be confidential.
+`amounts` says which to hide:
+
+```python
+r = Redactor()                                 # amounts="show": every amount stays
+r.redact_text("Base salary: $142,000")         # "Base salary: $142,000"
+
+r = Redactor(amounts="personal")               # only amounts tied to a person
+r.redact_text("Base salary: $142,000")         # "Base salary: AMOUNT_001"
+r.redact_text("The capital call of $250,000 is due")   # stays as it is
+
+r = Redactor(amounts="all")                    # every amount written as money
+r.redact_text("The capital call of $250,000 is due")   # "The capital call of AMOUNT_001 is due"
+```
+
+With `"personal"`, an amount is tied to a person when it's on the same line or
+table row (pipe, tab or comma separated) as a name, account, SSN, ID, email,
+phone number or birth date that veil hides, or a few words after a word such
+as salary, wages, pay, bonus, commission, balance, net worth, income,
+commitment, capital account, contribution, distribution, payout, settlement,
+award, owed or debt. Once hidden, the same amount is hidden wherever else it's
+written the same way.
+
+An amount is a number with a currency sign or code beside it (`$`, `€`, `£`,
+`¥`, `₹`, `USD`, `EUR` ...), including negative and bracketed ones
+(`-$45.10`, `($12,400.00)`), or a number with thousands commas or cents among
+money (`Total 6,250.00`). Percentages, dates, years, times, quantities
+(`1,200 shares`), box numbers and IDs aren't. The same amount written the
+same way gets the same placeholder, and comes back exactly as written,
+currency sign, commas and cents included.
+
+`reveal` can let the model see roughly how much, to two significant figures:
+
+```python
+r = Redactor(amounts="all", reveal={"AMOUNT": "round"})
+r.redact_text("Distribution: $1,339,032.49")             # "Distribution: AMOUNT_001 (about $1.3M)"
+r.restore_text("You received AMOUNT_001 (about $1.3M).") # "You received $1,339,032.49."
+```
+
+As with birth dates, the note is taken off again when the reply is restored.
+On the locked test set (165 documents, where amounts aren't labelled as
+personal), `"personal"` raises the share of ordinary words hidden from 3.89%
+to 4.50%, and `"all"` to 5.84%.
 
 ## When text tells the model to leak
 
