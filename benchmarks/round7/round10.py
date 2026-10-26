@@ -12,9 +12,11 @@ readout, outside the slices the choice is made on; its test half is never read h
 B's files are JSONL, one conversation a line: {"family": ..., "locale": ..., "messages": ["...", ...]}, each message
 marked as RULES.md says (⟦label|text⟧), with the two new labels.
 
-python round10.py build | train <base> <out> <offset> | dev <model>[@th] ...
+python round10.py build | train <base> <out> <offset> | dev <model>[@th] ... | mark <model dir> ...
 
-At most four segments, offsets 0, 4000, 8000 and 12000, the first from round 7's published model (ft/r7_3)."""
+At most four segments, offsets 0, 4000, 8000 and 12000, the first from round 7's published model (ft/r7_3).  The chosen
+model's folder, and its ONNX export's, is marked before it's published: veil.tagged asks a model for the new labels only
+when its gliner_config.json lists them under "veil_labels"."""
 import glob
 import json
 import os
@@ -144,6 +146,16 @@ def pii_trace_readout(models):
               "  ".join(f"{k} {r['found']:.1%}/{r['over']:.2%}" for k, r in cells.items()), flush=True)
 
 
+def mark(dirs):
+    """List the new labels under "veil_labels" in each model folder's gliner_config.json."""
+    for d in dirs:
+        path = Path(d) / "gliner_config.json"
+        config = json.loads(path.read_text())
+        config["veil_labels"] = sorted(set(config.get("veil_labels", [])) | set(NEW))
+        path.write_text(json.dumps(config, indent=2) + "\n")
+        print(f"{path}: veil_labels {config['veil_labels']}")
+
+
 def dev(models):
     know_new_labels()
     R7.dev(models)
@@ -155,4 +167,4 @@ if __name__ == "__main__":
         os.execve(sys.executable, [sys.executable, *sys.argv], {**os.environ, "PYTHONHASHSEED": "0"})
     R7.dev_sets = dev_sets   # round 7's dev() reads its own dev_sets(): give it round 10's
     cmd, *a = sys.argv[1:]
-    {"build": build, "train": lambda: train(*a), "dev": lambda: dev(a)}[cmd]()
+    {"build": build, "train": lambda: train(*a), "dev": lambda: dev(a), "mark": lambda: mark(a)}[cmd]()

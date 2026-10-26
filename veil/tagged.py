@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import difflib
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -31,10 +32,29 @@ LABELS = {"name": "NAME", "street address": "ADDRESS", "city": "ADDRESS", "postc
           "email address": "EMAIL", "phone number": "PHONE", "ssn": "SSN", "account number": "ACCOUNT",
           "credit card number": "ACCOUNT", "iban": "ACCOUNT", "swift code": "ACCOUNT", "date of birth": "DOB",
           "customer id": "ID", "employee id": "ID", "username": "ID", "passport number": "ID",
-          "driver license number": "ID", "tax id": "ID",
-          # from round 10 on (benchmarks/judged/PROTOCOL.md): secrets, under veil's ID placeholder
-          "password or access code": "ID", "api key": "ID"}
+          "driver license number": "ID", "tax id": "ID"}
+# Secrets, from round 10 on (benchmarks/judged/PROTOCOL.md), under veil's ID placeholder.  Asked for only of a model
+# whose gliner_config.json lists them under "veil_labels", as one trained on them does: GLiNER reads every label's name
+# with the text, so asking a model for labels it wasn't trained on can move its scores for the rest.
+SECRET_LABELS = {"password or access code": "ID", "api key": "ID"}
 _WORD = re.compile(r"\w+")   # the words the benchmarks score by
+
+
+def model_labels(config: dict) -> dict[str, str]:
+    """What a model with this gliner_config.json is asked to find: LABELS, and the SECRET_LABELS it lists under
+    "veil_labels"."""
+    trained = set(config.get("veil_labels", ()))
+    return {**LABELS, **{k: v for k, v in SECRET_LABELS.items() if k in trained}}
+
+
+def _config(folder_or_repo: str) -> dict:
+    """A model's gliner_config.json, from its folder or its Hugging Face repo."""
+    path = os.path.join(folder_or_repo, "gliner_config.json")
+    if not os.path.isfile(path):
+        from huggingface_hub import hf_hub_download
+        path = hf_hub_download(folder_or_repo, "gliner_config.json")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
 @dataclass(frozen=True)
@@ -130,6 +150,7 @@ class TaggedRedactor:
         self.model_name, self.threshold, self.system, self.profile = model, threshold, system, profile
         self.batch_size = batch_size
         self._model = None
+        self.labels = LABELS   # what the model is asked to find; set from its gliner_config.json as it loads
 
     def _load(self):
         if self._model is None:
@@ -141,10 +162,12 @@ class TaggedRedactor:
                     folder = snapshot_download(folder, allow_patterns=["gliner_config.json", "tokenizer.json",
                                                                        "tokenizer_config.json", onnx_file])
                 self._model = OnnxTagger(folder, onnx_file)
+                self.labels = model_labels(_config(folder))
             else:
                 from gliner import GLiNER
                 self._model = GLiNER.from_pretrained(self.model_name)
                 self._model.eval()
+                self.labels = model_labels(_config(self.model_name))
         return self._model
 
     def model_spans(self, texts: list[str], threshold: float | None = None) -> list[list[tuple[int, int, str, float]]]:
@@ -156,9 +179,10 @@ class TaggedRedactor:
         with _inference_mode(m):
             for b in range(0, len(pieces), self.batch_size):
                 batch = pieces[b:b + self.batch_size]
-                ents = m.batch_predict_entities([p for _, _, p in batch], list(LABELS), threshold=th)
+                ents = m.batch_predict_entities([p for _, _, p in batch], list(self.labels), threshold=th)
                 for (i, off, _), es in zip(batch, ents):
-                    found[i] += [(off + e["start"], off + e["end"], LABELS[e["label"]], round(e["score"], 3)) for e in es]
+                    found[i] += [(off + e["start"], off + e["end"], self.labels[e["label"]], round(e["score"], 3))
+                                 for e in es]
         return [sorted(f) for f in found]
 
     def find(self, text: str) -> list[Span]:
