@@ -6,9 +6,11 @@ round 10's model is chosen and frozen.  Three steps, in this order:
     python benchmarks/score_locked3.py score                                     once, after every verdict is in
 
 The folder (--dir, judged/locked3 by default) holds the written conversations (W01.jsonl to W10.jsonl, WRITERS.md's
-format), the WildChat draw (wildchat.jsonl: {"id", "redacted", "messages": [user turns]}) and, for the second
-labeller, relabel.jsonl (15 written conversations marked again from scratch, as WRITERS.md asks, with "file" and
-"line" naming the conversation).  Only user messages are read.
+format) and, for the second labeller, relabel.jsonl (15 written conversations marked again from scratch, as WRITERS.md
+asks, with "file" and "line" naming the conversation).  The WildChat half is read from --wildchat
+($VEIL_BENCH_DATA/locked3_wildchat.jsonl, made by locked3_draw.py: {"id", "redacted", "messages", "spans"}, the spans
+the made-up details put in Presidio's markers, which count as details as a writer's marks do).  Only user messages
+are read.
 
 Systems, each one message at a time and over the whole conversation (its user messages joined by a blank line, as
 pii_trace.SEP), the spans of the joined text mapped back to each message:
@@ -39,6 +41,7 @@ models are scored on both labellings.  It writes scores.json."""
 import argparse
 import glob
 import json
+import os
 import random
 import re
 import sys
@@ -54,6 +57,7 @@ import train_wider as W  # noqa: E402
 from veil import GENERIC, tagged  # noqa: E402
 
 DIR = Path(__file__).resolve().parent / "judged" / "locked3"
+WILDCHAT = Path(os.environ.get("VEIL_BENCH_DATA", Path(__file__).resolve().parent / "data")) / "locked3_wildchat.jsonl"
 MODES = ("one message", "whole conversation")
 SEED = 0
 _WORD = re.compile(r"\w+")
@@ -63,7 +67,7 @@ for _lab in tagged.SECRET_LABELS:   # round 10's labels, in the writers' marks a
 
 # -- the conversations ----------------------------------------------------------------------------------------------
 
-def load(d):
+def load(d, wildchat=WILDCHAT):
     """[{"id", "part", "users": [text], "marks": [[(start, end, label)] per message]}]: written, then WildChat."""
     convs = []
     for f in sorted(glob.glob(str(d / "W[0-9][0-9].jsonl"))):
@@ -72,13 +76,12 @@ def load(d):
                 msgs = [W.unmark(m) for m in json.loads(line)["messages"]]
                 convs.append({"id": f"{Path(f).stem}:{i}", "part": "written", "users": [t for t, _ in msgs],
                               "marks": [s for _, s in msgs]})
-    path = d / "wildchat.jsonl"
-    if path.exists():
-        for line in open(path, encoding="utf-8"):
+    if Path(wildchat).exists():
+        for line in open(wildchat, encoding="utf-8"):
             if line.strip():
                 r = json.loads(line)
                 convs.append({"id": f"wildchat:{r['id']}", "part": "wildchat", "users": r["messages"],
-                              "marks": [[] for _ in r["messages"]]})
+                              "marks": [[tuple(x) for x in sp] for sp in r.get("spans", [[] for _ in r["messages"]])]})
     return convs
 
 
@@ -314,8 +317,8 @@ def bootstrap(per, systems, pairs, n=2000):
     return {k: {"found": ci([x for x, _ in v]), "over": ci([y for _, y in v])} for k, v in draws.items()}
 
 
-def score(d):
-    convs = load(d)
+def score(d, wildchat=WILDCHAT):
+    convs = load(d, wildchat)
     runs = json.load(open(d / "runs.json"))
     verdict = verdicts(d)
     systems = list(next(iter(runs.values())))
@@ -395,6 +398,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("step", choices=("run", "agree", "score"))
     ap.add_argument("--dir", type=Path, default=DIR)
+    ap.add_argument("--wildchat", type=Path, default=WILDCHAT)
     ap.add_argument("--round7", default=tagged.MODEL)
     ap.add_argument("--round10")
     ap.add_argument("--th7", type=float, default=tagged.THRESHOLD)
@@ -403,7 +407,7 @@ def main():
     if a.step == "run":
         if not a.round10:
             ap.error("run needs --round10, the frozen round 10 model")
-        convs = load(a.dir)
+        convs = load(a.dir, a.wildchat)
         print(f"{sum(c['part'] == 'written' for c in convs)} written and {sum(c['part'] == 'wildchat' for c in convs)} "
               f"WildChat conversations, {sum(len(c['users']) for c in convs)} user messages")
         runs = run_systems(convs, a.round7, a.th7, a.round10, a.th10)
@@ -420,7 +424,7 @@ def main():
         json.dump({"spans": len(pairs), "verdicts": [raw, k], "five": [fraw, fk], "personal": [braw, bk]},
                   open(a.dir / "agreement.json", "w"), indent=1)
     else:
-        score(a.dir)
+        score(a.dir, a.wildchat)
 
 
 if __name__ == "__main__":
