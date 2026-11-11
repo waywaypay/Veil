@@ -199,6 +199,48 @@ refused with `ValueError` before anything in it is read, by `read_text`,
 `redact_docx` and `restore_docx` alike. The limits are
 `veil.files.DOCX_MAX_UNPACKED` and `DOCX_MAX_PARTS`, if you need to raise them.
 
+## Run it as a gateway
+
+`veil.gateway` is a small server that speaks the Anthropic Messages API and
+OpenAI's Chat Completions API, so an app or tool that can change its API base
+URL gets veil without code changes. It uses only the standard library.
+
+```
+python -m veil.gateway --profile finance --port 8787 --restore-tool add_member
+```
+
+```python
+client = anthropic.Anthropic(base_url="http://127.0.0.1:8787")   # your API key goes through as usual
+client = openai.OpenAI(base_url="http://127.0.0.1:8787/v1")
+```
+
+Each `POST /v1/messages` is redacted as `wrap` would redact it and sent on to
+Anthropic; each `POST /v1/chat/completions` is redacted by
+`veil.openai.ChatSession` and sent on to OpenAI, or to another provider's
+compatible API with `--openai-upstream`. The reply's text comes back with the
+real values. Tool calls
+get real values only for the tools named with `--restore-tool` (repeat it), or
+every tool with `--restore-all-tools`. `POST /v1/messages/count_tokens` is
+redacted and sent on too, and `GET /healthz` answers `{"ok": true}`; nothing
+else is served.
+
+Every request carries the whole conversation, so each gets a fresh redactor:
+the same text gets the same placeholders on every turn, and nothing is kept
+between requests. The client's own `x-api-key` or `Authorization` header is
+passed on, with `anthropic-version` and `anthropic-beta` to Anthropic and
+`OpenAI-Organization` and `OpenAI-Project` to OpenAI; the gateway holds no key. It listens on 127.0.0.1 unless `--host` says otherwise, and logs only
+each request's method, path and status.
+
+As with `wrap`, a request veil can't send safely is refused with a 400 and
+nothing is sent: `stream: true` (not supported yet), images and PDFs unless
+`--files read` or `--files send`, MCP servers, and unknown content blocks.
+OpenAI's Responses API isn't served yet. `--upstream` sends Anthropic requests
+somewhere other than `https://api.anthropic.com`.
+
+Without the gateway, `veil.openai.ChatSession` does the same for a Chat
+Completions request and reply in your own code: `redact_request(body)` before
+you send it, `restore_response(reply)` after.
+
 ## Use it with anything else
 
 ```python
